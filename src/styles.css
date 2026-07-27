@@ -146,3 +146,16 @@
     color: var(--color-foreground);
   }
 }
+
+@theme inline {
+  --color-success: var(--success);
+}
+
+@utility app-gradient {
+  background-image: var(--gradient-app);
+  background-attachment: fixed;
+}
+
+@utility card-soft {
+  box-shadow: var(--shadow-card);
+}
