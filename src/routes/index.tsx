@@ -128,6 +128,8 @@ function CatalogPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  // Al cambiar de catálogo la selección múltiple se limpia.
+  useEffect(() => setSelectedIds([]), [catalogId]);
   const setCategoryFilter = (categoryFilter: string) => setPrefs({ categoryFilter });
   const setOnlyActive = (onlyActive: boolean) => setPrefs({ onlyActive });
   const setOnlyFavorites = (onlyFavorites: boolean) => setPrefs({ onlyFavorites });
