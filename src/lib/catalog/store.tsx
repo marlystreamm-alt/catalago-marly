@@ -35,13 +35,20 @@ const newId = () =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-const entry = (action: LogAction, target: string, summary: string): LogEntry => ({
+const entry = (
+  action: LogAction,
+  target: string,
+  summary: string,
+  user = "Administrador",
+): LogEntry => ({
   id: newId(),
   at: new Date().toISOString(),
   action,
   target,
   summary,
+  user,
 });
+
 
 interface StoreValue {
   state: AppState;
