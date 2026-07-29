@@ -84,6 +84,8 @@ interface StoreValue {
   saveSubsection: (categoryId: string, sub: { id?: string; name: string }) => void;
   deleteSubsection: (categoryId: string, subId: string) => void;
   clearLog: () => void;
+  auditLog: (LogEntry & { catalogId: CatalogId; catalogName: string })[];
+
   exportBackup: () => void;
   importBackup: (json: string) => boolean;
   resetAll: () => void;
