@@ -466,6 +466,7 @@ function CatalogPage() {
               aria-label="Buscar servicio"
             />
           </div>
+          {isAdmin ? (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Filtrar por categoría">
