@@ -74,7 +74,11 @@ export function normalizeState(raw: unknown): AppState {
             target: String(e.target ?? ""),
             summary: String(e.summary ?? ""),
             user: typeof e.user === "string" && e.user.trim() ? e.user : "Administrador",
+            field: typeof e.field === "string" ? e.field : undefined,
+            before: typeof e.before === "string" ? e.before : undefined,
+            after: typeof e.after === "string" ? e.after : undefined,
           }))
+
         : [],
     };
   }

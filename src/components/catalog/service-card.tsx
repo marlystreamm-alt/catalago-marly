@@ -1,19 +1,24 @@
-import { Copy, Eye, EyeOff, MessageCircle, Pencil, Star, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, Info, Link2, MessageCircle, Pencil, Star, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
+import { buildServiceLink } from "@/lib/catalog/links";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
 import type { Service } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
+
 export function ServiceCard({
   service,
   onEdit,
+  onOpenDetail,
 }: {
   service: Service;
   onEdit: (service: Service) => void;
+  onOpenDetail?: (id: string) => void;
 }) {
   const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
     useCatalogStore();
@@ -21,6 +26,7 @@ export function ServiceCard({
   const { enqueue } = useOrderQueue();
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
+
 
   const meta = [
     service.devices ? `${service.devices} disp.` : null,
@@ -96,6 +102,31 @@ export function ServiceCard({
             Guardar pedido (sin conexión)
           </Button>
         )}
+
+        <div className="flex flex-wrap gap-1.5">
+          {onOpenDetail ? (
+            <Button variant="outline" size="sm" onClick={() => onOpenDetail(service.id)}>
+              <Info className="size-4" />
+              Ver detalle
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const url = buildServiceLink(catalog.id, service.id);
+              navigator.clipboard
+                .writeText(url)
+                .then(() => toast.success("Enlace del servicio copiado"))
+                .catch(() => toast.error("No se pudo copiar el enlace"));
+            }}
+          >
+            <Link2 className="size-4" />
+            Compartir
+          </Button>
+        </div>
+
+
 
         {isAdmin ? (
           <div className="flex flex-wrap gap-1.5">

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
+import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
 import { LOG_LABELS, type LogAction } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
@@ -37,7 +37,35 @@ const formatDate = (iso: string) => {
   });
 };
 
-const LOG_HEADERS = ["Fecha", "Usuario", "Catálogo", "Acción", "Elemento", "Resumen"];
+/** Muestra el valor anterior y el nuevo cuando la acción los registró. */
+function ChangeDiff({ entry }: { entry: { field?: string; before?: string; after?: string } }) {
+  if (!entry.field || (entry.before === undefined && entry.after === undefined)) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="font-semibold text-muted-foreground">{entry.field}:</span>
+      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-destructive line-through">
+        {entry.before || "—"}
+      </span>
+      <span className="text-muted-foreground">→</span>
+      <span className="rounded-md bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+        {entry.after || "—"}
+      </span>
+    </div>
+  );
+}
+
+const LOG_HEADERS = [
+
+  "Fecha",
+  "Usuario",
+  "Catálogo",
+  "Acción",
+  "Elemento",
+  "Resumen",
+  "Campo",
+  "Valor anterior",
+  "Valor nuevo",
+];
 
 export function HistoryDialog({
   open,
@@ -63,8 +91,24 @@ export function HistoryDialog({
         LOG_LABELS[e.action],
         e.target,
         e.summary,
+        e.field ?? "",
+        e.before ?? "",
+        e.after ?? "",
       ]),
     [entries, catalog.name],
+  );
+
+  const meta = useMemo(
+    () =>
+      buildMeta([
+        { label: "Catálogo", value: catalog.name },
+        {
+          label: "Filtro de acción",
+          value: filter === ALL ? "Todos los movimientos" : LOG_LABELS[filter as LogAction],
+        },
+        { label: "Movimientos exportados", value: String(entries.length) },
+      ]),
+    [catalog.name, filter, entries.length],
   );
 
   if (!isAdmin) return null;
@@ -102,7 +146,7 @@ export function HistoryDialog({
             size="sm"
             disabled={!rows.length}
             onClick={() => {
-              downloadCsv(`ma2-historial-${catalog.id}-${stamp()}`, LOG_HEADERS, rows);
+              downloadCsv(`ma2-historial-${catalog.id}-${stamp()}`, LOG_HEADERS, rows, meta);
               toast.success("Historial exportado en CSV");
             }}
           >
@@ -116,9 +160,10 @@ export function HistoryDialog({
             onClick={() => {
               const ok = printPdf(
                 `Historial · ${catalog.name}`,
-                `${rows.length} movimiento(s) · generado el ${formatDate(new Date().toISOString())}`,
+                `${rows.length} movimiento(s) · generado el ${formatStamp()}`,
                 LOG_HEADERS,
                 rows,
+                meta,
               );
               if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
             }}
@@ -127,6 +172,7 @@ export function HistoryDialog({
             Exportar PDF
           </Button>
         </div>
+
 
         <div className="grid gap-2">
           {entries.length === 0 ? (
@@ -142,6 +188,8 @@ export function HistoryDialog({
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
                 <p className="text-sm text-muted-foreground">{e.summary}</p>
+                <ChangeDiff entry={e} />
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   Por {e.user ?? "Administrador"} · {catalog.name}
                 </p>
@@ -249,9 +297,32 @@ export function AuditDialog({
         LOG_LABELS[e.action],
         e.target,
         e.summary,
+        e.field ?? "",
+        e.before ?? "",
+        e.after ?? "",
       ]),
     [entries],
   );
+
+  const meta = useMemo(
+    () =>
+      buildMeta([
+        {
+          label: "Catálogo",
+          value:
+            scope === ALL
+              ? "Todos los catálogos"
+              : (state.catalogs[scope as keyof typeof state.catalogs]?.name ?? scope),
+        },
+        {
+          label: "Filtro de acción",
+          value: action === ALL ? "Todas las acciones" : LOG_LABELS[action as LogAction],
+        },
+        { label: "Movimientos exportados", value: String(entries.length) },
+      ]),
+    [scope, action, entries.length, state.catalogs],
+  );
+
 
   if (!isAdmin) return null;
 
@@ -303,7 +374,7 @@ export function AuditDialog({
             size="sm"
             disabled={!rows.length}
             onClick={() => {
-              downloadCsv(`ma2-auditoria-${stamp()}`, LOG_HEADERS, rows);
+              downloadCsv(`ma2-auditoria-${stamp()}`, LOG_HEADERS, rows, meta);
               toast.success("Bitácora exportada en CSV");
             }}
           >
@@ -317,10 +388,12 @@ export function AuditDialog({
             onClick={() => {
               const ok = printPdf(
                 "Bitácora de auditoría MA²",
-                `${rows.length} movimiento(s) · generado el ${formatDate(new Date().toISOString())}`,
+                `${rows.length} movimiento(s) · generado el ${formatStamp()}`,
                 LOG_HEADERS,
                 rows,
+                meta,
               );
+
               if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
             }}
           >
@@ -349,6 +422,8 @@ export function AuditDialog({
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
                 <p className="text-sm text-muted-foreground">{e.summary}</p>
+                <ChangeDiff entry={e} />
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   Por {e.user ?? "Administrador"}
                 </p>
