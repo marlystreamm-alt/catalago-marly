@@ -541,8 +541,9 @@ function CatalogPage() {
               </div>
             ) : null}
           </div>
+          ) : null}
 
-          {activeFilters.length ? (
+          {isAdmin && activeFilters.length ? (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {activeFilters.map((f) => (
                 <Badge key={f.key} variant="secondary" className="gap-1">
