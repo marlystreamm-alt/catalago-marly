@@ -445,13 +445,15 @@ function CatalogPage() {
 
         <PendingOrdersBar />
 
-        <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
-          <StatCard label="Total" value={stats.total} />
-          <StatCard label="Activos" value={stats.activos} />
-          <StatCard label="Categorías" value={stats.categorias} />
-          <StatCard label="Ocultos" value={stats.ocultos} />
-          <StatCard label="Favoritos" value={stats.favoritos} />
-        </section>
+        {isAdmin ? (
+          <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
+            <StatCard label="Total" value={stats.total} />
+            <StatCard label="Activos" value={stats.activos} />
+            <StatCard label="Categorías" value={stats.categorias} />
+            <StatCard label="Ocultos" value={stats.ocultos} />
+            <StatCard label="Favoritos" value={stats.favoritos} />
+          </section>
+        ) : null}
 
         <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
           <div className="relative">
