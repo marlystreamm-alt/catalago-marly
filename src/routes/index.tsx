@@ -90,6 +90,20 @@ export const Route = createFileRoute("/")({
 
 const ALL = ALL_CATEGORIES;
 
+const SEARCH_HEADERS = [
+  "Servicio",
+  "Precio MXN",
+  "Categoría",
+  "Subsección",
+  "Descripción",
+  "Dispositivos",
+  "Perfiles",
+  "Entrega",
+  "Garantía",
+  "Estado",
+  "Favorito",
+];
+
 function CatalogPage() {
   const {
     state,
@@ -241,6 +255,30 @@ function CatalogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, categoryFilter, onlyFavorites, onlyActive, sortMode, isAdmin, catalog]);
 
+  const searchRows = useMemo(
+    () =>
+      sorted.map((s) => [
+        s.name,
+        s.price,
+        catalog.categories.find((c) => c.id === s.categoryId)?.name ?? "",
+        catalog.categories
+          .find((c) => c.id === s.categoryId)
+          ?.subsections.find((x) => x.id === s.subsectionId)?.name ?? "",
+        s.description,
+        s.devices,
+        s.profiles,
+        s.delivery,
+        s.warranty,
+        s.active ? "Activo" : "Oculto",
+        s.favorite ? "Sí" : "No",
+      ]),
+    [sorted, catalog],
+  );
+
+  const filtersSummary = activeFilters.length
+    ? activeFilters.map((f) => f.label).join(" · ")
+    : "Sin filtros aplicados";
+
   const openNew = () => {
     setEditing(null);
     setFormOpen(true);
@@ -299,6 +337,8 @@ function CatalogPage() {
             </span>
           </div>
         ) : null}
+
+        <PendingOrdersBar />
 
         <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
           <StatCard label="Total" value={stats.total} />
@@ -393,6 +433,42 @@ function CatalogPage() {
             </div>
           ) : null}
 
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+            <Button size="sm" variant="outline" onClick={shareLink}>
+              <Link2 className="size-4" />
+              Compartir enlace con filtros
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!sorted.length}
+              onClick={() => {
+                downloadCsv(`ma2-busqueda-${catalogId}-${stamp()}`, SEARCH_HEADERS, searchRows);
+                toast.success("Búsqueda exportada en CSV");
+              }}
+            >
+              <FileDown className="size-4" />
+              Exportar búsqueda CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!sorted.length}
+              onClick={() => {
+                const ok = printPdf(
+                  `${catalog.name} · Búsqueda`,
+                  `${sorted.length} servicio(s) · ${filtersSummary}`,
+                  SEARCH_HEADERS,
+                  searchRows,
+                );
+                if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+              }}
+            >
+              <FileText className="size-4" />
+              Exportar búsqueda PDF
+            </Button>
+          </div>
+
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
               <Button size="sm" onClick={openNew}>
@@ -410,6 +486,10 @@ function CatalogPage() {
               <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" />
                 Historial
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
+                <ShieldCheck className="size-4" />
+                Bitácora
               </Button>
               <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
                 <Settings2 className="size-4" />
@@ -468,6 +548,7 @@ function CatalogPage() {
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
+      <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
     </main>
   );
 }
