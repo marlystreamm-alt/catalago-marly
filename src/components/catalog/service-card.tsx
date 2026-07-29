@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, MessageCircle, Pencil, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, MessageCircle, Pencil, Star, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCatalogStore } from "@/lib/catalog/store";
@@ -13,7 +13,8 @@ export function ServiceCard({
   service: Service;
   onEdit: (service: Service) => void;
 }) {
-  const { catalog, isAdmin, duplicateService, deleteService, toggleService } = useCatalogStore();
+  const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
+    useCatalogStore();
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
 
@@ -35,7 +36,20 @@ export function ServiceCard({
             {!service.active ? <Badge variant="destructive">Oculto</Badge> : null}
           </div>
         </div>
-        <p className="shrink-0 text-lg font-bold text-primary">{formatMXN(service.price)}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          <p className="text-lg font-bold text-primary">{formatMXN(service.price)}</p>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-pressed={service.favorite}
+            aria-label={service.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
+            onClick={() => toggleFavorite(service.id)}
+          >
+            <Star
+              className={`size-5 ${service.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
+            />
+          </Button>
+        </div>
       </div>
 
       {service.description ? (
