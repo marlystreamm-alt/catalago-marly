@@ -45,7 +45,6 @@ import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog"
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
 import { ServiceTable } from "@/components/catalog/service-table";
 
-
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
@@ -65,7 +64,6 @@ const searchSchema = z.object({
   /** Servicio específico: abre su detalle listo para pedir por WhatsApp. */
   svc: fallback(z.string(), "").default(""),
 });
-
 
 export const Route = createFileRoute("/")({
   validateSearch: zodValidator(searchSchema),
@@ -225,7 +223,6 @@ function CatalogPage() {
       .catch(() => toast.error("No se pudo copiar el enlace"));
   };
 
-
   const stats = useMemo(() => {
     const total = catalog.services.length;
     const activos = catalog.services.filter((s) => s.active).length;
@@ -380,7 +377,6 @@ function CatalogPage() {
     ],
   );
 
-
   const openNew = () => {
     setEditing(null);
     setFormOpen(true);
@@ -405,7 +401,6 @@ function CatalogPage() {
             </div>
             <AdminBar />
           </div>
-
 
           <nav
             className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
@@ -467,80 +462,80 @@ function CatalogPage() {
             />
           </div>
           {isAdmin ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Filtrar por categoría">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Todas las categorías</SelectItem>
-                {catalog.categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-              <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Ordenar servicios">
-                <ArrowUpDown className="size-4 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="categoria">Por categoría</SelectItem>
-                <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
-                <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={viewMode}
-              onValueChange={(v) => setPrefs({ viewMode: v as "tarjetas" | "tabla" })}
-            >
-              <SelectTrigger className="flex-1 min-w-[9rem]" aria-label="Vista del catálogo">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tarjetas">Vista tarjetas</SelectItem>
-                <SelectItem value="tabla">Vista tabla</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Filtrar por categoría">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas las categorías</SelectItem>
+                  {catalog.categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+                <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Ordenar servicios">
+                  <ArrowUpDown className="size-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="categoria">Por categoría</SelectItem>
+                  <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
+                  <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={viewMode}
+                onValueChange={(v) => setPrefs({ viewMode: v as "tarjetas" | "tabla" })}
+              >
+                <SelectTrigger className="flex-1 min-w-[9rem]" aria-label="Vista del catálogo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tarjetas">Vista tarjetas</SelectItem>
+                  <SelectItem value="tabla">Vista tabla</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <div className="flex items-center gap-2">
-              <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
-              <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
-                <Star className="size-3.5" />
-                Favoritos
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="show-detail"
-                checked={showDetail}
-                onCheckedChange={(v) => setPrefs({ showDetail: v })}
-              />
-              <Label htmlFor="show-detail" className="text-sm">
-                Ver detalles
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="show-share"
-                checked={showShare}
-                onCheckedChange={(v) => setPrefs({ showShare: v })}
-              />
-              <Label htmlFor="show-share" className="text-sm">
-                Compartir
-              </Label>
-            </div>
-            {isAdmin ? (
               <div className="flex items-center gap-2">
-                <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
-                <Label htmlFor="only-active" className="text-sm">
-                  Solo activos
+                <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
+                <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
+                  <Star className="size-3.5" />
+                  Favoritos
                 </Label>
               </div>
-            ) : null}
-          </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-detail"
+                  checked={showDetail}
+                  onCheckedChange={(v) => setPrefs({ showDetail: v })}
+                />
+                <Label htmlFor="show-detail" className="text-sm">
+                  Ver detalles
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-share"
+                  checked={showShare}
+                  onCheckedChange={(v) => setPrefs({ showShare: v })}
+                />
+                <Label htmlFor="show-share" className="text-sm">
+                  Compartir
+                </Label>
+              </div>
+              {isAdmin ? (
+                <div className="flex items-center gap-2">
+                  <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
+                  <Label htmlFor="only-active" className="text-sm">
+                    Solo activos
+                  </Label>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           {isAdmin && activeFilters.length ? (
@@ -572,48 +567,48 @@ function CatalogPage() {
           ) : null}
 
           {isAdmin ? (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-            <Button size="sm" variant="outline" onClick={shareLink}>
-              <Link2 className="size-4" />
-              Compartir enlace con filtros
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!sorted.length}
-              onClick={() => {
-                downloadCsv(
-                  `ma2-busqueda-${catalogId}-${stamp()}`,
-                  SEARCH_HEADERS,
-                  searchRows,
-                  exportMeta,
-                );
-                toast.success("Búsqueda exportada en CSV");
-              }}
-            >
-              <FileDown className="size-4" />
-              Exportar búsqueda CSV
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!sorted.length}
-              onClick={() => {
-                const ok = printPdf(
-                  `${catalog.name} · Búsqueda`,
-                  `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
-                  SEARCH_HEADERS,
-                  searchRows,
-                  exportMeta,
-                );
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+              <Button size="sm" variant="outline" onClick={shareLink}>
+                <Link2 className="size-4" />
+                Compartir enlace con filtros
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!sorted.length}
+                onClick={() => {
+                  downloadCsv(
+                    `ma2-busqueda-${catalogId}-${stamp()}`,
+                    SEARCH_HEADERS,
+                    searchRows,
+                    exportMeta,
+                  );
+                  toast.success("Búsqueda exportada en CSV");
+                }}
+              >
+                <FileDown className="size-4" />
+                Exportar búsqueda CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!sorted.length}
+                onClick={() => {
+                  const ok = printPdf(
+                    `${catalog.name} · Búsqueda`,
+                    `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
+                    SEARCH_HEADERS,
+                    searchRows,
+                    exportMeta,
+                  );
 
-                if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
-              }}
-            >
-              <FileText className="size-4" />
-              Exportar búsqueda PDF
-            </Button>
-          </div>
+                  if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+                }}
+              >
+                <FileText className="size-4" />
+                Exportar búsqueda PDF
+              </Button>
+            </div>
           ) : null}
 
           {isAdmin ? (
@@ -672,7 +667,6 @@ function CatalogPage() {
                     showShare={showShare}
                   />
                 ))}
-
               </div>
             )
           ) : grouped.length === 0 ? (
@@ -708,7 +702,6 @@ function CatalogPage() {
                           showShare={showShare}
                         />
                       ))}
-
                     </div>
                   </div>
                 ))}
@@ -723,7 +716,6 @@ function CatalogPage() {
         />
       </div>
 
-
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
@@ -737,7 +729,6 @@ function CatalogPage() {
           if (!v) setDetailId(null);
         }}
       />
-
     </main>
   );
 }
