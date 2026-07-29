@@ -5,7 +5,6 @@ import { useCatalogStore } from "@/lib/catalog/store";
 import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
-import { toast } from "sonner";
 import type { Service } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
