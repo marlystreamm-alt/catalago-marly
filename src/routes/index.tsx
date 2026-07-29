@@ -160,7 +160,6 @@ function CatalogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, catalogId]);
 
-
   const shareLink = () => {
     const params = new URLSearchParams({ cat: catalogId });
     if (query.trim()) params.set("q", query.trim());
