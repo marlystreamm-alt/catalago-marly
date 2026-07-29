@@ -131,13 +131,24 @@ function CatalogPage() {
 
   // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
   const search = Route.useSearch();
-  const applied = useRef(false);
+  const targetCatalog =
+    search.cat && (CATALOG_IDS as string[]).includes(search.cat) ? (search.cat as CatalogId) : null;
+  const appliedCatalog = useRef(false);
+  const appliedPrefs = useRef(false);
+
   useEffect(() => {
-    if (applied.current || !hydrated) return;
-    applied.current = true;
-    if (search.cat && (CATALOG_IDS as string[]).includes(search.cat))
-      setCatalogId(search.cat as CatalogId);
+    if (appliedCatalog.current || !hydrated) return;
+    appliedCatalog.current = true;
+    if (targetCatalog) setCatalogId(targetCatalog);
     if (search.q) setQuery(search.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
+  // Las preferencias se aplican cuando el catálogo del enlace ya está activo.
+  useEffect(() => {
+    if (appliedPrefs.current || !hydrated) return;
+    if (targetCatalog && catalogId !== targetCatalog) return;
+    appliedPrefs.current = true;
     const patch: Partial<typeof prefs> = {};
     if (search.categoria) patch.categoryFilter = search.categoria;
     if (search.activos) patch.onlyActive = search.activos === "1";
@@ -146,7 +157,8 @@ function CatalogPage() {
       patch.sortMode = search.orden as SortMode;
     if (Object.keys(patch).length) setPrefs(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated]);
+  }, [hydrated, catalogId]);
+
 
   const shareLink = () => {
     const params = new URLSearchParams({ cat: catalogId });
