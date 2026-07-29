@@ -124,12 +124,29 @@ function CatalogPage() {
 
   const online = useOnline();
   const [query, setQuery] = useState("");
-  const { categoryFilter, onlyActive, onlyFavorites, sortMode } = prefs;
+  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare } = prefs;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const toggleSelect = (id: string) =>
+  // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
+  const [snapshots, setSnapshots] = useState<Record<string, number>>({});
+  const toggleSelect = (id: string) => {
+    const price = catalog.services.find((s) => s.id === id)?.price;
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSnapshots((prev) => {
+      const next = { ...prev };
+      if (selectedIds.includes(id)) delete next[id];
+      else if (typeof price === "number") next[id] = price;
+      return next;
+    });
+  };
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSnapshots({});
+  };
   // Al cambiar de catálogo la selección múltiple se limpia.
-  useEffect(() => setSelectedIds([]), [catalogId]);
+  useEffect(() => {
+    setSelectedIds([]);
+    setSnapshots({});
+  }, [catalogId]);
   const setCategoryFilter = (categoryFilter: string) => setPrefs({ categoryFilter });
   const setOnlyActive = (onlyActive: boolean) => setPrefs({ onlyActive });
   const setOnlyFavorites = (onlyFavorites: boolean) => setPrefs({ onlyFavorites });
@@ -475,6 +492,26 @@ function CatalogPage() {
                 Favoritos
               </Label>
             </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-detail"
+                checked={showDetail}
+                onCheckedChange={(v) => setPrefs({ showDetail: v })}
+              />
+              <Label htmlFor="show-detail" className="text-sm">
+                Ver detalles
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-share"
+                checked={showShare}
+                onCheckedChange={(v) => setPrefs({ showShare: v })}
+              />
+              <Label htmlFor="show-share" className="text-sm">
+                Compartir
+              </Label>
+            </div>
             {isAdmin ? (
               <div className="flex items-center gap-2">
                 <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
@@ -602,6 +639,8 @@ function CatalogPage() {
                     onOpenDetail={setDetailId}
                     selected={selectedIds.includes(service.id)}
                     onToggleSelect={toggleSelect}
+                    showDetail={showDetail}
+                    showShare={showShare}
                   />
                 ))}
 
