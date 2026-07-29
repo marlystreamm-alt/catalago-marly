@@ -25,6 +25,7 @@ interface OrderQueueValue {
   sendAll: () => void;
   sendOne: (id: string) => void;
   retryFailed: () => void;
+  importOrders: (list: PendingOrder[], mode: "merge" | "replace") => void;
   maxAttempts: number;
   setMaxAttempts: (value: number) => void;
   autoRetry: boolean;
@@ -241,6 +242,20 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
           return;
         }
         sendOrders(list);
+      },
+      importOrders: (list, mode) => {
+        if (!list.length) return;
+        setOrders((prev) => {
+          if (mode === "replace") return list;
+          const known = new Set(prev.map((o) => o.id));
+          const added = list.filter((o) => !known.has(o.id));
+          return [...added, ...prev];
+        });
+        toast.success(
+          mode === "replace"
+            ? `Historial restaurado con ${list.length} pedido(s)`
+            : `${list.length} pedido(s) revisados para importar`,
+        );
       },
       maxAttempts: config.maxAttempts,
       setMaxAttempts: (value) =>
