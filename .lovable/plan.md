@@ -1,36 +1,26 @@
 ## Objetivo
 
-Mostrar el catálogo como una tabla simple de "Plataforma / Precio", donde lo único editable es el precio.
+Cuando no hay sesión de administrador (modo público), dejar la pantalla limpia: solo el buscador de servicios y el listado. Todo lo marcado en rojo se oculta.
 
-## Qué se construye
+## Qué se oculta en modo público
 
-1. **Vista de tabla** por catálogo, con columnas:
-   - Plataforma (nombre + estrella de favorito + marca "oculto")
-   - Precio en MXN
-   - Acción (pedir por WhatsApp)
-   - Checkbox de selección, para reutilizar el pedido múltiple existente
+1. **Fila de estadísticas** (Total, Activos, Categorías, Ocultos, Favoritos).
+2. **Controles de la tarjeta de filtros**, dejando únicamente "Buscar servicio…":
+   - Selector de categorías
+   - Selector de orden (Por categoría / precio / nombre)
+   - Selector de vista (Tarjetas / Tabla)
+   - Interruptores Favoritos, Ver detalles, Compartir
+   - Chips de filtros activos y "Limpiar filtros"
+3. **Fila de acciones**: Compartir enlace con filtros, Exportar búsqueda CSV, Exportar búsqueda PDF.
 
-2. **Edición de precio en línea (solo administrador)**
-   - Se toca el precio y se convierte en un campo numérico; Enter o ✓ guarda, Esc cancela.
-   - Validación: número válido ≥ 0 en MXN; si falla, error visual y no guarda.
-   - El nombre y los demás campos NO se editan aquí (para eso sigue el formulario completo).
-   - Guarda con la misma función del store, así queda en historial y bitácora con precio anterior → nuevo.
-   - En modo público no aparece ningún control de edición: solo lectura.
-
-3. **Interruptor de vista** en la barra de filtros: "Tarjetas / Tabla", guardado en las preferencias por catálogo (localStorage), igual que orden y favoritos.
+En modo administrador todo sigue igual que hoy.
 
 ## Detalles técnicos
 
-```text
-src/components/catalog/service-table.tsx   (nuevo)  ← tabla + edición de precio en línea
-src/lib/catalog/prefs.ts                   ← nuevo campo viewMode: "tarjetas" | "tabla"
-src/routes/index.tsx                       ← selector de vista y render condicional
-```
-
-- La tabla usa `sorted`, que ya trae aplicados búsqueda, categoría, solo activos, favoritos y orden.
-- Reutiliza `saveService` y `buildWhatsappLink`; no se agrega lógica de negocio nueva.
-- Nota: quedó un cambio parcial en `src/routes/index.tsx` que referencia `viewMode` y `ServiceTable`; la implementación lo completa y deja el build limpio.
+- `src/routes/index.tsx`: envolver en `{isAdmin ? … : null}` la sección de estadísticas (líneas ~448-454), el bloque de selects/switches (~467-540), los chips de filtros (~542-568) y la barra de exportar/compartir (~570-611). El input de búsqueda queda siempre visible.
+- La lógica de filtrado no cambia: en público se usan los valores por defecto de preferencias (categoría = todas, favoritos apagado, vista según preferencia guardada) y solo se aplica `query`.
+- Nota: los enlaces públicos con parámetros (categoría, favoritos, servicio) siguen funcionando aunque los controles no se muestren.
 
 ## Prueba antes de terminar
 
-Cambiar a Tabla, entrar como administrador, editar un precio en línea, confirmar que se refleja en las tarjetas y en el historial, y abrir el enlace de WhatsApp desde una fila.
+Cerrar sesión de administrador y confirmar que solo aparece el buscador sobre el listado, sin estadísticas ni botones; luego entrar como administrador y verificar que todos los controles reaparecen.
