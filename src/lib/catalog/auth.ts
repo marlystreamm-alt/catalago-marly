@@ -183,3 +183,87 @@ export function validatePasswordStrength(password: string) {
   if (!/\d/.test(value)) return "Incluye al menos un número";
   return null;
 }
+
+/* ------------------------------------------------------------------ *
+ * Bloqueo temporal tras varios intentos fallidos.
+ * Se guarda en este dispositivo para frenar intentos por fuerza bruta.
+ * ------------------------------------------------------------------ */
+
+const LOCK_KEY = "ma2-auth-lock-v1";
+export const MAX_LOGIN_ATTEMPTS = 5;
+/** Duración del bloqueo según cuántas veces se ha bloqueado ya. */
+const LOCK_STEPS_MS = [30_000, 60_000, 300_000, 900_000];
+
+interface LockRecord {
+  fails: number;
+  locks: number;
+  until: number;
+}
+
+function readLock(): LockRecord {
+  if (!isBrowser()) return { fails: 0, locks: 0, until: 0 };
+  try {
+    const raw = window.localStorage.getItem(LOCK_KEY);
+    if (!raw) return { fails: 0, locks: 0, until: 0 };
+    const p = JSON.parse(raw) as Partial<LockRecord>;
+    return {
+      fails: Number(p.fails) || 0,
+      locks: Number(p.locks) || 0,
+      until: Number(p.until) || 0,
+    };
+  } catch {
+    return { fails: 0, locks: 0, until: 0 };
+  }
+}
+
+function writeLock(record: LockRecord) {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(LOCK_KEY, JSON.stringify(record));
+  } catch (error) {
+    console.error("No se pudo guardar el estado de bloqueo:", error);
+  }
+}
+
+export interface LockStatus {
+  locked: boolean;
+  remainingMs: number;
+  fails: number;
+  attemptsLeft: number;
+}
+
+export function getLockStatus(): LockStatus {
+  const rec = readLock();
+  const remaining = Math.max(0, rec.until - Date.now());
+  return {
+    locked: remaining > 0,
+    remainingMs: remaining,
+    fails: rec.fails,
+    attemptsLeft: Math.max(0, MAX_LOGIN_ATTEMPTS - rec.fails),
+  };
+}
+
+/** Registra un intento fallido y bloquea al superar el límite. */
+export function registerFailedAttempt(): LockStatus {
+  const rec = readLock();
+  const fails = rec.fails + 1;
+  if (fails >= MAX_LOGIN_ATTEMPTS) {
+    const locks = rec.locks + 1;
+    const ms = LOCK_STEPS_MS[Math.min(locks - 1, LOCK_STEPS_MS.length - 1)];
+    writeLock({ fails: 0, locks, until: Date.now() + ms });
+  } else {
+    writeLock({ ...rec, fails });
+  }
+  return getLockStatus();
+}
+
+export function clearFailedAttempts() {
+  writeLock({ fails: 0, locks: 0, until: 0 });
+}
+
+export function formatLockWait(ms: number) {
+  const total = Math.ceil(ms / 1000);
+  if (total < 60) return `${total} s`;
+  const min = Math.ceil(total / 60);
+  return `${min} min`;
+}
