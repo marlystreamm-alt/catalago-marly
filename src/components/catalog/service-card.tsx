@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
 import { useOnline } from "@/hooks/use-online";
+import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { toast } from "sonner";
 import type { Service } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
@@ -18,6 +19,7 @@ export function ServiceCard({
   const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
     useCatalogStore();
   const online = useOnline();
+  const { enqueue } = useOrderQueue();
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
 
@@ -80,16 +82,23 @@ export function ServiceCard({
             className="flex-1 min-w-[10rem]"
             onClick={async () => {
               const message = buildWhatsappMessage(service, catalog);
+              enqueue({
+                catalogId: catalog.id,
+                catalogName: catalog.name,
+                serviceName: service.name,
+                price: service.price,
+                message,
+                link: buildWhatsappLink(service, catalog),
+              });
               try {
                 await navigator.clipboard.writeText(message);
-                toast.success("Sin conexión: mensaje copiado para enviarlo después");
               } catch {
-                toast.error("Sin conexión: copia el mensaje manualmente");
+                /* el pedido ya quedó en la cola aunque no se pueda copiar */
               }
             }}
           >
             <MessageCircle className="size-4" />
-            Copiar pedido (sin conexión)
+            Guardar pedido (sin conexión)
           </Button>
         )}
 
