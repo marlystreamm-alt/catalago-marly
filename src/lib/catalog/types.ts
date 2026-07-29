@@ -23,6 +23,24 @@ export interface Service {
   delivery: string;
   warranty: string;
   active: boolean;
+  favorite: boolean;
+}
+
+export type LogAction =
+  | "creacion"
+  | "edicion"
+  | "estado"
+  | "eliminacion"
+  | "catalogo"
+  | "categoria"
+  | "sistema";
+
+export interface LogEntry {
+  id: string;
+  at: string;
+  action: LogAction;
+  target: string;
+  summary: string;
 }
 
 export interface Catalog {
@@ -31,8 +49,10 @@ export interface Catalog {
   subtitle: string;
   whatsappNumber: string;
   whatsappTemplate: string;
+  hidden: boolean;
   categories: Category[];
   services: Service[];
+  log: LogEntry[];
 }
 
 export interface AppState {
@@ -41,6 +61,20 @@ export interface AppState {
 }
 
 export const CATALOG_IDS: CatalogId[] = ["clientes", "cyberdoc", "revendedores"];
+
+export const LOG_LABELS: Record<LogAction, string> = {
+  creacion: "Creación",
+  edicion: "Edición",
+  estado: "Activación",
+  eliminacion: "Eliminación",
+  catalogo: "Catálogo",
+  categoria: "Categorías",
+  sistema: "Sistema",
+};
+
+export const MAX_LOG_ENTRIES = 200;
+
+export type SortMode = "categoria" | "precio" | "nombre";
 
 export const DEFAULT_TEMPLATE =
   "Hola, me interesa {servicio} por {precio}. Detalles: {detalles}";
