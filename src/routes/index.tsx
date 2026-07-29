@@ -52,8 +52,9 @@ const searchSchema = z.object({
   cat: fallback(z.string(), "").default(""),
   q: fallback(z.string(), "").default(""),
   categoria: fallback(z.string(), "").default(""),
-  activos: fallback(z.string(), "").default(""),
-  fav: fallback(z.string(), "").default(""),
+  // Los valores llegan como número (1/0) desde la URL, por eso se convierten a texto.
+  activos: fallback(z.coerce.string(), "").default(""),
+  fav: fallback(z.coerce.string(), "").default(""),
   orden: fallback(z.string(), "").default(""),
 });
 
@@ -155,7 +156,6 @@ function CatalogPage() {
     if (search.fav) patch.onlyFavorites = search.fav === "1";
     if (["categoria", "precio", "nombre"].includes(search.orden))
       patch.sortMode = search.orden as SortMode;
-    console.log("DBG patch", JSON.stringify(patch));
     if (Object.keys(patch).length) setPrefs(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, catalogId]);
