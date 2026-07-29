@@ -614,6 +614,7 @@ function CatalogPage() {
               Exportar búsqueda PDF
             </Button>
           </div>
+          ) : null}
 
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
