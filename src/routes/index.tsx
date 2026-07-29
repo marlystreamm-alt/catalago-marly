@@ -126,7 +126,9 @@ function CatalogPage() {
 
   const online = useOnline();
   const [query, setQuery] = useState("");
-  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare } = prefs;
+  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare, viewMode } =
+    prefs;
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
   const [snapshots, setSnapshots] = useState<Record<string, number>>({});
