@@ -26,7 +26,7 @@ export const baseCategories = (): Category[] => [
   cat("otros", "Otros trámites"),
 ];
 
-type Seed = Omit<Service, "id" | "active"> & { active?: boolean };
+type Seed = Omit<Service, "id" | "active" | "favorite"> & { active?: boolean };
 
 const s = (
   name: string,
@@ -119,6 +119,7 @@ function buildCatalog(id: CatalogId): Catalog {
     id: `${id}-${i + 1}`,
     price: roundPrice(seed.price * ratio[id]),
     active: true,
+    favorite: false,
   }));
   return {
     id,
@@ -126,8 +127,10 @@ function buildCatalog(id: CatalogId): Catalog {
     subtitle: meta[id].subtitle,
     whatsappNumber: "5215500000000",
     whatsappTemplate: DEFAULT_TEMPLATE,
+    hidden: false,
     categories: baseCategories(),
     services,
+    log: [],
   };
 }
 
