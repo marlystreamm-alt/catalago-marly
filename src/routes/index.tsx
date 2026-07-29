@@ -644,7 +644,13 @@ function CatalogPage() {
             ))
           )}
         </div>
+
+        <BulkOrderBar
+          services={catalog.services.filter((s) => selectedIds.includes(s.id))}
+          onClear={() => setSelectedIds([])}
+        />
       </div>
+
 
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
