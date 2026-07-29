@@ -39,7 +39,10 @@ const emptyService = (categoryId: string): Omit<Service, "id"> => ({
 });
 
 type Errors = Partial<
-  Record<"name" | "price" | "devices" | "profiles" | "delivery" | "warranty" | "description", string>
+  Record<
+    "name" | "price" | "devices" | "profiles" | "delivery" | "warranty" | "description",
+    string
+  >
 >;
 
 /** Validaciones de negocio para el formulario de servicio. */

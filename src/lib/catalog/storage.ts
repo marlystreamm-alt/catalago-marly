@@ -36,15 +36,19 @@ export function normalizeState(raw: unknown): AppState {
         typeof c.whatsappTemplate === "string" && c.whatsappTemplate.trim()
           ? c.whatsappTemplate
           : DEFAULT_TEMPLATE,
-      categories: Array.isArray(c.categories) && c.categories.length
-        ? c.categories.map((cat) => ({
-            id: String(cat.id),
-            name: String(cat.name ?? ""),
-            subsections: Array.isArray(cat.subsections)
-              ? cat.subsections.map((sub) => ({ id: String(sub.id), name: String(sub.name ?? "") }))
-              : [],
-          }))
-        : seed.catalogs[id].categories,
+      categories:
+        Array.isArray(c.categories) && c.categories.length
+          ? c.categories.map((cat) => ({
+              id: String(cat.id),
+              name: String(cat.name ?? ""),
+              subsections: Array.isArray(cat.subsections)
+                ? cat.subsections.map((sub) => ({
+                    id: String(sub.id),
+                    name: String(sub.name ?? ""),
+                  }))
+                : [],
+            }))
+          : seed.catalogs[id].categories,
       services: c.services.map((sv, i) => ({
         id: String(sv.id ?? `${id}-r${i}`),
         name: String(sv.name ?? "Sin nombre"),
@@ -72,7 +76,6 @@ export function normalizeState(raw: unknown): AppState {
             user: typeof e.user === "string" && e.user.trim() ? e.user : "Administrador",
           }))
         : [],
-
     };
   }
   return result;

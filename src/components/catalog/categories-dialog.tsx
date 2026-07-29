@@ -66,7 +66,8 @@ export function CategoriesDialog({
                       <Button
                         size="sm"
                         onClick={() => {
-                          if (editing[c.id].trim()) saveCategory({ id: c.id, name: editing[c.id].trim() });
+                          if (editing[c.id].trim())
+                            saveCategory({ id: c.id, name: editing[c.id].trim() });
                           const next = { ...editing };
                           delete next[c.id];
                           setEditing(next);

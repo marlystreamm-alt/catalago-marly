@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Copy,
-  Download,
-  KeyRound,
-  LockKeyhole,
-  LogOut,
-  RotateCcw,
-  Upload,
-} from "lucide-react";
+import { Copy, Download, KeyRound, LockKeyhole, LogOut, RotateCcw, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,7 +79,9 @@ function PasswordDialog({
     <Dialog open={open} onOpenChange={(v) => (code && !v ? onOpenChange(false) : onOpenChange(v))}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{forced ? "Cambia la contraseña inicial" : "Cambiar contraseña"}</DialogTitle>
+          <DialogTitle>
+            {forced ? "Cambia la contraseña inicial" : "Cambiar contraseña"}
+          </DialogTitle>
           <DialogDescription>
             {forced
               ? "Por seguridad, rota la contraseña temporal antes de seguir editando."
@@ -141,7 +135,9 @@ function PasswordDialog({
                 value={next}
                 onChange={(e) => setNext(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Mínimo 8 caracteres, con letra y número.</p>
+              <p className="text-xs text-muted-foreground">
+                Mínimo 8 caracteres, con letra y número.
+              </p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="rep-pass">Repetir contraseña</Label>

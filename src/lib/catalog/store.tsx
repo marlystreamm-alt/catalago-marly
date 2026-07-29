@@ -8,12 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
-import {
-  ensureAuthRecord,
-  resetWithRecoveryCode,
-  rotatePassword,
-  verifyPassword,
-} from "./auth";
+import { ensureAuthRecord, resetWithRecoveryCode, rotatePassword, verifyPassword } from "./auth";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
@@ -48,7 +43,6 @@ const entry = (
   summary,
   user,
 });
-
 
 interface StoreValue {
   state: AppState;
@@ -198,10 +192,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return result;
         }
         setMustChangePassword(false);
-        mutate(
-          (c) => c,
-          entry("sistema", catalog.name, "Contraseña de administrador actualizada"),
-        );
+        mutate((c) => c, entry("sistema", catalog.name, "Contraseña de administrador actualizada"));
         toast.success("Contraseña actualizada");
         return result;
       },
@@ -227,8 +218,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           ...prev,
           [activeId]: { ...(prev[activeId] ?? DEFAULT_PREFS), ...patch },
         })),
-      resetPrefs: () =>
-        setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
+      resetPrefs: () => setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
       updateCatalog: (patch) =>
         guard(() => {
           const changes: string[] = [];
@@ -247,7 +237,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             entry(
               "catalogo",
               patch.name ?? catalog.name,
-              changes.length ? `Se actualizó ${changes.join(", ")}` : "Ajustes guardados sin cambios",
+              changes.length
+                ? `Se actualizó ${changes.join(", ")}`
+                : "Ajustes guardados sin cambios",
             ),
           );
           toast.success("Cambios guardados");
@@ -273,7 +265,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const changes: string[] = [];
           if (prev) {
             if (prev.name !== service.name) changes.push(`nombre → ${service.name}`);
-            if (prev.price !== service.price) changes.push(`precio ${prev.price} → ${service.price}`);
+            if (prev.price !== service.price)
+              changes.push(`precio ${prev.price} → ${service.price}`);
             if (prev.categoryId !== service.categoryId) changes.push("categoría");
             if (prev.subsectionId !== service.subsectionId) changes.push("subsección");
             if (prev.description !== service.description) changes.push("descripción");

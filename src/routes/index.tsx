@@ -40,12 +40,8 @@ import {
 import { PendingOrdersBar } from "@/components/catalog/pending-orders";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
-import { formatMXN } from "@/lib/catalog/whatsapp";
 import { toast } from "sonner";
-import {
-  CatalogSettingsDialog,
-  ServiceFormDialog,
-} from "@/components/catalog/service-dialogs";
+import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
@@ -385,11 +381,7 @@ function CatalogPage() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
-              <Switch
-                id="only-fav"
-                checked={onlyFavorites}
-                onCheckedChange={setOnlyFavorites}
-              />
+              <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
               <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
                 <Star className="size-3.5" />
                 Favoritos
@@ -521,7 +513,9 @@ function CatalogPage() {
               <section key={category.id}>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-foreground">{category.name}</h2>
-                  <Badge variant="secondary">{groups.reduce((n, g) => n + g.items.length, 0)}</Badge>
+                  <Badge variant="secondary">
+                    {groups.reduce((n, g) => n + g.items.length, 0)}
+                  </Badge>
                 </div>
                 {groups.map((group) => (
                   <div key={group.key} className="mt-3">

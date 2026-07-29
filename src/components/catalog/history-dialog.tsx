@@ -39,7 +39,6 @@ const formatDate = (iso: string) => {
 
 const LOG_HEADERS = ["Fecha", "Usuario", "Catálogo", "Acción", "Elemento", "Resumen"];
 
-
 export function HistoryDialog({
   open,
   onOpenChange,
@@ -67,7 +66,6 @@ export function HistoryDialog({
       ]),
     [entries, catalog.name],
   );
-
 
   if (!isAdmin) return null;
 
@@ -130,8 +128,6 @@ export function HistoryDialog({
           </Button>
         </div>
 
-
-
         <div className="grid gap-2">
           {entries.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -149,7 +145,6 @@ export function HistoryDialog({
                 <p className="mt-1 text-xs text-muted-foreground">
                   Por {e.user ?? "Administrador"} · {catalog.name}
                 </p>
-
               </div>
             ))
           )}
@@ -341,7 +336,10 @@ export function AuditDialog({
             </p>
           ) : (
             entries.map((e) => (
-              <div key={`${e.catalogId}-${e.id}`} className="rounded-xl border border-border bg-muted/40 p-3">
+              <div
+                key={`${e.catalogId}-${e.id}`}
+                className="rounded-xl border border-border bg-muted/40 p-3"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="secondary">{LOG_LABELS[e.action]}</Badge>
@@ -351,7 +349,9 @@ export function AuditDialog({
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
                 <p className="text-sm text-muted-foreground">{e.summary}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Por {e.user ?? "Administrador"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Por {e.user ?? "Administrador"}
+                </p>
               </div>
             ))
           )}

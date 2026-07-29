@@ -58,7 +58,9 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
     const ids = new Set(list.map((o) => o.id));
     setOrders((prev) => prev.filter((o) => !ids.has(o.id)));
     toast.success(
-      list.length === 1 ? "Pedido enviado por WhatsApp" : `${list.length} pedidos enviados por WhatsApp`,
+      list.length === 1
+        ? "Pedido enviado por WhatsApp"
+        : `${list.length} pedidos enviados por WhatsApp`,
     );
   }, []);
 

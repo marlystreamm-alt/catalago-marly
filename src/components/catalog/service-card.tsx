@@ -67,11 +67,7 @@ export function ServiceCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {online ? (
           <Button asChild className="flex-1 min-w-[10rem]">
-            <a
-              href={buildWhatsappLink(service, catalog)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={buildWhatsappLink(service, catalog)} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="size-4" />
               Pedir por WhatsApp
             </a>
