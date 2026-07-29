@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, MessageCircle, Pencil, Star, X } from "lucide-react";
+import { Check, MessageCircle, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { useCatalogStore } from "@/lib/catalog/store";
 import { buildWhatsappLink, formatMXN } from "@/lib/catalog/whatsapp";
 import type { Service } from "@/lib/catalog/types";
 
-/** Vista de tabla: plataforma + precio, editable en línea para el administrador. */
+/** Tabla compacta plataforma/precio; el administrador edita el precio en línea. */
 export function ServiceTable({
   services,
   selectedIds = [],
@@ -17,10 +17,10 @@ export function ServiceTable({
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
 }) {
-  const { catalog, isAdmin, saveService, toggleService, toggleFavorite } = useCatalogStore();
+  const { catalog, isAdmin, saveService, toggleFavorite } = useCatalogStore();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftName, setDraftName] = useState("");
-  const [draftPrice, setDraftPrice] = useState("");
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isAdmin) setEditingId(null);
@@ -28,23 +28,26 @@ export function ServiceTable({
 
   const startEdit = (s: Service) => {
     setEditingId(s.id);
-    setDraftName(s.name);
-    setDraftPrice(String(s.price));
+    setDraft(String(s.price));
+    setError("");
+  };
+
+  const cancel = () => {
+    setEditingId(null);
+    setError("");
   };
 
   const commit = (s: Service) => {
-    const name = draftName.trim();
-    const price = Number(draftPrice);
-    if (!name) {
-      toast.error("El nombre no puede quedar vacío");
+    const price = Number(draft.replace(",", "."));
+    if (!draft.trim() || !Number.isFinite(price) || price < 0) {
+      setError("Precio inválido");
       return;
     }
-    if (!Number.isFinite(price) || price < 0) {
-      toast.error("Precio inválido: usa un número en MXN");
-      return;
+    if (price !== s.price) {
+      saveService({ ...s, price });
+      toast.success(`Precio actualizado: ${s.name}`);
     }
-    saveService({ ...s, name, price });
-    setEditingId(null);
+    cancel();
   };
 
   if (!services.length) {
@@ -64,14 +67,14 @@ export function ServiceTable({
             {onToggleSelect ? <th className="w-8 p-2" aria-label="Seleccionar" /> : null}
             <th className="p-2 font-semibold">Plataforma</th>
             <th className="p-2 text-right font-semibold">Precio</th>
-            <th className="w-24 p-2 text-right font-semibold">Acción</th>
+            <th className="w-20 p-2 text-right font-semibold">Pedir</th>
           </tr>
         </thead>
         <tbody>
           {services.map((s) => {
             const editing = editingId === s.id;
             return (
-              <tr key={s.id} className="border-b border-border last:border-0 align-middle">
+              <tr key={s.id} className="border-b border-border align-middle last:border-0">
                 {onToggleSelect ? (
                   <td className="p-2">
                     <input
@@ -84,95 +87,75 @@ export function ServiceTable({
                   </td>
                 ) : null}
                 <td className="p-2">
-                  {editing ? (
-                    <Input
-                      value={draftName}
-                      onChange={(e) => setDraftName(e.target.value)}
-                      aria-label={`Nombre de ${s.name}`}
-                      className="h-8"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        aria-label={s.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
-                        onClick={() => toggleFavorite(s.id)}
-                      >
-                        <Star
-                          className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
-                        />
-                      </button>
-                      <span className="font-medium text-card-foreground">{s.name}</span>
-                      {!s.active ? (
-                        <span className="text-xs text-destructive">(oculto)</span>
-                      ) : null}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-label={s.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                      onClick={() => toggleFavorite(s.id)}
+                    >
+                      <Star
+                        className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                      />
+                    </button>
+                    <span className="font-medium text-card-foreground">{s.name}</span>
+                    {!s.active ? <span className="text-xs text-destructive">(oculto)</span> : null}
+                  </div>
                 </td>
                 <td className="p-2 text-right">
                   {editing ? (
-                    <Input
-                      value={draftPrice}
-                      inputMode="decimal"
-                      onChange={(e) => setDraftPrice(e.target.value)}
-                      aria-label={`Precio de ${s.name}`}
-                      className="h-8 text-right"
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <div className="grid gap-0.5">
+                        <Input
+                          autoFocus
+                          value={draft}
+                          inputMode="decimal"
+                          aria-label={`Precio de ${s.name}`}
+                          aria-invalid={!!error}
+                          className={`h-8 w-24 text-right ${error ? "border-destructive" : ""}`}
+                          onChange={(e) => {
+                            setDraft(e.target.value);
+                            setError("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commit(s);
+                            if (e.key === "Escape") cancel();
+                          }}
+                        />
+                        {error ? (
+                          <span className="text-[11px] text-destructive">{error}</span>
+                        ) : null}
+                      </div>
+                      <Button size="icon" variant="ghost" aria-label="Guardar precio" onClick={() => commit(s)}>
+                        <Check className="size-4 text-primary" />
+                      </Button>
+                      <Button size="icon" variant="ghost" aria-label="Cancelar" onClick={cancel}>
+                        <X className="size-4" />
+                      </Button>
+                    </div>
+                  ) : isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={() => startEdit(s)}
+                      aria-label={`Editar precio de ${s.name}`}
+                      className="rounded-lg px-2 py-1 font-bold text-primary underline decoration-dotted underline-offset-4 hover:bg-muted"
+                    >
+                      {formatMXN(s.price)}
+                    </button>
                   ) : (
                     <span className="font-bold text-primary">{formatMXN(s.price)}</span>
                   )}
                 </td>
-                <td className="p-2">
-                  <div className="flex items-center justify-end gap-1">
-                    {isAdmin ? (
-                      editing ? (
-                        <>
-                          <Button size="icon" variant="ghost" aria-label="Guardar" onClick={() => commit(s)}>
-                            <Check className="size-4 text-primary" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label="Cancelar"
-                            onClick={() => setEditingId(null)}
-                          >
-                            <X className="size-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={`Editar ${s.name}`}
-                            onClick={() => startEdit(s)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={s.active ? `Desactivar ${s.name}` : `Activar ${s.name}`}
-                            onClick={() => toggleService(s.id)}
-                          >
-                            {s.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                          </Button>
-                        </>
-                      )
-                    ) : null}
-                    {!editing ? (
-                      <Button asChild size="icon" variant="ghost">
-                        <a
-                          href={buildWhatsappLink(s, catalog)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`Pedir ${s.name} por WhatsApp`}
-                        >
-                          <MessageCircle className="size-4 text-primary" />
-                        </a>
-                      </Button>
-                    ) : null}
-                  </div>
+                <td className="p-2 text-right">
+                  <Button asChild size="icon" variant="ghost">
+                    <a
+                      href={buildWhatsappLink(s, catalog)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Pedir ${s.name} por WhatsApp`}
+                    >
+                      <MessageCircle className="size-4 text-primary" />
+                    </a>
+                  </Button>
                 </td>
               </tr>
             );
