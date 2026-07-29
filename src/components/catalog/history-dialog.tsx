@@ -55,6 +55,20 @@ export function HistoryDialog({
     [catalog.log, filter],
   );
 
+  const rows = useMemo(
+    () =>
+      entries.map((e) => [
+        formatDate(e.at),
+        e.user ?? "Administrador",
+        catalog.name,
+        LOG_LABELS[e.action],
+        e.target,
+        e.summary,
+      ]),
+    [entries, catalog.name],
+  );
+
+
   if (!isAdmin) return null;
 
   return (
