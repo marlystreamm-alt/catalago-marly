@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Search, Settings2, Tags } from "lucide-react";
+import { ArrowUpDown, History, Plus, Search, Settings2, Star, Tags } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,11 +17,15 @@ import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import {
+  CatalogVisibilityDialog,
+  HistoryDialog,
+} from "@/components/catalog/history-dialog";
+import {
   CatalogSettingsDialog,
   ServiceFormDialog,
 } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
-import { CATALOG_IDS, type Service } from "@/lib/catalog/types";
+import type { Service, SortMode } from "@/lib/catalog/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -50,14 +54,19 @@ export const Route = createFileRoute("/")({
 const ALL = "__all__";
 
 function CatalogPage() {
-  const { state, catalog, catalogId, setCatalogId, isAdmin } = useCatalogStore();
+  const { state, catalog, catalogId, setCatalogId, isAdmin, visibleCatalogIds } =
+    useCatalogStore();
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL);
   const [onlyActive, setOnlyActive] = useState(true);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("categoria");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
 
   const stats = useMemo(() => {
     const total = catalog.services.length;
@@ -67,6 +76,7 @@ function CatalogPage() {
       activos,
       ocultos: total - activos,
       categorias: catalog.categories.length,
+      favoritos: catalog.services.filter((s) => s.favorite).length,
     };
   }, [catalog]);
 
@@ -74,6 +84,7 @@ function CatalogPage() {
     const q = query.trim().toLowerCase();
     return catalog.services.filter((s) => {
       if (!isAdmin && !s.active) return false;
+      if (onlyFavorites && !s.favorite) return false;
       if (onlyActive && !s.active) return false;
       if (categoryFilter !== ALL && s.categoryId !== categoryFilter) return false;
       if (!q) return true;
@@ -85,12 +96,20 @@ function CatalogPage() {
           .includes(q)
       );
     });
-  }, [catalog, query, categoryFilter, onlyActive, isAdmin]);
+  }, [catalog, query, categoryFilter, onlyActive, onlyFavorites, isAdmin]);
+
+  const sorted = useMemo(() => {
+    const list = [...visible];
+    if (sortMode === "precio") list.sort((a, b) => a.price - b.price);
+    if (sortMode === "nombre") list.sort((a, b) => a.name.localeCompare(b.name, "es-MX"));
+    // Los favoritos siempre suben al inicio para encontrarlos más rápido.
+    return list.sort((a, b) => Number(b.favorite) - Number(a.favorite));
+  }, [visible, sortMode]);
 
   const grouped = useMemo(() => {
     return catalog.categories
       .map((category) => {
-        const items = visible.filter((s) => s.categoryId === category.id);
+        const items = sorted.filter((s) => s.categoryId === category.id);
         const groups = [
           ...category.subsections.map((sub) => ({
             key: sub.id,
@@ -108,7 +127,7 @@ function CatalogPage() {
         return { category, groups, count: items.length };
       })
       .filter((g) => g.count > 0);
-  }, [catalog, visible]);
+  }, [catalog, sorted]);
 
   const openNew = () => {
     setEditing(null);
@@ -133,8 +152,11 @@ function CatalogPage() {
             <AdminBar />
           </div>
 
-          <nav className="mt-4 grid grid-cols-3 gap-1.5 rounded-2xl bg-muted p-1">
-            {CATALOG_IDS.map((id) => (
+          <nav
+            className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
+            style={{ gridTemplateColumns: `repeat(${visibleCatalogIds.length}, minmax(0, 1fr))` }}
+          >
+            {visibleCatalogIds.map((id) => (
               <button
                 key={id}
                 type="button"
@@ -147,16 +169,18 @@ function CatalogPage() {
                 }`}
               >
                 {state.catalogs[id].name}
+                {isAdmin && state.catalogs[id].hidden ? " (oculto)" : ""}
               </button>
             ))}
           </nav>
         </header>
 
-        <section className="mt-4 grid grid-cols-4 gap-2" aria-label="Estadísticas">
+        <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
           <StatCard label="Total" value={stats.total} />
           <StatCard label="Activos" value={stats.activos} />
           <StatCard label="Categorías" value={stats.categorias} />
           <StatCard label="Ocultos" value={stats.ocultos} />
+          <StatCard label="Favoritos" value={stats.favoritos} />
         </section>
 
         <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
@@ -184,12 +208,36 @@ function CatalogPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+              <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Ordenar servicios">
+                <ArrowUpDown className="size-4 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="categoria">Por categoría</SelectItem>
+                <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
+                <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="flex items-center gap-2">
-              <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
-              <Label htmlFor="only-active" className="text-sm">
-                Solo activos
+              <Switch
+                id="only-fav"
+                checked={onlyFavorites}
+                onCheckedChange={setOnlyFavorites}
+              />
+              <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
+                <Star className="size-3.5" />
+                Favoritos
               </Label>
             </div>
+            {isAdmin ? (
+              <div className="flex items-center gap-2">
+                <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
+                <Label htmlFor="only-active" className="text-sm">
+                  Solo activos
+                </Label>
+              </div>
+            ) : null}
           </div>
 
           {isAdmin ? (
@@ -206,12 +254,32 @@ function CatalogPage() {
                 <Tags className="size-4" />
                 Categorías
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+                <History className="size-4" />
+                Historial
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
+                <Settings2 className="size-4" />
+                Mostrar catálogos
+              </Button>
             </div>
           ) : null}
         </section>
 
         <div className="mt-5 grid gap-6">
-          {grouped.length === 0 ? (
+          {sortMode !== "categoria" ? (
+            sorted.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
+                No hay servicios que coincidan con tu búsqueda.
+              </p>
+            ) : (
+              <div className="grid gap-3">
+                {sorted.map((service) => (
+                  <ServiceCard key={service.id} service={service} onEdit={openEdit} />
+                ))}
+              </div>
+            )
+          ) : grouped.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
               No hay servicios que coincidan con tu búsqueda.
             </p>
@@ -245,6 +313,8 @@ function CatalogPage() {
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
+      <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
     </main>
   );
 }
