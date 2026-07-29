@@ -8,12 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
-import {
-  ensureAuthRecord,
-  resetWithRecoveryCode,
-  rotatePassword,
-  verifyPassword,
-} from "./auth";
+import { ensureAuthRecord, resetWithRecoveryCode, rotatePassword, verifyPassword } from "./auth";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
@@ -35,12 +30,18 @@ const newId = () =>
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-const entry = (action: LogAction, target: string, summary: string): LogEntry => ({
+const entry = (
+  action: LogAction,
+  target: string,
+  summary: string,
+  user = "Administrador",
+): LogEntry => ({
   id: newId(),
   at: new Date().toISOString(),
   action,
   target,
   summary,
+  user,
 });
 
 interface StoreValue {
@@ -77,6 +78,8 @@ interface StoreValue {
   saveSubsection: (categoryId: string, sub: { id?: string; name: string }) => void;
   deleteSubsection: (categoryId: string, subId: string) => void;
   clearLog: () => void;
+  auditLog: (LogEntry & { catalogId: CatalogId; catalogName: string })[];
+
   exportBackup: () => void;
   importBackup: (json: string) => boolean;
   resetAll: () => void;
@@ -189,10 +192,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           return result;
         }
         setMustChangePassword(false);
-        mutate(
-          (c) => c,
-          entry("sistema", catalog.name, "Contraseña de administrador actualizada"),
-        );
+        mutate((c) => c, entry("sistema", catalog.name, "Contraseña de administrador actualizada"));
         toast.success("Contraseña actualizada");
         return result;
       },
@@ -218,8 +218,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           ...prev,
           [activeId]: { ...(prev[activeId] ?? DEFAULT_PREFS), ...patch },
         })),
-      resetPrefs: () =>
-        setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
+      resetPrefs: () => setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
       updateCatalog: (patch) =>
         guard(() => {
           const changes: string[] = [];
@@ -238,7 +237,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             entry(
               "catalogo",
               patch.name ?? catalog.name,
-              changes.length ? `Se actualizó ${changes.join(", ")}` : "Ajustes guardados sin cambios",
+              changes.length
+                ? `Se actualizó ${changes.join(", ")}`
+                : "Ajustes guardados sin cambios",
             ),
           );
           toast.success("Cambios guardados");
@@ -264,7 +265,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const changes: string[] = [];
           if (prev) {
             if (prev.name !== service.name) changes.push(`nombre → ${service.name}`);
-            if (prev.price !== service.price) changes.push(`precio ${prev.price} → ${service.price}`);
+            if (prev.price !== service.price)
+              changes.push(`precio ${prev.price} → ${service.price}`);
             if (prev.categoryId !== service.categoryId) changes.push("categoría");
             if (prev.subsectionId !== service.subsectionId) changes.push("subsección");
             if (prev.description !== service.description) changes.push("descripción");
@@ -437,6 +439,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           mutate((c) => ({ ...c, log: [] }), entry("sistema", catalog.name, "Historial vaciado"));
           toast.success("Historial vaciado");
         }),
+      auditLog: CATALOG_IDS.flatMap((id) =>
+        state.catalogs[id].log.map((e) => ({
+          ...e,
+          catalogId: id,
+          catalogName: state.catalogs[id].name,
+        })),
+      ).sort((a, b) => b.at.localeCompare(a.at)),
+
       exportBackup: () =>
         guard(() => {
           try {

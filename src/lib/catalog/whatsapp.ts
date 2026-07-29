@@ -24,7 +24,8 @@ export function serviceDetails(service: Service, catalog: Catalog) {
 }
 
 export function buildWhatsappMessage(service: Service, catalog: Catalog) {
-  const template = catalog.whatsappTemplate || "Hola, me interesa {servicio} por {precio}. {detalles}";
+  const template =
+    catalog.whatsappTemplate || "Hola, me interesa {servicio} por {precio}. {detalles}";
   return template
     .replaceAll("{servicio}", service.name)
     .replaceAll("{precio}", formatMXN(service.price))

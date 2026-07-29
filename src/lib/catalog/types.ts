@@ -41,6 +41,8 @@ export interface LogEntry {
   action: LogAction;
   target: string;
   summary: string;
+  /** Quién realizó la acción (bitácora de auditoría). */
+  user?: string;
 }
 
 export interface Catalog {
@@ -76,5 +78,4 @@ export const MAX_LOG_ENTRIES = 200;
 
 export type SortMode = "categoria" | "precio" | "nombre";
 
-export const DEFAULT_TEMPLATE =
-  "Hola, me interesa {servicio} por {precio}. Detalles: {detalles}";
+export const DEFAULT_TEMPLATE = "Hola, me interesa {servicio} por {precio}. Detalles: {detalles}";

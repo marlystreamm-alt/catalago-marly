@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { History, Trash2 } from "lucide-react";
+import { FileDown, FileText, History, ShieldCheck, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCatalogStore } from "@/lib/catalog/store";
+import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
 import { LOG_LABELS, type LogAction } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
@@ -35,6 +37,8 @@ const formatDate = (iso: string) => {
   });
 };
 
+const LOG_HEADERS = ["Fecha", "Usuario", "Catálogo", "Acción", "Elemento", "Resumen"];
+
 export function HistoryDialog({
   open,
   onOpenChange,
@@ -48,6 +52,19 @@ export function HistoryDialog({
   const entries = useMemo(
     () => (filter === ALL ? catalog.log : catalog.log.filter((e) => e.action === filter)),
     [catalog.log, filter],
+  );
+
+  const rows = useMemo(
+    () =>
+      entries.map((e) => [
+        formatDate(e.at),
+        e.user ?? "Administrador",
+        catalog.name,
+        LOG_LABELS[e.action],
+        e.target,
+        e.summary,
+      ]),
+    [entries, catalog.name],
   );
 
   if (!isAdmin) return null;
@@ -79,6 +96,38 @@ export function HistoryDialog({
           </SelectContent>
         </Select>
 
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              downloadCsv(`ma2-historial-${catalog.id}-${stamp()}`, LOG_HEADERS, rows);
+              toast.success("Historial exportado en CSV");
+            }}
+          >
+            <FileDown className="size-4" />
+            Exportar CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              const ok = printPdf(
+                `Historial · ${catalog.name}`,
+                `${rows.length} movimiento(s) · generado el ${formatDate(new Date().toISOString())}`,
+                LOG_HEADERS,
+                rows,
+              );
+              if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+            }}
+          >
+            <FileText className="size-4" />
+            Exportar PDF
+          </Button>
+        </div>
+
         <div className="grid gap-2">
           {entries.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -93,6 +142,9 @@ export function HistoryDialog({
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
                 <p className="text-sm text-muted-foreground">{e.summary}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Por {e.user ?? "Administrador"} · {catalog.name}
+                </p>
               </div>
             ))
           )}
@@ -160,6 +212,151 @@ export function CatalogVisibilityDialog({
             ),
           )}
         </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Bitácora de auditoría: todos los catálogos con fecha, usuario, catálogo y acción. */
+export function AuditDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { auditLog, isAdmin, state } = useCatalogStore();
+  const [action, setAction] = useState<string>(ALL);
+  const [scope, setScope] = useState<string>(ALL);
+
+  const entries = useMemo(
+    () =>
+      auditLog.filter(
+        (e) => (action === ALL || e.action === action) && (scope === ALL || e.catalogId === scope),
+      ),
+    [auditLog, action, scope],
+  );
+
+  const rows = useMemo(
+    () =>
+      entries.map((e) => [
+        formatDate(e.at),
+        e.user ?? "Administrador",
+        e.catalogName,
+        LOG_LABELS[e.action],
+        e.target,
+        e.summary,
+      ]),
+    [entries],
+  );
+
+  if (!isAdmin) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="size-4" />
+            Bitácora de auditoría
+          </DialogTitle>
+          <DialogDescription>
+            Registro completo de los tres catálogos con fecha, usuario, catálogo y acción.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Select value={scope} onValueChange={setScope}>
+            <SelectTrigger aria-label="Filtrar por catálogo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todos los catálogos</SelectItem>
+              {Object.values(state.catalogs).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={action} onValueChange={setAction}>
+            <SelectTrigger aria-label="Filtrar por acción">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas las acciones</SelectItem>
+              {(Object.keys(LOG_LABELS) as LogAction[]).map((a) => (
+                <SelectItem key={a} value={a}>
+                  {LOG_LABELS[a]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              downloadCsv(`ma2-auditoria-${stamp()}`, LOG_HEADERS, rows);
+              toast.success("Bitácora exportada en CSV");
+            }}
+          >
+            <FileDown className="size-4" />
+            Exportar CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              const ok = printPdf(
+                "Bitácora de auditoría MA²",
+                `${rows.length} movimiento(s) · generado el ${formatDate(new Date().toISOString())}`,
+                LOG_HEADERS,
+                rows,
+              );
+              if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+            }}
+          >
+            <FileText className="size-4" />
+            Exportar PDF
+          </Button>
+        </div>
+
+        <div className="grid gap-2">
+          {entries.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              No hay movimientos con estos filtros.
+            </p>
+          ) : (
+            entries.map((e) => (
+              <div
+                key={`${e.catalogId}-${e.id}`}
+                className="rounded-xl border border-border bg-muted/40 p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="secondary">{LOG_LABELS[e.action]}</Badge>
+                    <Badge variant="outline">{e.catalogName}</Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{formatDate(e.at)}</span>
+                </div>
+                <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
+                <p className="text-sm text-muted-foreground">{e.summary}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Por {e.user ?? "Administrador"}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)}>Cerrar</Button>
         </DialogFooter>

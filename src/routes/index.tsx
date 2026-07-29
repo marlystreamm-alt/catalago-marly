@@ -1,8 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   ArrowUpDown,
+  FileDown,
+  FileText,
   History,
+  Link2,
+  ShieldCheck,
   Plus,
   Search,
   Settings2,
@@ -27,19 +33,33 @@ import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import {
+  AuditDialog,
   CatalogVisibilityDialog,
   HistoryDialog,
 } from "@/components/catalog/history-dialog";
-import {
-  CatalogSettingsDialog,
-  ServiceFormDialog,
-} from "@/components/catalog/service-dialogs";
+import { PendingOrdersBar } from "@/components/catalog/pending-orders";
+import { OrderQueueProvider } from "@/lib/catalog/order-queue";
+import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
+import { toast } from "sonner";
+import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
-import type { Service, SortMode } from "@/lib/catalog/types";
+import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
+
+/** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
+const searchSchema = z.object({
+  cat: fallback(z.string(), "").default(""),
+  q: fallback(z.string(), "").default(""),
+  categoria: fallback(z.string(), "").default(""),
+  // Los valores llegan como número (1/0) desde la URL, por eso se convierten a texto.
+  activos: fallback(z.coerce.string(), "").default(""),
+  fav: fallback(z.coerce.string(), "").default(""),
+  orden: fallback(z.string(), "").default(""),
+});
 
 export const Route = createFileRoute("/")({
+  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "MA² · Catálogos de servicios y trámites" },
@@ -58,12 +78,28 @@ export const Route = createFileRoute("/")({
   }),
   component: () => (
     <CatalogProvider>
-      <CatalogPage />
+      <OrderQueueProvider>
+        <CatalogPage />
+      </OrderQueueProvider>
     </CatalogProvider>
   ),
 });
 
 const ALL = ALL_CATEGORIES;
+
+const SEARCH_HEADERS = [
+  "Servicio",
+  "Precio MXN",
+  "Categoría",
+  "Subsección",
+  "Descripción",
+  "Dispositivos",
+  "Perfiles",
+  "Entrega",
+  "Garantía",
+  "Estado",
+  "Favorito",
+];
 
 function CatalogPage() {
   const {
@@ -72,11 +108,13 @@ function CatalogPage() {
     catalogId,
     setCatalogId,
     isAdmin,
+    hydrated,
     visibleCatalogIds,
     prefs,
     setPrefs,
     resetPrefs,
   } = useCatalogStore();
+
   const online = useOnline();
   const [query, setQuery] = useState("");
   const { categoryFilter, onlyActive, onlyFavorites, sortMode } = prefs;
@@ -90,6 +128,51 @@ function CatalogPage() {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+
+  // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
+  const search = Route.useSearch();
+  const targetCatalog =
+    search.cat && (CATALOG_IDS as string[]).includes(search.cat) ? (search.cat as CatalogId) : null;
+  const appliedCatalog = useRef(false);
+  const appliedPrefs = useRef(false);
+
+  useEffect(() => {
+    if (appliedCatalog.current || !hydrated) return;
+    appliedCatalog.current = true;
+    if (targetCatalog) setCatalogId(targetCatalog);
+    if (search.q) setQuery(search.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
+  // Las preferencias se aplican cuando el catálogo del enlace ya está activo.
+  useEffect(() => {
+    if (appliedPrefs.current || !hydrated) return;
+    if (targetCatalog && catalogId !== targetCatalog) return;
+    appliedPrefs.current = true;
+    const patch: Partial<typeof prefs> = {};
+    if (search.categoria) patch.categoryFilter = search.categoria;
+    if (search.activos) patch.onlyActive = search.activos === "1";
+    if (search.fav) patch.onlyFavorites = search.fav === "1";
+    if (["categoria", "precio", "nombre"].includes(search.orden))
+      patch.sortMode = search.orden as SortMode;
+    if (Object.keys(patch).length) setPrefs(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, catalogId]);
+
+  const shareLink = () => {
+    const params = new URLSearchParams({ cat: catalogId });
+    if (query.trim()) params.set("q", query.trim());
+    if (categoryFilter !== ALL) params.set("categoria", categoryFilter);
+    if (onlyActive) params.set("activos", "1");
+    if (onlyFavorites) params.set("fav", "1");
+    if (sortMode !== "categoria") params.set("orden", sortMode);
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Enlace con filtros copiado"))
+      .catch(() => toast.error("No se pudo copiar el enlace"));
+  };
 
   const stats = useMemo(() => {
     const total = catalog.services.length;
@@ -182,6 +265,30 @@ function CatalogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, categoryFilter, onlyFavorites, onlyActive, sortMode, isAdmin, catalog]);
 
+  const searchRows = useMemo(
+    () =>
+      sorted.map((s) => [
+        s.name,
+        s.price,
+        catalog.categories.find((c) => c.id === s.categoryId)?.name ?? "",
+        catalog.categories
+          .find((c) => c.id === s.categoryId)
+          ?.subsections.find((x) => x.id === s.subsectionId)?.name ?? "",
+        s.description,
+        s.devices,
+        s.profiles,
+        s.delivery,
+        s.warranty,
+        s.active ? "Activo" : "Oculto",
+        s.favorite ? "Sí" : "No",
+      ]),
+    [sorted, catalog],
+  );
+
+  const filtersSummary = activeFilters.length
+    ? activeFilters.map((f) => f.label).join(" · ")
+    : "Sin filtros aplicados";
+
   const openNew = () => {
     setEditing(null);
     setFormOpen(true);
@@ -241,6 +348,8 @@ function CatalogPage() {
           </div>
         ) : null}
 
+        <PendingOrdersBar />
+
         <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
           <StatCard label="Total" value={stats.total} />
           <StatCard label="Activos" value={stats.activos} />
@@ -286,11 +395,7 @@ function CatalogPage() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
-              <Switch
-                id="only-fav"
-                checked={onlyFavorites}
-                onCheckedChange={setOnlyFavorites}
-              />
+              <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
               <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
                 <Star className="size-3.5" />
                 Favoritos
@@ -334,6 +439,42 @@ function CatalogPage() {
             </div>
           ) : null}
 
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+            <Button size="sm" variant="outline" onClick={shareLink}>
+              <Link2 className="size-4" />
+              Compartir enlace con filtros
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!sorted.length}
+              onClick={() => {
+                downloadCsv(`ma2-busqueda-${catalogId}-${stamp()}`, SEARCH_HEADERS, searchRows);
+                toast.success("Búsqueda exportada en CSV");
+              }}
+            >
+              <FileDown className="size-4" />
+              Exportar búsqueda CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!sorted.length}
+              onClick={() => {
+                const ok = printPdf(
+                  `${catalog.name} · Búsqueda`,
+                  `${sorted.length} servicio(s) · ${filtersSummary}`,
+                  SEARCH_HEADERS,
+                  searchRows,
+                );
+                if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+              }}
+            >
+              <FileText className="size-4" />
+              Exportar búsqueda PDF
+            </Button>
+          </div>
+
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
               <Button size="sm" onClick={openNew}>
@@ -351,6 +492,10 @@ function CatalogPage() {
               <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
                 <History className="size-4" />
                 Historial
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
+                <ShieldCheck className="size-4" />
+                Bitácora
               </Button>
               <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
                 <Settings2 className="size-4" />
@@ -382,7 +527,9 @@ function CatalogPage() {
               <section key={category.id}>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-foreground">{category.name}</h2>
-                  <Badge variant="secondary">{groups.reduce((n, g) => n + g.items.length, 0)}</Badge>
+                  <Badge variant="secondary">
+                    {groups.reduce((n, g) => n + g.items.length, 0)}
+                  </Badge>
                 </div>
                 {groups.map((group) => (
                   <div key={group.key} className="mt-3">
@@ -409,6 +556,7 @@ function CatalogPage() {
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
+      <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
     </main>
   );
 }
