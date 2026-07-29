@@ -107,11 +107,13 @@ function CatalogPage() {
     catalogId,
     setCatalogId,
     isAdmin,
+    hydrated,
     visibleCatalogIds,
     prefs,
     setPrefs,
     resetPrefs,
   } = useCatalogStore();
+
   const online = useOnline();
   const [query, setQuery] = useState("");
   const { categoryFilter, onlyActive, onlyFavorites, sortMode } = prefs;
