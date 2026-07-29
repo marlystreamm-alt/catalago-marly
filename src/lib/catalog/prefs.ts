@@ -57,7 +57,9 @@ function normalize(raw: unknown): PrefsMap {
       categoryFilter: typeof p.categoryFilter === "string" ? p.categoryFilter : ALL_CATEGORIES,
       showDetail: p.showDetail !== false,
       showShare: p.showShare !== false,
+      viewMode: p.viewMode === "tabla" ? "tabla" : "tarjetas",
     };
+
   }
   return base;
 }
