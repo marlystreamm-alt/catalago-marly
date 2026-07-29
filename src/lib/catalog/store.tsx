@@ -177,11 +177,28 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       isAdmin,
       mustChangePassword,
       login: async (password: string) => {
-        const result = await verifyPassword(password);
-        if (!result.ok) {
-          toast.error("Contraseña incorrecta");
+        const lock = getLockStatus();
+        if (lock.locked) {
+          toast.error(
+            `Acceso bloqueado por seguridad. Intenta de nuevo en ${formatLockWait(lock.remainingMs)}.`,
+          );
           return false;
         }
+        const result = await verifyPassword(password);
+        if (!result.ok) {
+          const state = registerFailedAttempt();
+          if (state.locked) {
+            toast.error(
+              `Demasiados intentos fallidos. Acceso bloqueado ${formatLockWait(state.remainingMs)}.`,
+            );
+          } else {
+            toast.error(
+              `Contraseña incorrecta. Te quedan ${state.attemptsLeft} intento(s) antes del bloqueo.`,
+            );
+          }
+          return false;
+        }
+        clearFailedAttempts();
         setIsAdmin(true);
         setMustChangePassword(result.mustChange);
         if (result.mustChange) {
@@ -191,6 +208,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }
         return true;
       },
+
       changePassword: async (current: string, next: string) => {
         const result = await rotatePassword(current, next);
         if (!result.ok) {
