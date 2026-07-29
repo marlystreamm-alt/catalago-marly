@@ -1,8 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   ArrowUpDown,
+  FileDown,
+  FileText,
   History,
+  Link2,
+  ShieldCheck,
   Plus,
   Search,
   Settings2,
@@ -27,9 +33,15 @@ import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import {
+  AuditDialog,
   CatalogVisibilityDialog,
   HistoryDialog,
 } from "@/components/catalog/history-dialog";
+import { PendingOrdersBar } from "@/components/catalog/pending-orders";
+import { OrderQueueProvider } from "@/lib/catalog/order-queue";
+import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
+import { formatMXN } from "@/lib/catalog/whatsapp";
+import { toast } from "sonner";
 import {
   CatalogSettingsDialog,
   ServiceFormDialog,
@@ -37,9 +49,20 @@ import {
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
-import type { Service, SortMode } from "@/lib/catalog/types";
+import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
+
+/** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
+const searchSchema = z.object({
+  cat: fallback(z.string(), "").default(""),
+  q: fallback(z.string(), "").default(""),
+  categoria: fallback(z.string(), "").default(""),
+  activos: fallback(z.string(), "").default(""),
+  fav: fallback(z.string(), "").default(""),
+  orden: fallback(z.string(), "").default(""),
+});
 
 export const Route = createFileRoute("/")({
+  validateSearch: zodValidator(searchSchema),
   head: () => ({
     meta: [
       { title: "MA² · Catálogos de servicios y trámites" },
@@ -58,7 +81,9 @@ export const Route = createFileRoute("/")({
   }),
   component: () => (
     <CatalogProvider>
-      <CatalogPage />
+      <OrderQueueProvider>
+        <CatalogPage />
+      </OrderQueueProvider>
     </CatalogProvider>
   ),
 });
@@ -90,6 +115,40 @@ function CatalogPage() {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+
+  // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
+  const search = Route.useSearch();
+  const applied = useRef(false);
+  useEffect(() => {
+    if (applied.current) return;
+    applied.current = true;
+    if (search.cat && (CATALOG_IDS as string[]).includes(search.cat))
+      setCatalogId(search.cat as CatalogId);
+    if (search.q) setQuery(search.q);
+    const patch: Partial<typeof prefs> = {};
+    if (search.categoria) patch.categoryFilter = search.categoria;
+    if (search.activos) patch.onlyActive = search.activos === "1";
+    if (search.fav) patch.onlyFavorites = search.fav === "1";
+    if (["categoria", "precio", "nombre"].includes(search.orden))
+      patch.sortMode = search.orden as SortMode;
+    if (Object.keys(patch).length) setPrefs(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const shareLink = () => {
+    const params = new URLSearchParams({ cat: catalogId });
+    if (query.trim()) params.set("q", query.trim());
+    if (categoryFilter !== ALL) params.set("categoria", categoryFilter);
+    if (onlyActive) params.set("activos", "1");
+    if (onlyFavorites) params.set("fav", "1");
+    if (sortMode !== "categoria") params.set("orden", sortMode);
+    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Enlace con filtros copiado"))
+      .catch(() => toast.error("No se pudo copiar el enlace"));
+  };
 
   const stats = useMemo(() => {
     const total = catalog.services.length;
