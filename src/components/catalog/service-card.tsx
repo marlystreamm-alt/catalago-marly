@@ -2,7 +2,9 @@ import { Copy, Eye, EyeOff, MessageCircle, Pencil, Star, Trash2 } from "lucide-r
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { buildWhatsappLink, formatMXN } from "@/lib/catalog/whatsapp";
+import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
+import { useOnline } from "@/hooks/use-online";
+import { toast } from "sonner";
 import type { Service } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
@@ -15,6 +17,7 @@ export function ServiceCard({
 }) {
   const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
     useCatalogStore();
+  const online = useOnline();
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
 
@@ -61,16 +64,34 @@ export function ServiceCard({
       ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button asChild className="flex-1 min-w-[10rem]">
-          <a
-            href={buildWhatsappLink(service, catalog)}
-            target="_blank"
-            rel="noopener noreferrer"
+        {online ? (
+          <Button asChild className="flex-1 min-w-[10rem]">
+            <a
+              href={buildWhatsappLink(service, catalog)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <MessageCircle className="size-4" />
+              Pedir por WhatsApp
+            </a>
+          </Button>
+        ) : (
+          <Button
+            className="flex-1 min-w-[10rem]"
+            onClick={async () => {
+              const message = buildWhatsappMessage(service, catalog);
+              try {
+                await navigator.clipboard.writeText(message);
+                toast.success("Sin conexión: mensaje copiado para enviarlo después");
+              } catch {
+                toast.error("Sin conexión: copia el mensaje manualmente");
+              }
+            }}
           >
             <MessageCircle className="size-4" />
-            Pedir por WhatsApp
-          </a>
-        </Button>
+            Copiar pedido (sin conexión)
+          </Button>
+        )}
 
         {isAdmin ? (
           <div className="flex flex-wrap gap-1.5">

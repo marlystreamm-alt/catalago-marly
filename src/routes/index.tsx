@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUpDown, History, Plus, Search, Settings2, Star, Tags } from "lucide-react";
+import {
+  ArrowUpDown,
+  History,
+  Plus,
+  Search,
+  Settings2,
+  Star,
+  Tags,
+  WifiOff,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +35,8 @@ import {
   ServiceFormDialog,
 } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
+import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
+import { useOnline } from "@/hooks/use-online";
 import type { Service, SortMode } from "@/lib/catalog/types";
 
 export const Route = createFileRoute("/")({
@@ -51,16 +63,27 @@ export const Route = createFileRoute("/")({
   ),
 });
 
-const ALL = "__all__";
+const ALL = ALL_CATEGORIES;
 
 function CatalogPage() {
-  const { state, catalog, catalogId, setCatalogId, isAdmin, visibleCatalogIds } =
-    useCatalogStore();
+  const {
+    state,
+    catalog,
+    catalogId,
+    setCatalogId,
+    isAdmin,
+    visibleCatalogIds,
+    prefs,
+    setPrefs,
+    resetPrefs,
+  } = useCatalogStore();
+  const online = useOnline();
   const [query, setQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>(ALL);
-  const [onlyActive, setOnlyActive] = useState(true);
-  const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>("categoria");
+  const { categoryFilter, onlyActive, onlyFavorites, sortMode } = prefs;
+  const setCategoryFilter = (categoryFilter: string) => setPrefs({ categoryFilter });
+  const setOnlyActive = (onlyActive: boolean) => setPrefs({ onlyActive });
+  const setOnlyFavorites = (onlyFavorites: boolean) => setPrefs({ onlyFavorites });
+  const setSortMode = (sortMode: SortMode) => setPrefs({ sortMode });
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -129,6 +152,36 @@ function CatalogPage() {
       .filter((g) => g.count > 0);
   }, [catalog, sorted]);
 
+  const activeFilters = useMemo(() => {
+    const chips: { key: string; label: string; clear: () => void }[] = [];
+    if (query.trim())
+      chips.push({ key: "q", label: `Búsqueda: "${query.trim()}"`, clear: () => setQuery("") });
+    if (categoryFilter !== ALL) {
+      const name = catalog.categories.find((c) => c.id === categoryFilter)?.name ?? "Categoría";
+      chips.push({ key: "cat", label: name, clear: () => setPrefs({ categoryFilter: ALL }) });
+    }
+    if (onlyFavorites)
+      chips.push({
+        key: "fav",
+        label: "Solo favoritos",
+        clear: () => setPrefs({ onlyFavorites: false }),
+      });
+    if (isAdmin && onlyActive)
+      chips.push({
+        key: "act",
+        label: "Solo activos",
+        clear: () => setPrefs({ onlyActive: false }),
+      });
+    if (sortMode !== "categoria")
+      chips.push({
+        key: "sort",
+        label: sortMode === "precio" ? "Orden: precio" : "Orden: nombre",
+        clear: () => setPrefs({ sortMode: "categoria" }),
+      });
+    return chips;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, categoryFilter, onlyFavorites, onlyActive, sortMode, isAdmin, catalog]);
+
   const openNew = () => {
     setEditing(null);
     setFormOpen(true);
@@ -174,6 +227,19 @@ function CatalogPage() {
             ))}
           </nav>
         </header>
+
+        {!online ? (
+          <div
+            role="status"
+            className="card-soft mt-4 flex items-start gap-2 rounded-2xl border border-border bg-card p-3 text-sm text-muted-foreground"
+          >
+            <WifiOff className="mt-0.5 size-4 shrink-0 text-primary" />
+            <span>
+              Estás sin conexión. Puedes seguir navegando, buscando y filtrando tus catálogos; los
+              pedidos por WhatsApp se copian al portapapeles para enviarlos al recuperar internet.
+            </span>
+          </div>
+        ) : null}
 
         <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
           <StatCard label="Total" value={stats.total} />
@@ -239,6 +305,34 @@ function CatalogPage() {
               </div>
             ) : null}
           </div>
+
+          {activeFilters.length ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {activeFilters.map((f) => (
+                <Badge key={f.key} variant="secondary" className="gap-1">
+                  {f.label}
+                  <button
+                    type="button"
+                    aria-label={`Quitar filtro ${f.label}`}
+                    onClick={f.clear}
+                    className="rounded-full p-0.5 hover:bg-background"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQuery("");
+                  resetPrefs();
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+          ) : null}
 
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
