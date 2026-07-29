@@ -43,6 +43,8 @@ import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/cata
 import { buildCatalogLink } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
+import { ServiceTable } from "@/components/catalog/service-table";
+
 
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
