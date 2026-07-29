@@ -8,6 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import {
+  ensureAuthRecord,
+  resetWithRecoveryCode,
+  rotatePassword,
+  verifyPassword,
+} from "./auth";
+import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
 import {
@@ -22,8 +29,6 @@ import {
   type Service,
   type Subsection,
 } from "./types";
-
-const ADMIN_PASSWORD = "Artu1802";
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -46,8 +51,20 @@ interface StoreValue {
   visibleCatalogIds: CatalogId[];
   setCatalogId: (id: CatalogId) => void;
   isAdmin: boolean;
-  login: (password: string) => boolean;
+  mustChangePassword: boolean;
+  login: (password: string) => Promise<boolean>;
+  changePassword: (
+    current: string,
+    next: string,
+  ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
+  resetPassword: (
+    code: string,
+    next: string,
+  ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
   logout: () => void;
+  prefs: CatalogPrefs;
+  setPrefs: (patch: Partial<CatalogPrefs>) => void;
+  resetPrefs: () => void;
   updateCatalog: (patch: Partial<Omit<Catalog, "id" | "log">>) => void;
   toggleCatalogHidden: (id: CatalogId) => void;
   saveService: (service: Omit<Service, "id"> & { id?: string }) => void;
@@ -72,11 +89,20 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [catalogId, setCatalogIdRaw] = useState<CatalogId>("clientes");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [prefsMap, setPrefsMap] = useState<PrefsMap>(() => loadPrefs());
 
   useEffect(() => {
     setState(loadState());
+    setPrefsMap(loadPrefs());
     setHydrated(true);
+    void ensureAuthRecord();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    savePrefs(prefsMap);
+  }, [prefsMap, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -140,19 +166,60 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setCatalogIdRaw(id);
       },
       isAdmin,
-      login: (password: string) => {
-        if (password === ADMIN_PASSWORD) {
-          setIsAdmin(true);
-          toast.success("Modo administrador activado");
-          return true;
+      mustChangePassword,
+      login: async (password: string) => {
+        const result = await verifyPassword(password);
+        if (!result.ok) {
+          toast.error("Contraseña incorrecta");
+          return false;
         }
-        toast.error("Contraseña incorrecta");
-        return false;
+        setIsAdmin(true);
+        setMustChangePassword(result.mustChange);
+        if (result.mustChange) {
+          toast.warning("Cambia la contraseña inicial para proteger tus catálogos");
+        } else {
+          toast.success("Modo administrador activado");
+        }
+        return true;
+      },
+      changePassword: async (current: string, next: string) => {
+        const result = await rotatePassword(current, next);
+        if (!result.ok) {
+          toast.error(result.error ?? "No se pudo cambiar la contraseña");
+          return result;
+        }
+        setMustChangePassword(false);
+        mutate(
+          (c) => c,
+          entry("sistema", catalog.name, "Contraseña de administrador actualizada"),
+        );
+        toast.success("Contraseña actualizada");
+        return result;
+      },
+      resetPassword: async (code: string, next: string) => {
+        const result = await resetWithRecoveryCode(code, next);
+        if (!result.ok) {
+          toast.error(result.error ?? "No se pudo restablecer la contraseña");
+          return result;
+        }
+        setIsAdmin(false);
+        setMustChangePassword(false);
+        toast.success("Contraseña restablecida, inicia sesión de nuevo");
+        return result;
       },
       logout: () => {
         setIsAdmin(false);
+        setMustChangePassword(false);
         toast.success("Saliste del modo administrador");
       },
+      prefs: prefsMap[activeId] ?? DEFAULT_PREFS,
+      setPrefs: (patch) =>
+        setPrefsMap((prev) => ({
+          ...prev,
+          [activeId]: { ...(prev[activeId] ?? DEFAULT_PREFS), ...patch },
+        })),
+      resetPrefs: () =>
+        setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
       updateCatalog: (patch) =>
         guard(() => {
           const changes: string[] = [];
@@ -427,7 +494,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success("Catálogos restaurados");
         }),
     };
-  }, [state, hydrated, activeId, catalog, isAdmin, mutate, visibleCatalogIds]);
+  }, [
+    state,
+    hydrated,
+    activeId,
+    catalog,
+    isAdmin,
+    mustChangePassword,
+    prefsMap,
+    mutate,
+    visibleCatalogIds,
+  ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
