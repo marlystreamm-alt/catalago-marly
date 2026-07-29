@@ -155,6 +155,7 @@ function CatalogPage() {
     if (search.fav) patch.onlyFavorites = search.fav === "1";
     if (["categoria", "precio", "nombre"].includes(search.orden))
       patch.sortMode = search.orden as SortMode;
+    console.log("DBG patch", JSON.stringify(patch));
     if (Object.keys(patch).length) setPrefs(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, catalogId]);
