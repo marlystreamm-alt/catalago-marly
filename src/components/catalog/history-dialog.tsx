@@ -146,6 +146,10 @@ export function HistoryDialog({
                 </div>
                 <p className="mt-1.5 text-sm font-semibold text-card-foreground">{e.target}</p>
                 <p className="text-sm text-muted-foreground">{e.summary}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Por {e.user ?? "Administrador"} · {catalog.name}
+                </p>
+
               </div>
             ))
           )}
