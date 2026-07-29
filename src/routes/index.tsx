@@ -675,6 +675,8 @@ function CatalogPage() {
                           onOpenDetail={setDetailId}
                           selected={selectedIds.includes(service.id)}
                           onToggleSelect={toggleSelect}
+                          showDetail={showDetail}
+                          showShare={showShare}
                         />
                       ))}
 
