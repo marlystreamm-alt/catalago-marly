@@ -624,7 +624,13 @@ function CatalogPage() {
         </section>
 
         <div className="mt-5 grid gap-6">
-          {sortMode !== "categoria" ? (
+          {viewMode === "tabla" ? (
+            <ServiceTable
+              services={sorted}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+            />
+          ) : sortMode !== "categoria" ? (
             sorted.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
                 No hay servicios que coincidan con tu búsqueda.
