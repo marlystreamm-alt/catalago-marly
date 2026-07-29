@@ -571,6 +571,7 @@ function CatalogPage() {
             </div>
           ) : null}
 
+          {isAdmin ? (
           <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
             <Button size="sm" variant="outline" onClick={shareLink}>
               <Link2 className="size-4" />
