@@ -10,15 +10,19 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useOnline } from "@/hooks/use-online";
-import { loadOrders, saveOrders, type PendingOrder } from "./orders";
+import { loadOrders, saveOrders, type OrderStatus, type PendingOrder } from "./orders";
 
 interface OrderQueueValue {
   orders: PendingOrder[];
-  enqueue: (order: Omit<PendingOrder, "id" | "at">) => void;
+  pending: PendingOrder[];
+  enqueue: (order: Omit<PendingOrder, "id" | "at" | "status" | "attempts">) => void;
   remove: (id: string) => void;
   clear: () => void;
+  clearSent: () => void;
   sendAll: () => void;
   sendOne: (id: string) => void;
+  retryFailed: () => void;
+  online: boolean;
 }
 
 const OrderQueueContext = createContext<OrderQueueValue | null>(null);
@@ -27,6 +31,9 @@ const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `ord-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+/** Un pedido sigue pendiente mientras no se haya enviado. */
+export const isPending = (o: PendingOrder) => o.status === "cola" || o.status === "fallido";
 
 export function OrderQueueProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<PendingOrder[]>([]);
@@ -43,26 +50,75 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
     if (hydrated) saveOrders(orders);
   }, [orders, hydrated]);
 
-  const sendOrders = useCallback((list: PendingOrder[]) => {
-    if (!list.length) return;
-    let blocked = false;
-    list.forEach((order, index) => {
-      window.setTimeout(() => {
-        const win = window.open(order.link, "_blank", "noopener,noreferrer");
-        if (!win && !blocked) {
-          blocked = true;
-          toast.warning("Permite ventanas emergentes para enviar los pedidos pendientes");
-        }
-      }, index * 600);
-    });
-    const ids = new Set(list.map((o) => o.id));
-    setOrders((prev) => prev.filter((o) => !ids.has(o.id)));
-    toast.success(
-      list.length === 1
-        ? "Pedido enviado por WhatsApp"
-        : `${list.length} pedidos enviados por WhatsApp`,
-    );
+  const patch = useCallback((id: string, changes: Partial<PendingOrder>) => {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...changes } : o)));
   }, []);
+
+  /** Intenta abrir WhatsApp para cada pedido y va marcando su estado. */
+  const sendOrders = useCallback(
+    (list: PendingOrder[]) => {
+      const targets = list.filter(isPending);
+      if (!targets.length) return;
+
+      if (!navigator.onLine) {
+        const now = new Date().toISOString();
+        targets.forEach((o) =>
+          patch(o.id, {
+            status: "fallido" as OrderStatus,
+            attempts: o.attempts + 1,
+            lastAttemptAt: now,
+            error: "Sin conexión a internet",
+          }),
+        );
+        toast.error("Sin conexión: los pedidos quedaron marcados como fallidos");
+        return;
+      }
+
+      const ids = new Set(targets.map((o) => o.id));
+      setOrders((prev) =>
+        prev.map((o) => (ids.has(o.id) ? { ...o, status: "enviando" as OrderStatus } : o)),
+      );
+
+      let blocked = false;
+      targets.forEach((order, index) => {
+        window.setTimeout(() => {
+          const at = new Date().toISOString();
+          let win: Window | null = null;
+          try {
+            win = window.open(order.link, "_blank", "noopener,noreferrer");
+          } catch {
+            win = null;
+          }
+          if (win) {
+            patch(order.id, {
+              status: "enviado",
+              attempts: order.attempts + 1,
+              lastAttemptAt: at,
+              error: undefined,
+            });
+          } else {
+            patch(order.id, {
+              status: "fallido",
+              attempts: order.attempts + 1,
+              lastAttemptAt: at,
+              error: "El navegador bloqueó la ventana de WhatsApp",
+            });
+            if (!blocked) {
+              blocked = true;
+              toast.warning("Permite ventanas emergentes y reintenta los pedidos fallidos");
+            }
+          }
+        }, index * 600);
+      });
+
+      toast.success(
+        targets.length === 1
+          ? "Enviando el pedido por WhatsApp…"
+          : `Enviando ${targets.length} pedidos por WhatsApp…`,
+      );
+    },
+    [patch],
+  );
 
   // Al recuperar la conexión, la cola se envía sola por WhatsApp.
   useEffect(() => {
@@ -71,18 +127,22 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
       wasOffline.current = true;
       return;
     }
-    if (wasOffline.current && orders.length) {
+    if (wasOffline.current) {
       wasOffline.current = false;
-      sendOrders(orders);
+      const queued = orders.filter(isPending);
+      if (queued.length) sendOrders(queued);
     }
-    wasOffline.current = false;
   }, [online, hydrated, orders, sendOrders]);
 
   const value = useMemo<OrderQueueValue>(
     () => ({
       orders,
+      pending: orders.filter(isPending),
       enqueue: (order) => {
-        setOrders((prev) => [{ ...order, id: newId(), at: new Date().toISOString() }, ...prev]);
+        setOrders((prev) => [
+          { ...order, id: newId(), at: new Date().toISOString(), status: "cola", attempts: 0 },
+          ...prev,
+        ]);
         toast.success("Pedido guardado: se enviará solo al recuperar la conexión");
       },
       remove: (id) => setOrders((prev) => prev.filter((o) => o.id !== id)),
@@ -90,13 +150,19 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
         setOrders([]);
         toast.success("Cola de pedidos vaciada");
       },
-      sendAll: () => sendOrders(orders),
+      clearSent: () => {
+        setOrders((prev) => prev.filter((o) => o.status !== "enviado"));
+        toast.success("Pedidos enviados quitados de la lista");
+      },
+      sendAll: () => sendOrders(orders.filter(isPending)),
       sendOne: (id) => {
         const found = orders.find((o) => o.id === id);
         if (found) sendOrders([found]);
       },
+      retryFailed: () => sendOrders(orders.filter((o) => o.status === "fallido")),
+      online,
     }),
-    [orders, sendOrders],
+    [orders, sendOrders, online],
   );
 
   return <OrderQueueContext.Provider value={value}>{children}</OrderQueueContext.Provider>;

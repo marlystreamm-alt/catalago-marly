@@ -39,7 +39,10 @@ import {
 } from "@/components/catalog/history-dialog";
 import { PendingOrdersBar } from "@/components/catalog/pending-orders";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
-import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
+import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
+import { buildCatalogLink } from "@/lib/catalog/links";
+import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
+
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
@@ -56,7 +59,10 @@ const searchSchema = z.object({
   activos: fallback(z.coerce.string(), "").default(""),
   fav: fallback(z.coerce.string(), "").default(""),
   orden: fallback(z.string(), "").default(""),
+  /** Servicio específico: abre su detalle listo para pedir por WhatsApp. */
+  svc: fallback(z.string(), "").default(""),
 });
+
 
 export const Route = createFileRoute("/")({
   validateSearch: zodValidator(searchSchema),
@@ -129,6 +135,7 @@ function CatalogPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
   const search = Route.useSearch();
@@ -136,6 +143,7 @@ function CatalogPage() {
     search.cat && (CATALOG_IDS as string[]).includes(search.cat) ? (search.cat as CatalogId) : null;
   const appliedCatalog = useRef(false);
   const appliedPrefs = useRef(false);
+  const appliedService = useRef(false);
 
   useEffect(() => {
     if (appliedCatalog.current || !hydrated) return;
@@ -160,19 +168,36 @@ function CatalogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, catalogId]);
 
+  // ?svc=<id> abre el detalle del servicio listo para pedir por WhatsApp.
+  useEffect(() => {
+    if (appliedService.current || !hydrated || !search.svc) return;
+    if (targetCatalog && catalogId !== targetCatalog) return;
+    appliedService.current = true;
+    const found = catalog.services.find((s) => s.id === search.svc);
+    if (found) setDetailId(found.id);
+    else toast.error("El servicio del enlace ya no está disponible");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, catalogId, catalog]);
+
+  const detailService = useMemo(
+    () => catalog.services.find((s) => s.id === detailId) ?? null,
+    [catalog.services, detailId],
+  );
+
   const shareLink = () => {
-    const params = new URLSearchParams({ cat: catalogId });
-    if (query.trim()) params.set("q", query.trim());
-    if (categoryFilter !== ALL) params.set("categoria", categoryFilter);
-    if (onlyActive) params.set("activos", "1");
-    if (onlyFavorites) params.set("fav", "1");
-    if (sortMode !== "categoria") params.set("orden", sortMode);
-    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+    const url = buildCatalogLink(catalogId, {
+      q: query,
+      categoria: categoryFilter !== ALL ? categoryFilter : undefined,
+      activos: onlyActive,
+      fav: onlyFavorites,
+      orden: sortMode,
+    });
     navigator.clipboard
       .writeText(url)
       .then(() => toast.success("Enlace con filtros copiado"))
       .catch(() => toast.error("No se pudo copiar el enlace"));
   };
+
 
   const stats = useMemo(() => {
     const total = catalog.services.length;
@@ -289,6 +314,46 @@ function CatalogPage() {
     ? activeFilters.map((f) => f.label).join(" · ")
     : "Sin filtros aplicados";
 
+  // Metadatos de auditoría que acompañan cada exportación de la búsqueda.
+  const exportMeta = useMemo(
+    () =>
+      buildMeta([
+        { label: "Catálogo", value: catalog.name },
+        { label: "Búsqueda", value: query.trim() || "(vacía)" },
+        {
+          label: "Categoría",
+          value:
+            categoryFilter === ALL
+              ? "Todas"
+              : (catalog.categories.find((c) => c.id === categoryFilter)?.name ?? categoryFilter),
+        },
+        { label: "Solo activos", value: onlyActive ? "Sí" : "No" },
+        { label: "Solo favoritos", value: onlyFavorites ? "Sí" : "No" },
+        {
+          label: "Orden",
+          value:
+            sortMode === "precio"
+              ? "Precio (menor a mayor)"
+              : sortMode === "nombre"
+                ? "Nombre (A-Z)"
+                : "Categoría",
+        },
+        { label: "Filtros aplicados", value: filtersSummary },
+        { label: "Resultados exportados", value: String(sorted.length) },
+      ]),
+    [
+      catalog,
+      query,
+      categoryFilter,
+      onlyActive,
+      onlyFavorites,
+      sortMode,
+      filtersSummary,
+      sorted.length,
+    ],
+  );
+
+
   const openNew = () => {
     setEditing(null);
     setFormOpen(true);
@@ -303,14 +368,17 @@ function CatalogPage() {
     <main className="app-gradient min-h-screen pb-16">
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         <header className="card-soft rounded-3xl border border-border bg-card/90 p-4 backdrop-blur">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold tracking-[0.2em] text-primary">MA²</p>
-              <h1 className="truncate text-2xl font-bold text-card-foreground">{catalog.name}</h1>
+              <h1 className="text-2xl font-bold text-balance text-card-foreground">
+                {catalog.name}
+              </h1>
               <p className="text-sm text-muted-foreground">{catalog.subtitle}</p>
             </div>
             <AdminBar />
           </div>
+
 
           <nav
             className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
@@ -449,7 +517,12 @@ function CatalogPage() {
               variant="outline"
               disabled={!sorted.length}
               onClick={() => {
-                downloadCsv(`ma2-busqueda-${catalogId}-${stamp()}`, SEARCH_HEADERS, searchRows);
+                downloadCsv(
+                  `ma2-busqueda-${catalogId}-${stamp()}`,
+                  SEARCH_HEADERS,
+                  searchRows,
+                  exportMeta,
+                );
                 toast.success("Búsqueda exportada en CSV");
               }}
             >
@@ -463,10 +536,12 @@ function CatalogPage() {
               onClick={() => {
                 const ok = printPdf(
                   `${catalog.name} · Búsqueda`,
-                  `${sorted.length} servicio(s) · ${filtersSummary}`,
+                  `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
                   SEARCH_HEADERS,
                   searchRows,
+                  exportMeta,
                 );
+
                 if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
               }}
             >
@@ -514,7 +589,13 @@ function CatalogPage() {
             ) : (
               <div className="grid gap-3">
                 {sorted.map((service) => (
-                  <ServiceCard key={service.id} service={service} onEdit={openEdit} />
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    onEdit={openEdit}
+                    onOpenDetail={setDetailId}
+                  />
+
                 ))}
               </div>
             )
@@ -540,7 +621,13 @@ function CatalogPage() {
                     ) : null}
                     <div className="grid gap-3">
                       {group.items.map((service) => (
-                        <ServiceCard key={service.id} service={service} onEdit={openEdit} />
+                        <ServiceCard
+                          key={service.id}
+                          service={service}
+                          onEdit={openEdit}
+                          onOpenDetail={setDetailId}
+                        />
+
                       ))}
                     </div>
                   </div>
@@ -557,6 +644,14 @@ function CatalogPage() {
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
       <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
       <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
+      <ServiceDetailDialog
+        service={detailService}
+        open={!!detailService}
+        onOpenChange={(v) => {
+          if (!v) setDetailId(null);
+        }}
+      />
+
     </main>
   );
 }

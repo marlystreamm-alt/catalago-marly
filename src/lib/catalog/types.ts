@@ -43,7 +43,12 @@ export interface LogEntry {
   summary: string;
   /** Quién realizó la acción (bitácora de auditoría). */
   user?: string;
+  /** Campo modificado, con su valor anterior y nuevo (auditoría detallada). */
+  field?: string;
+  before?: string;
+  after?: string;
 }
+
 
 export interface Catalog {
   id: CatalogId;

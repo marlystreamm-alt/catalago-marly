@@ -34,15 +34,21 @@ const entry = (
   action: LogAction,
   target: string,
   summary: string,
-  user = "Administrador",
+  detail?: { field?: string; before?: string; after?: string; user?: string },
 ): LogEntry => ({
   id: newId(),
   at: new Date().toISOString(),
   action,
   target,
   summary,
-  user,
+  user: detail?.user ?? "Administrador",
+  field: detail?.field,
+  before: detail?.before,
+  after: detail?.after,
 });
+
+const mxn = (n: number) => `$${Number(n || 0).toLocaleString("es-MX")} MXN`;
+
 
 interface StoreValue {
   state: AppState;
@@ -222,28 +228,61 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       updateCatalog: (patch) =>
         guard(() => {
           const changes: string[] = [];
-          if (patch.name && patch.name !== catalog.name) changes.push(`nombre → ${patch.name}`);
-          if (patch.subtitle !== undefined && patch.subtitle !== catalog.subtitle)
+          const entries: LogEntry[] = [];
+          if (patch.name && patch.name !== catalog.name) {
+            changes.push(`nombre → ${patch.name}`);
+            entries.push(
+              entry("catalogo", patch.name, `Nombre del catálogo: "${catalog.name}" → "${patch.name}"`, {
+                field: "Nombre del catálogo",
+                before: catalog.name,
+                after: patch.name,
+              }),
+            );
+          }
+          if (patch.subtitle !== undefined && patch.subtitle !== catalog.subtitle) {
             changes.push("subtítulo");
-          if (patch.whatsappNumber !== undefined && patch.whatsappNumber !== catalog.whatsappNumber)
+            entries.push(
+              entry("catalogo", patch.name ?? catalog.name, "Se cambió el subtítulo", {
+                field: "Subtítulo",
+                before: catalog.subtitle,
+                after: patch.subtitle,
+              }),
+            );
+          }
+          if (patch.whatsappNumber !== undefined && patch.whatsappNumber !== catalog.whatsappNumber) {
             changes.push("número de WhatsApp");
+            entries.push(
+              entry("catalogo", patch.name ?? catalog.name, "Se cambió el número de WhatsApp", {
+                field: "Número de WhatsApp",
+                before: catalog.whatsappNumber || "(vacío)",
+                after: patch.whatsappNumber || "(vacío)",
+              }),
+            );
+          }
           if (
             patch.whatsappTemplate !== undefined &&
             patch.whatsappTemplate !== catalog.whatsappTemplate
-          )
+          ) {
             changes.push("plantilla de mensaje");
+            entries.push(
+              entry("catalogo", patch.name ?? catalog.name, "Se cambió la plantilla de mensaje", {
+                field: "Plantilla de mensaje",
+                before: catalog.whatsappTemplate,
+                after: patch.whatsappTemplate,
+              }),
+            );
+          }
           mutate(
             (c) => ({ ...c, ...patch }),
-            entry(
-              "catalogo",
-              patch.name ?? catalog.name,
-              changes.length
-                ? `Se actualizó ${changes.join(", ")}`
-                : "Ajustes guardados sin cambios",
-            ),
+            entries.length
+              ? entries
+              : entry("catalogo", catalog.name, "Ajustes guardados sin cambios"),
           );
-          toast.success("Cambios guardados");
+          toast.success(
+            changes.length ? `Cambios guardados: ${changes.join(", ")}` : "Cambios guardados",
+          );
         }),
+
       toggleCatalogHidden: (id) =>
         guard(() => {
           const target = state.catalogs[id];
@@ -263,10 +302,20 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         guard(() => {
           const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
           const changes: string[] = [];
+          const details: LogEntry[] = [];
           if (prev) {
             if (prev.name !== service.name) changes.push(`nombre → ${service.name}`);
-            if (prev.price !== service.price)
+            if (prev.price !== service.price) {
               changes.push(`precio ${prev.price} → ${service.price}`);
+              details.push(
+                entry(
+                  "edicion",
+                  service.name,
+                  `Precio: ${mxn(prev.price)} → ${mxn(service.price)}`,
+                  { field: "Precio", before: mxn(prev.price), after: mxn(service.price) },
+                ),
+              );
+            }
             if (prev.categoryId !== service.categoryId) changes.push("categoría");
             if (prev.subsectionId !== service.subsectionId) changes.push("subsección");
             if (prev.description !== service.description) changes.push("descripción");
@@ -274,8 +323,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             if (prev.profiles !== service.profiles) changes.push(`perfiles → ${service.profiles}`);
             if (prev.delivery !== service.delivery) changes.push("entrega");
             if (prev.warranty !== service.warranty) changes.push("garantía");
-            if (prev.active !== service.active)
+            if (prev.active !== service.active) {
               changes.push(service.active ? "activado" : "desactivado");
+              details.push(
+                entry(
+                  "estado",
+                  service.name,
+                  `Estado: ${prev.active ? "Activo" : "Oculto"} → ${service.active ? "Activo" : "Oculto"}`,
+                  {
+                    field: "Estado",
+                    before: prev.active ? "Activo" : "Oculto",
+                    after: service.active ? "Activo" : "Oculto",
+                  },
+                ),
+              );
+            }
           }
           mutate(
             (c) => {
@@ -290,15 +352,25 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
               return { ...c, services: [{ ...service, id: newId() } as Service, ...c.services] };
             },
             prev
-              ? entry(
-                  "edicion",
-                  service.name,
-                  changes.length ? `Se actualizó ${changes.join(", ")}` : "Guardado sin cambios",
-                )
-              : entry("creacion", service.name, `Servicio creado en $${service.price} MXN`),
+              ? details.length
+                ? details
+                : [
+                    entry(
+                      "edicion",
+                      service.name,
+                      changes.length ? `Se actualizó ${changes.join(", ")}` : "Guardado sin cambios",
+                    ),
+                  ]
+
+              : entry("creacion", service.name, `Servicio creado en ${mxn(service.price)}`, {
+                  field: "Precio",
+                  before: "—",
+                  after: mxn(service.price),
+                }),
           );
           toast.success(prev ? "Servicio actualizado" : "Servicio agregado");
         }),
+
       duplicateService: (id) =>
         guard(() => {
           const found = catalog.services.find((s) => s.id === id);
@@ -337,8 +409,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
             entry(
               "estado",
               found.name,
-              nowActive ? "Servicio activado (visible)" : "Servicio desactivado (oculto)",
+              `Estado: ${found.active ? "Activo" : "Oculto"} → ${nowActive ? "Activo" : "Oculto"}`,
+              {
+                field: "Estado",
+                before: found.active ? "Activo" : "Oculto",
+                after: nowActive ? "Activo" : "Oculto",
+              },
             ),
+
           );
           toast.success(nowActive ? "Servicio activado" : "Servicio desactivado");
         }),
