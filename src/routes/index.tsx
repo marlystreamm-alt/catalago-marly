@@ -598,9 +598,11 @@ function CatalogPage() {
                     service={service}
                     onEdit={openEdit}
                     onOpenDetail={setDetailId}
+                    selected={selectedIds.includes(service.id)}
+                    onToggleSelect={toggleSelect}
                   />
-
                 ))}
+
               </div>
             )
           ) : grouped.length === 0 ? (
@@ -630,9 +632,11 @@ function CatalogPage() {
                           service={service}
                           onEdit={openEdit}
                           onOpenDetail={setDetailId}
+                          selected={selectedIds.includes(service.id)}
+                          onToggleSelect={toggleSelect}
                         />
-
                       ))}
+
                     </div>
                   </div>
                 ))}
