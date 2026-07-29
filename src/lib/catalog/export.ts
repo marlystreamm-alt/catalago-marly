@@ -63,7 +63,7 @@ export function printPdf(
   <tbody>${rows
     .map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`)
     .join("")}</tbody></table>
-  <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };<\/script>
+  <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };</scr" + "ipt>
 </body></html>`;
   win.document.open();
   win.document.write(html);
