@@ -38,3 +38,24 @@ export function buildWhatsappLink(service: Service, catalog: Catalog) {
   const text = encodeURIComponent(buildWhatsappMessage(service, catalog));
   return number ? `https://wa.me/${number}?text=${text}` : `https://wa.me/?text=${text}`;
 }
+
+/** Mensaje único para pedir varias plataformas a la vez. */
+export function buildBulkWhatsappMessage(services: Service[], catalog: Catalog) {
+  const lines = services.map(
+    (s, i) => `${i + 1}. ${s.name} — ${formatMXN(s.price)}${
+      serviceDetails(s, catalog) ? `\n   ${serviceDetails(s, catalog)}` : ""
+    }`,
+  );
+  const total = services.reduce((sum, s) => sum + s.price, 0);
+  return [
+    `Hola, me interesan estos servicios de ${catalog.name}:`,
+    lines.join("\n"),
+    `Total: ${formatMXN(total)}`,
+  ].join("\n");
+}
+
+export function buildBulkWhatsappLink(services: Service[], catalog: Catalog) {
+  const number = (catalog.whatsappNumber || "").replace(/\D/g, "");
+  const text = encodeURIComponent(buildBulkWhatsappMessage(services, catalog));
+  return number ? `https://wa.me/${number}?text=${text}` : `https://wa.me/?text=${text}`;
+}

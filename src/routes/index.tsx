@@ -42,6 +42,7 @@ import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
 import { buildCatalogLink } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
+import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
 
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
@@ -124,6 +125,11 @@ function CatalogPage() {
   const online = useOnline();
   const [query, setQuery] = useState("");
   const { categoryFilter, onlyActive, onlyFavorites, sortMode } = prefs;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  // Al cambiar de catálogo la selección múltiple se limpia.
+  useEffect(() => setSelectedIds([]), [catalogId]);
   const setCategoryFilter = (categoryFilter: string) => setPrefs({ categoryFilter });
   const setOnlyActive = (onlyActive: boolean) => setPrefs({ onlyActive });
   const setOnlyFavorites = (onlyFavorites: boolean) => setPrefs({ onlyFavorites });
@@ -594,9 +600,11 @@ function CatalogPage() {
                     service={service}
                     onEdit={openEdit}
                     onOpenDetail={setDetailId}
+                    selected={selectedIds.includes(service.id)}
+                    onToggleSelect={toggleSelect}
                   />
-
                 ))}
+
               </div>
             )
           ) : grouped.length === 0 ? (
@@ -626,9 +634,11 @@ function CatalogPage() {
                           service={service}
                           onEdit={openEdit}
                           onOpenDetail={setDetailId}
+                          selected={selectedIds.includes(service.id)}
+                          onToggleSelect={toggleSelect}
                         />
-
                       ))}
+
                     </div>
                   </div>
                 ))}
@@ -636,7 +646,13 @@ function CatalogPage() {
             ))
           )}
         </div>
+
+        <BulkOrderBar
+          services={catalog.services.filter((s) => selectedIds.includes(s.id))}
+          onClear={() => setSelectedIds([])}
+        />
       </div>
+
 
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

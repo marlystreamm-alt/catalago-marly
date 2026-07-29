@@ -12,20 +12,65 @@ import { toast } from "sonner";
 import { useOnline } from "@/hooks/use-online";
 import { loadOrders, saveOrders, type OrderStatus, type PendingOrder } from "./orders";
 
+type NewOrder = Omit<PendingOrder, "id" | "at" | "status" | "attempts">;
+
 interface OrderQueueValue {
   orders: PendingOrder[];
   pending: PendingOrder[];
-  enqueue: (order: Omit<PendingOrder, "id" | "at" | "status" | "attempts">) => void;
+  enqueue: (order: NewOrder) => void;
+  enqueueMany: (orders: NewOrder[]) => void;
   remove: (id: string) => void;
   clear: () => void;
   clearSent: () => void;
   sendAll: () => void;
   sendOne: (id: string) => void;
   retryFailed: () => void;
+  maxAttempts: number;
+  setMaxAttempts: (value: number) => void;
+  autoRetry: boolean;
+  setAutoRetry: (value: boolean) => void;
   online: boolean;
 }
 
 const OrderQueueContext = createContext<OrderQueueValue | null>(null);
+
+const CONFIG_KEY = "ma2-pedidos-config-v1";
+export const MIN_ATTEMPTS = 1;
+export const MAX_ATTEMPTS_LIMIT = 10;
+
+interface QueueConfig {
+  maxAttempts: number;
+  autoRetry: boolean;
+}
+
+const DEFAULT_CONFIG: QueueConfig = { maxAttempts: 3, autoRetry: true };
+
+function loadConfig(): QueueConfig {
+  if (typeof window === "undefined") return DEFAULT_CONFIG;
+  try {
+    const raw = window.localStorage.getItem(CONFIG_KEY);
+    if (!raw) return DEFAULT_CONFIG;
+    const p = JSON.parse(raw) as Partial<QueueConfig>;
+    const n = Number(p.maxAttempts);
+    return {
+      maxAttempts: Number.isFinite(n)
+        ? Math.min(MAX_ATTEMPTS_LIMIT, Math.max(MIN_ATTEMPTS, Math.round(n)))
+        : DEFAULT_CONFIG.maxAttempts,
+      autoRetry: p.autoRetry !== false,
+    };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+function saveConfig(config: QueueConfig) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  } catch (error) {
+    console.error("No se pudo guardar la configuración de pedidos:", error);
+  }
+}
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -37,12 +82,16 @@ export const isPending = (o: PendingOrder) => o.status === "cola" || o.status ==
 
 export function OrderQueueProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<PendingOrder[]>([]);
+  const [config, setConfig] = useState<QueueConfig>(DEFAULT_CONFIG);
   const [hydrated, setHydrated] = useState(false);
   const online = useOnline();
   const wasOffline = useRef(false);
+  const configRef = useRef(config);
+  configRef.current = config;
 
   useEffect(() => {
     setOrders(loadOrders());
+    setConfig(loadConfig());
     setHydrated(true);
   }, []);
 
@@ -50,15 +99,20 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
     if (hydrated) saveOrders(orders);
   }, [orders, hydrated]);
 
+  useEffect(() => {
+    if (hydrated) saveConfig(config);
+  }, [config, hydrated]);
+
   const patch = useCallback((id: string, changes: Partial<PendingOrder>) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...changes } : o)));
   }, []);
 
   /** Intenta abrir WhatsApp para cada pedido y va marcando su estado. */
   const sendOrders = useCallback(
-    (list: PendingOrder[]) => {
+    (list: PendingOrder[], options?: { silent?: boolean }) => {
       const targets = list.filter(isPending);
       if (!targets.length) return;
+      const silent = options?.silent === true;
 
       if (!navigator.onLine) {
         const now = new Date().toISOString();
@@ -96,6 +150,7 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
               lastAttemptAt: at,
               error: undefined,
             });
+            toast.success(`Enviado: ${order.serviceName}`);
           } else {
             patch(order.id, {
               status: "fallido",
@@ -111,16 +166,19 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
         }, index * 600);
       });
 
-      toast.success(
-        targets.length === 1
-          ? "Enviando el pedido por WhatsApp…"
-          : `Enviando ${targets.length} pedidos por WhatsApp…`,
-      );
+      if (!silent) {
+        toast.success(
+          targets.length === 1
+            ? "Enviando el pedido por WhatsApp…"
+            : `Enviando ${targets.length} pedidos por WhatsApp…`,
+        );
+      }
     },
     [patch],
   );
 
-  // Al recuperar la conexión, la cola se envía sola por WhatsApp.
+  // Al recuperar la conexión, la cola (incluidos los fallidos con intentos
+  // disponibles) se envía sola por WhatsApp.
   useEffect(() => {
     if (!hydrated) return;
     if (!online) {
@@ -129,21 +187,36 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
     }
     if (wasOffline.current) {
       wasOffline.current = false;
-      const queued = orders.filter(isPending);
-      if (queued.length) sendOrders(queued);
+      if (!configRef.current.autoRetry) return;
+      const queued = orders.filter(
+        (o) => isPending(o) && o.attempts < configRef.current.maxAttempts,
+      );
+      if (queued.length) {
+        toast.info(`Conexión recuperada: reintentando ${queued.length} pedido(s)`);
+        sendOrders(queued, { silent: true });
+      }
     }
   }, [online, hydrated, orders, sendOrders]);
 
-  const value = useMemo<OrderQueueValue>(
-    () => ({
+  const value = useMemo<OrderQueueValue>(() => {
+    const create = (order: NewOrder): PendingOrder => ({
+      ...order,
+      id: newId(),
+      at: new Date().toISOString(),
+      status: "cola",
+      attempts: 0,
+    });
+    return {
       orders,
       pending: orders.filter(isPending),
       enqueue: (order) => {
-        setOrders((prev) => [
-          { ...order, id: newId(), at: new Date().toISOString(), status: "cola", attempts: 0 },
-          ...prev,
-        ]);
+        setOrders((prev) => [create(order), ...prev]);
         toast.success("Pedido guardado: se enviará solo al recuperar la conexión");
+      },
+      enqueueMany: (list) => {
+        if (!list.length) return;
+        setOrders((prev) => [...list.map(create), ...prev]);
+        toast.success(`${list.length} pedido(s) guardados en la cola`);
       },
       remove: (id) => setOrders((prev) => prev.filter((o) => o.id !== id)),
       clear: () => {
@@ -159,11 +232,27 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
         const found = orders.find((o) => o.id === id);
         if (found) sendOrders([found]);
       },
-      retryFailed: () => sendOrders(orders.filter((o) => o.status === "fallido")),
+      retryFailed: () => {
+        const list = orders.filter(
+          (o) => o.status === "fallido" && o.attempts < config.maxAttempts,
+        );
+        if (!list.length) {
+          toast.info("No hay fallidos con intentos disponibles");
+          return;
+        }
+        sendOrders(list);
+      },
+      maxAttempts: config.maxAttempts,
+      setMaxAttempts: (value) =>
+        setConfig((prev) => ({
+          ...prev,
+          maxAttempts: Math.min(MAX_ATTEMPTS_LIMIT, Math.max(MIN_ATTEMPTS, Math.round(value))),
+        })),
+      autoRetry: config.autoRetry,
+      setAutoRetry: (value) => setConfig((prev) => ({ ...prev, autoRetry: value })),
       online,
-    }),
-    [orders, sendOrders, online],
-  );
+    };
+  }, [orders, sendOrders, online, config]);
 
   return <OrderQueueContext.Provider value={value}>{children}</OrderQueueContext.Provider>;
 }

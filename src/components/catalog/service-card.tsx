@@ -15,10 +15,14 @@ export function ServiceCard({
   service,
   onEdit,
   onOpenDetail,
+  selected,
+  onToggleSelect,
 }: {
   service: Service;
   onEdit: (service: Service) => void;
   onOpenDetail?: (id: string) => void;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
     useCatalogStore();
@@ -36,16 +40,34 @@ export function ServiceCard({
   ].filter(Boolean) as string[];
 
   return (
-    <article className="card-soft rounded-2xl border border-border bg-card p-4">
+    <article
+      className={`card-soft rounded-2xl border bg-card p-4 ${
+        selected ? "border-primary ring-2 ring-primary/30" : "border-border"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-card-foreground">{service.name}</h3>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {category ? <Badge variant="secondary">{category.name}</Badge> : null}
-            {subsection ? <Badge variant="outline">{subsection.name}</Badge> : null}
-            {!service.active ? <Badge variant="destructive">Oculto</Badge> : null}
+        <div className="flex min-w-0 items-start gap-2">
+          {onToggleSelect ? (
+            <input
+              type="checkbox"
+              className="mt-1 size-4 shrink-0 accent-primary"
+              checked={!!selected}
+              aria-label={`Seleccionar ${service.name}`}
+              onChange={() => onToggleSelect(service.id)}
+            />
+          ) : null}
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-card-foreground">
+              {service.name}
+            </h3>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {category ? <Badge variant="secondary">{category.name}</Badge> : null}
+              {subsection ? <Badge variant="outline">{subsection.name}</Badge> : null}
+              {!service.active ? <Badge variant="destructive">Oculto</Badge> : null}
+            </div>
           </div>
         </div>
+
         <div className="flex shrink-0 items-center gap-1">
           <p className="text-lg font-bold text-primary">{formatMXN(service.price)}</p>
           <Button
