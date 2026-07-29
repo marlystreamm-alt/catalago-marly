@@ -35,6 +35,7 @@ const emptyService = (categoryId: string): Omit<Service, "id"> => ({
   delivery: "Inmediato (5 a 30 min)",
   warranty: "30 días",
   active: true,
+  favorite: false,
 });
 
 export function ServiceFormDialog({

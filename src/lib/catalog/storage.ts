@@ -1,5 +1,14 @@
 import { createSeedState } from "./seed";
-import { CATALOG_IDS, DEFAULT_TEMPLATE, type AppState, type Catalog, type CatalogId } from "./types";
+import {
+  CATALOG_IDS,
+  DEFAULT_TEMPLATE,
+  LOG_LABELS,
+  MAX_LOG_ENTRIES,
+  type AppState,
+  type Catalog,
+  type CatalogId,
+  type LogEntry,
+} from "./types";
 
 const KEY = "ma2-catalogos-v1";
 
@@ -48,7 +57,20 @@ export function normalizeState(raw: unknown): AppState {
         delivery: String(sv.delivery ?? ""),
         warranty: String(sv.warranty ?? ""),
         active: sv.active !== false,
+        favorite: sv.favorite === true,
       })),
+      hidden: c.hidden === true,
+      log: Array.isArray(c.log)
+        ? c.log.slice(0, MAX_LOG_ENTRIES).map((e, i) => ({
+            id: String(e.id ?? `log-${i}`),
+            at: String(e.at ?? new Date().toISOString()),
+            action: (LOG_LABELS as Record<string, string>)[String(e.action)]
+              ? (e.action as LogEntry["action"])
+              : "sistema",
+            target: String(e.target ?? ""),
+            summary: String(e.summary ?? ""),
+          }))
+        : [],
     };
   }
   return result;
