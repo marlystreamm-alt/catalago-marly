@@ -41,7 +41,10 @@ export interface LogEntry {
   action: LogAction;
   target: string;
   summary: string;
+  /** Quién realizó la acción (bitácora de auditoría). */
+  user?: string;
 }
+
 
 export interface Catalog {
   id: CatalogId;

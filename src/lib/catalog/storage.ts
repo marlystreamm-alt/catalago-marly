@@ -69,8 +69,10 @@ export function normalizeState(raw: unknown): AppState {
               : "sistema",
             target: String(e.target ?? ""),
             summary: String(e.summary ?? ""),
+            user: typeof e.user === "string" && e.user.trim() ? e.user : "Administrador",
           }))
         : [],
+
     };
   }
   return result;
