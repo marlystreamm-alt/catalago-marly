@@ -43,6 +43,8 @@ import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/cata
 import { buildCatalogLink } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
+import { ServiceTable } from "@/components/catalog/service-table";
+
 
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
@@ -124,7 +126,9 @@ function CatalogPage() {
 
   const online = useOnline();
   const [query, setQuery] = useState("");
-  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare } = prefs;
+  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare, viewMode } =
+    prefs;
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
   const [snapshots, setSnapshots] = useState<Record<string, number>>({});
@@ -485,6 +489,19 @@ function CatalogPage() {
                 <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={viewMode}
+              onValueChange={(v) => setPrefs({ viewMode: v as "tarjetas" | "tabla" })}
+            >
+              <SelectTrigger className="flex-1 min-w-[9rem]" aria-label="Vista del catálogo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tarjetas">Vista tarjetas</SelectItem>
+                <SelectItem value="tabla">Vista tabla</SelectItem>
+              </SelectContent>
+            </Select>
+
             <div className="flex items-center gap-2">
               <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
               <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">

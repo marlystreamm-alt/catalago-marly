@@ -1,5 +1,8 @@
 import { CATALOG_IDS, type CatalogId, type SortMode } from "./types";
 
+/** Vista del catálogo: tarjetas completas o tabla compacta plataforma/precio. */
+export type ViewMode = "tarjetas" | "tabla";
+
 /** Preferencias de filtrado y orden guardadas por catálogo en este dispositivo. */
 export interface CatalogPrefs {
   sortMode: SortMode;
@@ -10,6 +13,8 @@ export interface CatalogPrefs {
   showDetail: boolean;
   /** Muestra el botón "Compartir" en las tarjetas. */
   showShare: boolean;
+  /** Tarjetas o tabla de plataformas y precios. */
+  viewMode: ViewMode;
 }
 
 export type PrefsMap = Record<CatalogId, CatalogPrefs>;
@@ -25,9 +30,11 @@ export const DEFAULT_PREFS: CatalogPrefs = {
   categoryFilter: ALL_CATEGORIES,
   showDetail: true,
   showShare: true,
+  viewMode: "tarjetas",
 };
 
 const SORTS: SortMode[] = ["categoria", "precio", "nombre"];
+
 
 function isBrowser() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -50,7 +57,9 @@ function normalize(raw: unknown): PrefsMap {
       categoryFilter: typeof p.categoryFilter === "string" ? p.categoryFilter : ALL_CATEGORIES,
       showDetail: p.showDetail !== false,
       showShare: p.showShare !== false,
+      viewMode: p.viewMode === "tabla" ? "tabla" : "tarjetas",
     };
+
   }
   return base;
 }
