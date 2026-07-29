@@ -446,6 +446,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           mutate((c) => ({ ...c, log: [] }), entry("sistema", catalog.name, "Historial vaciado"));
           toast.success("Historial vaciado");
         }),
+      auditLog: CATALOG_IDS.flatMap((id) =>
+        state.catalogs[id].log.map((e) => ({
+          ...e,
+          catalogId: id,
+          catalogName: state.catalogs[id].name,
+        })),
+      ).sort((a, b) => b.at.localeCompare(a.at)),
+
       exportBackup: () =>
         guard(() => {
           try {
