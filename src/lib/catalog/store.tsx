@@ -8,7 +8,16 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
-import { ensureAuthRecord, resetWithRecoveryCode, rotatePassword, verifyPassword } from "./auth";
+import {
+  clearFailedAttempts,
+  ensureAuthRecord,
+  formatLockWait,
+  getLockStatus,
+  registerFailedAttempt,
+  resetWithRecoveryCode,
+  rotatePassword,
+  verifyPassword,
+} from "./auth";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
