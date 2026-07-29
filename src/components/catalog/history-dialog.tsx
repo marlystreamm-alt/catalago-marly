@@ -98,6 +98,40 @@ export function HistoryDialog({
           </SelectContent>
         </Select>
 
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              downloadCsv(`ma2-historial-${catalog.id}-${stamp()}`, LOG_HEADERS, rows);
+              toast.success("Historial exportado en CSV");
+            }}
+          >
+            <FileDown className="size-4" />
+            Exportar CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!rows.length}
+            onClick={() => {
+              const ok = printPdf(
+                `Historial · ${catalog.name}`,
+                `${rows.length} movimiento(s) · generado el ${formatDate(new Date().toISOString())}`,
+                LOG_HEADERS,
+                rows,
+              );
+              if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+            }}
+          >
+            <FileText className="size-4" />
+            Exportar PDF
+          </Button>
+        </div>
+
+
+
         <div className="grid gap-2">
           {entries.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
