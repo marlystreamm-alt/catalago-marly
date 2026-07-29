@@ -17,12 +17,16 @@ export function ServiceCard({
   onOpenDetail,
   selected,
   onToggleSelect,
+  showDetail = true,
+  showShare = true,
 }: {
   service: Service;
   onEdit: (service: Service) => void;
   onOpenDetail?: (id: string) => void;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  showDetail?: boolean;
+  showShare?: boolean;
 }) {
   const { catalog, isAdmin, duplicateService, deleteService, toggleService, toggleFavorite } =
     useCatalogStore();
@@ -126,12 +130,13 @@ export function ServiceCard({
         )}
 
         <div className="flex flex-wrap gap-1.5">
-          {onOpenDetail ? (
+          {onOpenDetail && showDetail ? (
             <Button variant="outline" size="sm" onClick={() => onOpenDetail(service.id)}>
               <Info className="size-4" />
               Ver detalle
             </Button>
           ) : null}
+          {showShare ? (
           <Button
             variant="outline"
             size="sm"
@@ -146,6 +151,7 @@ export function ServiceCard({
             <Link2 className="size-4" />
             Compartir
           </Button>
+          ) : null}
         </div>
 
 

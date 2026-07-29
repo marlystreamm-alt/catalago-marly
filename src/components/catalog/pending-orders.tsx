@@ -1,11 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock,
   Loader2,
+  Download,
+  Info,
   RotateCw,
   Send,
+  Upload,
   Trash2,
   X,
 } from "lucide-react";
@@ -26,7 +29,16 @@ import {
   MIN_ATTEMPTS,
   useOrderQueue,
 } from "@/lib/catalog/order-queue";
-import { ORDER_STATUS_LABELS, type OrderStatus, type PendingOrder } from "@/lib/catalog/orders";
+import {
+  ORDER_STATUS_LABELS,
+  buildOrdersBackup,
+  downloadTextFile,
+  parseOrdersBackup,
+  type OrderStatus,
+  type PendingOrder,
+} from "@/lib/catalog/orders";
+import { OrderDetailDialog } from "./order-detail-dialog";
+import { toast } from "sonner";
 import { formatMXN } from "@/lib/catalog/whatsapp";
 import { useOnline } from "@/hooks/use-online";
 import { ConfirmButton } from "./confirm-button";
@@ -91,11 +103,42 @@ export function PendingOrdersBar() {
     setMaxAttempts,
     autoRetry,
     setAutoRetry,
+    importOrders,
   } = useOrderQueue();
   const online = useOnline();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<OrderStatus | "todos">("todos");
   const [query, setQuery] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const importMode = useRef<"merge" | "replace">("merge");
+
+  const detailOrder = orders.find((o) => o.id === detailId) ?? null;
+
+  const exportJson = () => {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    downloadTextFile(
+      `ma2-pedidos-${stamp}.json`,
+      JSON.stringify(buildOrdersBackup(orders), null, 2),
+    );
+    toast.success("Historial de pedidos exportado en JSON");
+  };
+
+  const pickFile = (mode: "merge" | "replace") => {
+    importMode.current = mode;
+    fileRef.current?.click();
+  };
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const list = parseOrdersBackup(await file.text());
+      importOrders(list, importMode.current);
+    } catch (error) {
+      console.error("No se pudo importar el historial de pedidos:", error);
+      toast.error("El archivo JSON no es un respaldo de pedidos válido");
+    }
+  };
 
   const counts = useMemo(() => {
     const base: Record<OrderStatus, number> = { cola: 0, enviando: 0, enviado: 0, fallido: 0 };
@@ -217,6 +260,28 @@ export function PendingOrdersBar() {
               <CheckCircle2 className="size-4" />
               Quitar enviados
             </Button>
+            <Button size="sm" variant="outline" onClick={exportJson}>
+              <Download className="size-4" />
+              Exportar JSON
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => pickFile("merge")}>
+              <Upload className="size-4" />
+              Importar (agregar)
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => pickFile("replace")}>
+              <Upload className="size-4" />
+              Restaurar (reemplazar)
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                void onFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -275,6 +340,10 @@ export function PendingOrdersBar() {
                   </p>
                 ) : null}
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => setDetailId(o.id)}>
+                    <Info className="size-4" />
+                    Ver detalle
+                  </Button>
                   {o.status === "enviado" ? null : (
                     <Button
                       size="sm"
@@ -314,6 +383,15 @@ export function PendingOrdersBar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OrderDetailDialog
+        order={detailOrder}
+        open={!!detailOrder}
+        maxAttempts={maxAttempts}
+        onOpenChange={(v) => {
+          if (!v) setDetailId(null);
+        }}
+      />
     </>
   );
 }

@@ -6,6 +6,10 @@ export interface CatalogPrefs {
   onlyActive: boolean;
   onlyFavorites: boolean;
   categoryFilter: string;
+  /** Muestra el botón "Ver detalle" en las tarjetas. */
+  showDetail: boolean;
+  /** Muestra el botón "Compartir" en las tarjetas. */
+  showShare: boolean;
 }
 
 export type PrefsMap = Record<CatalogId, CatalogPrefs>;
@@ -19,6 +23,8 @@ export const DEFAULT_PREFS: CatalogPrefs = {
   onlyActive: true,
   onlyFavorites: false,
   categoryFilter: ALL_CATEGORIES,
+  showDetail: true,
+  showShare: true,
 };
 
 const SORTS: SortMode[] = ["categoria", "precio", "nombre"];
@@ -42,6 +48,8 @@ function normalize(raw: unknown): PrefsMap {
       onlyActive: p.onlyActive !== false,
       onlyFavorites: p.onlyFavorites === true,
       categoryFilter: typeof p.categoryFilter === "string" ? p.categoryFilter : ALL_CATEGORIES,
+      showDetail: p.showDetail !== false,
+      showShare: p.showShare !== false,
     };
   }
   return base;
