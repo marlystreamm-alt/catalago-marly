@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { History, Trash2 } from "lucide-react";
+import { FileDown, FileText, History, ShieldCheck, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCatalogStore } from "@/lib/catalog/store";
+import { downloadCsv, printPdf, stamp } from "@/lib/catalog/export";
 import { LOG_LABELS, type LogAction } from "@/lib/catalog/types";
 import { ConfirmButton } from "./confirm-button";
 
@@ -34,6 +36,9 @@ const formatDate = (iso: string) => {
     minute: "2-digit",
   });
 };
+
+const LOG_HEADERS = ["Fecha", "Usuario", "Catálogo", "Acción", "Elemento", "Resumen"];
+
 
 export function HistoryDialog({
   open,
