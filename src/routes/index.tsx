@@ -131,7 +131,7 @@ function CatalogPage() {
   const search = Route.useSearch();
   const applied = useRef(false);
   useEffect(() => {
-    if (applied.current) return;
+    if (applied.current || !hydrated) return;
     applied.current = true;
     if (search.cat && (CATALOG_IDS as string[]).includes(search.cat))
       setCatalogId(search.cat as CatalogId);
@@ -144,7 +144,7 @@ function CatalogPage() {
       patch.sortMode = search.orden as SortMode;
     if (Object.keys(patch).length) setPrefs(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hydrated]);
 
   const shareLink = () => {
     const params = new URLSearchParams({ cat: catalogId });
