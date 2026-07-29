@@ -489,6 +489,19 @@ function CatalogPage() {
                 <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
               </SelectContent>
             </Select>
+            <Select
+              value={viewMode}
+              onValueChange={(v) => setPrefs({ viewMode: v as "tarjetas" | "tabla" })}
+            >
+              <SelectTrigger className="flex-1 min-w-[9rem]" aria-label="Vista del catálogo">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tarjetas">Vista tarjetas</SelectItem>
+                <SelectItem value="tabla">Vista tabla</SelectItem>
+              </SelectContent>
+            </Select>
+
             <div className="flex items-center gap-2">
               <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
               <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
