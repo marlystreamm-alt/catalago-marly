@@ -3,7 +3,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
+import {
+  buildWhatsappLink,
+  buildWhatsappMessage,
+  displayPrice,
+  serviceFacts,
+} from "@/lib/catalog/whatsapp";
 import { buildServiceLink } from "@/lib/catalog/links";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
@@ -36,12 +41,8 @@ export function ServiceCard({
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
 
 
-  const meta = [
-    service.devices ? `${service.devices} disp.` : null,
-    service.profiles ? `${service.profiles} perfiles` : null,
-    service.delivery,
-    service.warranty ? `Garantía ${service.warranty}` : null,
-  ].filter(Boolean) as string[];
+  // Etiqueta fija + valor; los campos vacíos no se muestran.
+  const meta = serviceFacts(service).map((f) => `${f.label}: ${f.value.trim()}`);
 
   return (
     <article
@@ -73,7 +74,7 @@ export function ServiceCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <p className="text-lg font-bold text-primary">{formatMXN(service.price)}</p>
+          <p className="text-lg font-bold text-primary">{displayPrice(service)}</p>
           <Button
             variant="ghost"
             size="icon"

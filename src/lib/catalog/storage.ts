@@ -49,20 +49,31 @@ export function normalizeState(raw: unknown): AppState {
                 : [],
             }))
           : seed.catalogs[id].categories,
-      services: c.services.map((sv, i) => ({
-        id: String(sv.id ?? `${id}-r${i}`),
-        name: String(sv.name ?? "Sin nombre"),
-        price: Number.isFinite(Number(sv.price)) ? Number(sv.price) : 0,
-        categoryId: String(sv.categoryId ?? "otros"),
-        subsectionId: sv.subsectionId ? String(sv.subsectionId) : null,
-        description: String(sv.description ?? ""),
-        devices: String(sv.devices ?? ""),
-        profiles: String(sv.profiles ?? ""),
-        delivery: String(sv.delivery ?? ""),
-        warranty: String(sv.warranty ?? ""),
-        active: sv.active !== false,
-        favorite: sv.favorite === true,
-      })),
+      services: c.services.map((sv, i) => {
+        const opt = (v: unknown) =>
+          typeof v === "string" && v.trim() ? String(v) : undefined;
+        return {
+          id: String(sv.id ?? `${id}-r${i}`),
+          name: String(sv.name ?? "Sin nombre"),
+          price: Number.isFinite(Number(sv.price)) ? Number(sv.price) : 0,
+          categoryId: String(sv.categoryId ?? "otros"),
+          subsectionId: sv.subsectionId ? String(sv.subsectionId) : null,
+          description: String(sv.description ?? ""),
+          devices: String(sv.devices ?? ""),
+          profiles: String(sv.profiles ?? ""),
+          delivery: String(sv.delivery ?? ""),
+          warranty: String(sv.warranty ?? ""),
+          active: sv.active !== false,
+          favorite: sv.favorite === true,
+          priceText: opt(sv.priceText),
+          icon: opt(sv.icon),
+          plan: opt(sv.plan),
+          users: opt(sv.users),
+          vigencia: opt(sv.vigencia),
+          requirements: opt(sv.requirements),
+          sortIndex: Number.isFinite(Number(sv.sortIndex)) ? Number(sv.sortIndex) : i,
+        };
+      }),
       hidden: c.hidden === true,
       log: Array.isArray(c.log)
         ? c.log.slice(0, MAX_LOG_ENTRIES).map((e, i) => ({
