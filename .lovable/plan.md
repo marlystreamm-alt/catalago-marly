@@ -1,26 +1,33 @@
 ## Objetivo
 
-Cuando no hay sesión de administrador (modo público), dejar la pantalla limpia: solo el buscador de servicios y el listado. Todo lo marcado en rojo se oculta.
+Que al **editar** (modo administrador) veas una lista simple tipo la de tu captura —plataforma y precio en filas— y que el **catálogo público** siempre se vea con las tarjetas normales, sin importar la vista que hayas dejado activa.
 
-## Qué se oculta en modo público
+## Qué cambia
 
-1. **Fila de estadísticas** (Total, Activos, Categorías, Ocultos, Favoritos).
-2. **Controles de la tarjeta de filtros**, dejando únicamente "Buscar servicio…":
-   - Selector de categorías
-   - Selector de orden (Por categoría / precio / nombre)
-   - Selector de vista (Tarjetas / Tabla)
-   - Interruptores Favoritos, Ver detalles, Compartir
-   - Chips de filtros activos y "Limpiar filtros"
-3. **Fila de acciones**: Compartir enlace con filtros, Exportar búsqueda CSV, Exportar búsqueda PDF.
+**1. El público siempre ve tarjetas**
+Hoy el modo de vista (tarjetas / tabla / lista) se guarda como preferencia y se sigue aplicando aunque cierres sesión de administrador, por eso el catálogo puede quedarse en modo tabla. Se forzará: si no hay sesión de administrador, siempre se renderizan las tarjetas normales. La preferencia se conserva para cuando vuelvas a entrar como admin.
 
-En modo administrador todo sigue igual que hoy.
+**2. La vista de edición se simplifica al estilo de tu captura**
+La "Vista lista (editar)" pasa a mostrar filas compactas: icono/estrella, nombre de la plataforma y precio (texto libre), con el resto de los campos —plan, dispositivos, perfiles, usuarios, tiempo de entrega, garantía, vigencia, requisitos, descripción— ocultos dentro de un desplegable por fila ("Más datos"). Así editas nombre y precio de corrido y solo abres el detalle cuando lo necesitas.
+
+Se conservan tal cual: las tres pestañas (Perfiles, Completas, Trámites), buscar, filtrar activos/desactivados, seleccionar, agregar/duplicar/eliminar fila, activar/desactivar, reordenar y el botón único **Guardar todos los cambios**.
+
+**3. Selector de vista más claro**
+Solo dos opciones visibles para el admin: **Editar** (lista) y **Vista pública** (tarjetas, para revisar cómo queda). La vista "tabla" actual se deja disponible pero deja de ser lo que puede "escaparse" al público.
+
+## Lo que NO cambia
+
+- Diseño, colores, tamaños y comportamiento de las tarjetas públicas.
+- Campos de texto libre sin mínimos ni números forzados.
+- Ocultamiento de líneas vacías en las tarjetas.
+- Toda la lógica de datos, WhatsApp, respaldos e historial.
 
 ## Detalles técnicos
 
-- `src/routes/index.tsx`: envolver en `{isAdmin ? … : null}` la sección de estadísticas (líneas ~448-454), el bloque de selects/switches (~467-540), los chips de filtros (~542-568) y la barra de exportar/compartir (~570-611). El input de búsqueda queda siempre visible.
-- La lógica de filtrado no cambia: en público se usan los valores por defecto de preferencias (categoría = todas, favoritos apagado, vista según preferencia guardada) y solo se aplica `query`.
-- Nota: los enlaces públicos con parámetros (categoría, favoritos, servicio) siguen funcionando aunque los controles no se muestren.
+- `src/routes/index.tsx`: el render usa `isAdmin ? viewMode : "tarjetas"`; se ajustan las etiquetas del selector.
+- `src/components/catalog/admin-list.tsx`: se reestructura la fila a un layout de dos columnas (nombre + precio) con `Collapsible` para el resto de campos; misma lógica de estado y `replaceServices`.
+- Sin cambios en `store.tsx`, `types.ts`, `whatsapp.ts` ni `service-card.tsx`.
 
-## Prueba antes de terminar
+## Verificación
 
-Cerrar sesión de administrador y confirmar que solo aparece el buscador sobre el listado, sin estadísticas ni botones; luego entrar como administrador y verificar que todos los controles reaparecen.
+Prueba en el navegador: entrar como admin, editar dos precios y un nombre en la lista, guardar una sola vez, abrir "Más datos" de una fila, cerrar sesión y confirmar que el catálogo público aparece con tarjetas normales.
