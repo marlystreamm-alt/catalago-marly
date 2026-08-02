@@ -24,6 +24,20 @@ export interface Service {
   warranty: string;
   active: boolean;
   favorite: boolean;
+  /** Precio en texto libre ("Desde $45", "Consultar"); tiene prioridad al mostrarse. */
+  priceText?: string;
+  /** Emoji o URL de imagen que identifica la plataforma o trámite. */
+  icon?: string;
+  /** Plan, modalidad o tipo de cuenta (texto libre). */
+  plan?: string;
+  /** Usuarios permitidos (texto libre). */
+  users?: string;
+  /** Vigencia o duración (texto libre). */
+  vigencia?: string;
+  /** Requisitos o campos requeridos (texto libre, usado en trámites). */
+  requirements?: string;
+  /** Orden manual dentro del catálogo (menor primero). */
+  sortIndex?: number;
 }
 
 export type LogAction =
