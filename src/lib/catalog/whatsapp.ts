@@ -8,6 +8,27 @@ export function formatMXN(value: number) {
   }).format(value);
 }
 
+/** Precio visible: usa el texto libre si existe, si no el precio en MXN. */
+export function displayPrice(service: Service) {
+  const text = service.priceText?.trim();
+  if (text) return text;
+  return formatMXN(service.price);
+}
+
+/** Líneas con etiqueta fija; los valores vacíos se omiten por completo. */
+export function serviceFacts(service: Service): { label: string; value: string }[] {
+  return [
+    { label: "Plan", value: service.plan ?? "" },
+    { label: "Dispositivos", value: service.devices },
+    { label: "Perfiles", value: service.profiles },
+    { label: "Usuarios", value: service.users ?? "" },
+    { label: "Tiempo de entrega", value: service.delivery },
+    { label: "Garantía", value: service.warranty },
+    { label: "Vigencia", value: service.vigencia ?? "" },
+    { label: "Requisitos", value: service.requirements ?? "" },
+  ].filter((f) => f.value && f.value.trim());
+}
+
 export function serviceDetails(service: Service, catalog: Catalog) {
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
@@ -15,10 +36,7 @@ export function serviceDetails(service: Service, catalog: Catalog) {
     category ? `Categoría: ${category.name}` : null,
     subsection ? `Subsección: ${subsection.name}` : null,
     service.description ? service.description : null,
-    service.devices ? `Dispositivos: ${service.devices}` : null,
-    service.profiles ? `Perfiles: ${service.profiles}` : null,
-    service.delivery ? `Entrega: ${service.delivery}` : null,
-    service.warranty ? `Garantía: ${service.warranty}` : null,
+    ...serviceFacts(service).map((f) => `${f.label}: ${f.value.trim()}`),
   ].filter(Boolean);
   return parts.join(" · ");
 }
