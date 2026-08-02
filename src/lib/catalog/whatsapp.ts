@@ -46,7 +46,7 @@ export function buildWhatsappMessage(service: Service, catalog: Catalog) {
     catalog.whatsappTemplate || "Hola, me interesa {servicio} por {precio}. {detalles}";
   return template
     .replaceAll("{servicio}", service.name)
-    .replaceAll("{precio}", formatMXN(service.price))
+    .replaceAll("{precio}", displayPrice(service))
     .replaceAll("{detalles}", serviceDetails(service, catalog))
     .replaceAll("{catalogo}", catalog.name);
 }
@@ -60,7 +60,7 @@ export function buildWhatsappLink(service: Service, catalog: Catalog) {
 /** Mensaje único para pedir varias plataformas a la vez. */
 export function buildBulkWhatsappMessage(services: Service[], catalog: Catalog) {
   const lines = services.map(
-    (s, i) => `${i + 1}. ${s.name} — ${formatMXN(s.price)}${
+    (s, i) => `${i + 1}. ${s.name} — ${displayPrice(s)}${
       serviceDetails(s, catalog) ? `\n   ${serviceDetails(s, catalog)}` : ""
     }`,
   );
