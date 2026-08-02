@@ -32,8 +32,8 @@ const emptyService = (categoryId: string): Omit<Service, "id"> => ({
   description: "",
   devices: "",
   profiles: "",
-  delivery: "Inmediato (5 a 30 min)",
-  warranty: "30 días",
+  delivery: "",
+  warranty: "",
   active: true,
   favorite: false,
 });
@@ -135,12 +135,9 @@ export function ServiceFormDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="sv-price">Precio (MXN) *</Label>
+              <Label htmlFor="sv-price">Precio (MXN)</Label>
               <Input
                 id="sv-price"
-                type="number"
-                min="1"
-                step="0.01"
                 inputMode="decimal"
                 aria-invalid={!!errors.price}
                 className={errors.price ? invalid : undefined}
