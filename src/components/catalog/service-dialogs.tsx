@@ -45,7 +45,7 @@ type Errors = Partial<
   >
 >;
 
-/** Validaciones de negocio para el formulario de servicio. */
+/** Solo el nombre es obligatorio; los demás campos son texto libre y pueden ir vacíos. */
 export function validateService(form: Omit<Service, "id">): Errors {
   const errors: Errors = {};
   const name = form.name.trim();
@@ -54,24 +54,8 @@ export function validateService(form: Omit<Service, "id">): Errors {
 
   const price = Number(form.price);
   if (!Number.isFinite(price)) errors.price = "Escribe un precio válido en MXN.";
-  else if (price <= 0) errors.price = "El precio debe ser mayor a $0.00 MXN.";
-  else if (price > 100000) errors.price = "El precio no puede superar $100,000 MXN.";
-  else if (Math.round(price * 100) !== price * 100)
-    errors.price = "Usa como máximo dos decimales (centavos).";
+  else if (price < 0) errors.price = "El precio no puede ser negativo.";
 
-  const numField = (value: string, label: string) => {
-    const v = value.trim();
-    if (!v) return undefined;
-    if (!/^\d+$/.test(v)) return `${label} debe ser un número entero.`;
-    const n = Number(v);
-    if (n < 1 || n > 50) return `${label} debe estar entre 1 y 50.`;
-    return undefined;
-  };
-  errors.devices = numField(form.devices, "Dispositivos");
-  errors.profiles = numField(form.profiles, "Perfiles");
-
-  if (!form.delivery.trim()) errors.delivery = "Indica el tiempo de entrega.";
-  if (!form.warranty.trim()) errors.warranty = "Indica la garantía.";
   if (form.description.length > 300) errors.description = "Máximo 300 caracteres.";
 
   return Object.fromEntries(Object.entries(errors).filter(([, v]) => v)) as Errors;
