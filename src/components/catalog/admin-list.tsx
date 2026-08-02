@@ -241,6 +241,9 @@ export function AdminList() {
   const toggleSelect = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   return (
     <section className="grid gap-3" aria-label="Vista lista del administrador">
       <div className="grid gap-1.5 rounded-2xl bg-muted p-1 sm:grid-cols-3">
