@@ -328,169 +328,200 @@ export function AdminList() {
                 selected.includes(s.id) ? "border-primary ring-2 ring-primary/30" : "border-border"
               }`}
             >
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="size-4 accent-primary"
+                  className="size-4 shrink-0 accent-primary"
                   checked={selected.includes(s.id)}
                   aria-label={`Seleccionar ${s.name || "servicio"}`}
                   onChange={() => toggleSelect(s.id)}
                 />
+                <button
+                  type="button"
+                  aria-label={s.favorite ? "Quitar destacado" : "Destacar"}
+                  onClick={() => patch(s.id, { favorite: !s.favorite })}
+                  className="shrink-0 p-1"
+                >
+                  <Star
+                    className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                  />
+                </button>
                 <Input
-                  className="h-9 w-14 text-center"
-                  type="text"
-                  aria-label="Icono o imagen"
-                  placeholder="🎬"
-                  value={s.icon ?? ""}
-                  onChange={(e) => patch(s.id, { icon: e.target.value })}
-                />
-                <Input
-                  className="h-9 min-w-[10rem] flex-1 font-semibold"
+                  className="h-9 min-w-0 flex-1 font-semibold"
                   type="text"
                   aria-label="Nombre"
                   placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
                   value={s.name}
                   onChange={(e) => patch(s.id, { name: e.target.value })}
                 />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={s.favorite ? "Quitar destacado" : "Destacar"}
-                  onClick={() => patch(s.id, { favorite: !s.favorite })}
-                >
-                  <Star
-                    className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
-                  />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => patch(s.id, { active: !s.active })}
-                >
-                  {s.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  {s.active ? "Desactivar" : "Activar"}
-                </Button>
-                <Button size="icon" variant="ghost" aria-label="Subir" onClick={() => move(s.id, -1)}>
-                  <ArrowUp className="size-4" />
-                </Button>
-                <Button size="icon" variant="ghost" aria-label="Bajar" onClick={() => move(s.id, 1)}>
-                  <ArrowDown className="size-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label="Duplicar fila"
-                  onClick={() => duplicateRow(s.id)}
-                >
-                  <Copy className="size-4" />
-                </Button>
-                <ConfirmButton
-                  title={`¿Eliminar ${s.name || "este servicio"}?`}
-                  description="Se quitará al guardar los cambios."
-                  confirmLabel="Eliminar"
-                  onConfirm={() => removeRows([s.id])}
-                >
-                  <Button size="icon" variant="ghost" aria-label="Eliminar fila">
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </ConfirmButton>
-              </div>
-
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {tab === "tramites" ? (
-                  <label className="grid gap-1 text-xs">
-                    <span className="font-medium text-muted-foreground">Categoría</span>
-                    <Select
-                      value={s.categoryId}
-                      onValueChange={(v) => patch(s.id, { categoryId: v })}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalog.categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                ) : (
-                  <TextField
-                    label={tab === "completas" ? "Tipo de cuenta o plan" : "Plan o modalidad"}
-                    value={s.plan ?? ""}
-                    onChange={(v) => patch(s.id, { plan: v })}
-                    placeholder="Completa, 1 perfil…"
-                  />
-                )}
-                <TextField
-                  label="Precio"
+                <Input
+                  className="h-9 w-24 shrink-0 text-right font-semibold text-primary"
+                  type="text"
+                  aria-label="Precio"
+                  placeholder="$45"
                   value={s.priceText ?? ""}
-                  onChange={(v) => patch(s.id, { priceText: v })}
-                  placeholder="Desde $45, Consultar…"
+                  onChange={(e) => patch(s.id, { priceText: e.target.value })}
                 />
-                <TextField
-                  label="Tiempo de entrega"
-                  value={s.delivery}
-                  onChange={(v) => patch(s.id, { delivery: v })}
-                  placeholder="10 a 40 min, Inmediato…"
-                />
-                {tab !== "tramites" ? (
-                  <>
-                    <TextField
-                      label="Dispositivos"
-                      value={s.devices}
-                      onChange={(v) => patch(s.id, { devices: v })}
-                      placeholder="3 a 4, Sin límite…"
-                    />
-                    <TextField
-                      label="Perfiles"
-                      value={s.profiles}
-                      onChange={(v) => patch(s.id, { profiles: v })}
-                      placeholder="1 perfil, Completa…"
-                    />
-                    <TextField
-                      label="Usuarios"
-                      value={s.users ?? ""}
-                      onChange={(v) => patch(s.id, { users: v })}
-                      placeholder="1, 2 a 4…"
-                    />
-                  </>
-                ) : (
-                  <TextField
-                    label="Requisitos"
-                    value={s.requirements ?? ""}
-                    onChange={(v) => patch(s.id, { requirements: v })}
-                    placeholder="CURP, correo…"
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0"
+                  aria-label={expanded.includes(s.id) ? "Ocultar más datos" : "Más datos"}
+                  aria-expanded={expanded.includes(s.id)}
+                  onClick={() => toggleExpand(s.id)}
+                >
+                  <ChevronDown
+                    className={`size-4 transition-transform ${expanded.includes(s.id) ? "rotate-180" : ""}`}
                   />
-                )}
-                <TextField
-                  label="Garantía"
-                  value={s.warranty}
-                  onChange={(v) => patch(s.id, { warranty: v })}
-                  placeholder="25 días, Reimpresión 7 días…"
-                />
-                {tab !== "tramites" ? (
-                  <TextField
-                    label="Vigencia o duración"
-                    value={s.vigencia ?? ""}
-                    onChange={(v) => patch(s.id, { vigencia: v })}
-                    placeholder="1 mes, 30 días…"
-                  />
-                ) : null}
+                </Button>
               </div>
 
-              <label className="mt-2 grid gap-1 text-xs">
-                <span className="font-medium text-muted-foreground">
-                  {tab === "tramites" ? "Descripción corta" : "Descripción"}
-                </span>
-                <Textarea
-                  rows={2}
-                  value={s.description}
-                  onChange={(e) => patch(s.id, { description: e.target.value })}
-                />
-              </label>
+              {expanded.includes(s.id) ? (
+                <>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    <Input
+                      className="h-9 w-14 text-center"
+                      type="text"
+                      aria-label="Icono o imagen"
+                      placeholder="🎬"
+                      value={s.icon ?? ""}
+                      onChange={(e) => patch(s.id, { icon: e.target.value })}
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => patch(s.id, { active: !s.active })}
+                    >
+                      {s.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      {s.active ? "Desactivar" : "Activar"}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Subir"
+                      onClick={() => move(s.id, -1)}
+                    >
+                      <ArrowUp className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Bajar"
+                      onClick={() => move(s.id, 1)}
+                    >
+                      <ArrowDown className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Duplicar fila"
+                      onClick={() => duplicateRow(s.id)}
+                    >
+                      <Copy className="size-4" />
+                    </Button>
+                    <ConfirmButton
+                      title={`¿Eliminar ${s.name || "este servicio"}?`}
+                      description="Se quitará al guardar los cambios."
+                      confirmLabel="Eliminar"
+                      onConfirm={() => removeRows([s.id])}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Eliminar fila">
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </ConfirmButton>
+                  </div>
+
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {tab === "tramites" ? (
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium text-muted-foreground">Categoría</span>
+                        <Select
+                          value={s.categoryId}
+                          onValueChange={(v) => patch(s.id, { categoryId: v })}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {catalog.categories.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    ) : (
+                      <TextField
+                        label={tab === "completas" ? "Tipo de cuenta o plan" : "Plan o modalidad"}
+                        value={s.plan ?? ""}
+                        onChange={(v) => patch(s.id, { plan: v })}
+                        placeholder="Completa, 1 perfil…"
+                      />
+                    )}
+                    <TextField
+                      label="Tiempo de entrega"
+                      value={s.delivery}
+                      onChange={(v) => patch(s.id, { delivery: v })}
+                      placeholder="10 a 40 min, Inmediato…"
+                    />
+                    {tab !== "tramites" ? (
+                      <>
+                        <TextField
+                          label="Dispositivos"
+                          value={s.devices}
+                          onChange={(v) => patch(s.id, { devices: v })}
+                          placeholder="3 a 4, Sin límite…"
+                        />
+                        <TextField
+                          label="Perfiles"
+                          value={s.profiles}
+                          onChange={(v) => patch(s.id, { profiles: v })}
+                          placeholder="1 perfil, Completa…"
+                        />
+                        <TextField
+                          label="Usuarios"
+                          value={s.users ?? ""}
+                          onChange={(v) => patch(s.id, { users: v })}
+                          placeholder="1, 2 a 4…"
+                        />
+                      </>
+                    ) : (
+                      <TextField
+                        label="Requisitos"
+                        value={s.requirements ?? ""}
+                        onChange={(v) => patch(s.id, { requirements: v })}
+                        placeholder="CURP, correo…"
+                      />
+                    )}
+                    <TextField
+                      label="Garantía"
+                      value={s.warranty}
+                      onChange={(v) => patch(s.id, { warranty: v })}
+                      placeholder="25 días, Reimpresión 7 días…"
+                    />
+                    {tab !== "tramites" ? (
+                      <TextField
+                        label="Vigencia o duración"
+                        value={s.vigencia ?? ""}
+                        onChange={(v) => patch(s.id, { vigencia: v })}
+                        placeholder="1 mes, 30 días…"
+                      />
+                    ) : null}
+                  </div>
+
+                  <label className="mt-2 grid gap-1 text-xs">
+                    <span className="font-medium text-muted-foreground">
+                      {tab === "tramites" ? "Descripción corta" : "Descripción"}
+                    </span>
+                    <Textarea
+                      rows={2}
+                      value={s.description}
+                      onChange={(e) => patch(s.id, { description: e.target.value })}
+                    />
+                  </label>
+                </>
+              ) : null}
             </article>
           ))
         )}
