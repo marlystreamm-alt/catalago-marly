@@ -84,6 +84,8 @@ interface StoreValue {
   updateCatalog: (patch: Partial<Omit<Catalog, "id" | "log">>) => void;
   toggleCatalogHidden: (id: CatalogId) => void;
   saveService: (service: Omit<Service, "id"> & { id?: string }) => void;
+  /** Guarda de una sola vez toda la lista de servicios del catálogo activo. */
+  replaceServices: (services: Service[], summary?: string) => void;
   duplicateService: (id: string) => void;
   deleteService: (id: string) => void;
   toggleService: (id: string) => void;
@@ -398,6 +400,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success(prev ? "Servicio actualizado" : "Servicio agregado");
         }),
 
+      replaceServices: (services, summary) =>
+        guard(() => {
+          mutate(
+            (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
+            entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
+          );
+        }),
       duplicateService: (id) =>
         guard(() => {
           const found = catalog.services.find((s) => s.id === id);

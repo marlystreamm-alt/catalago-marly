@@ -1,7 +1,7 @@
 import { CATALOG_IDS, type CatalogId, type SortMode } from "./types";
 
 /** Vista del catálogo: tarjetas completas o tabla compacta plataforma/precio. */
-export type ViewMode = "tarjetas" | "tabla";
+export type ViewMode = "tarjetas" | "tabla" | "lista";
 
 /** Preferencias de filtrado y orden guardadas por catálogo en este dispositivo. */
 export interface CatalogPrefs {
@@ -57,7 +57,8 @@ function normalize(raw: unknown): PrefsMap {
       categoryFilter: typeof p.categoryFilter === "string" ? p.categoryFilter : ALL_CATEGORIES,
       showDetail: p.showDetail !== false,
       showShare: p.showShare !== false,
-      viewMode: p.viewMode === "tabla" ? "tabla" : "tarjetas",
+      viewMode:
+        p.viewMode === "tabla" ? "tabla" : p.viewMode === "lista" ? "lista" : "tarjetas",
     };
 
   }
