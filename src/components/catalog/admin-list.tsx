@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
+import { formatMXN } from "@/lib/catalog/whatsapp";
 import type { Service } from "@/lib/catalog/types";
 
 type TabKey = "perfiles" | "completas" | "tramites";
@@ -35,6 +36,13 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "completas", label: "Completas" },
   { key: "tramites", label: "Trámites" },
 ];
+
+/** El precio se edita como texto libre; si aún no existe se parte del monto en MXN. */
+const fromCatalog = (services: Service[]): Service[] =>
+  services.map((s) => ({
+    ...s,
+    priceText: s.priceText ?? (s.price ? formatMXN(s.price) : ""),
+  }));
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -70,7 +78,7 @@ function TextField({
 export function AdminList() {
   const { catalog, isAdmin, replaceServices } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
-  const [rows, setRows] = useState<Service[]>(catalog.services);
+  const [rows, setRows] = useState<Service[]>(() => fromCatalog(catalog.services));
   const [dirty, setDirty] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
@@ -81,13 +89,13 @@ export function AdminList() {
   // La lista siempre parte de los mismos datos del catálogo público.
   useEffect(() => {
     if (dirtyRef.current) return;
-    setRows(catalog.services);
+    setRows(fromCatalog(catalog.services));
   }, [catalog.services, catalog.id]);
 
   useEffect(() => {
     setDirty(false);
     setSelected([]);
-    setRows(catalog.services);
+    setRows(fromCatalog(catalog.services));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog.id]);
 
@@ -222,7 +230,7 @@ export function AdminList() {
   };
 
   const discard = () => {
-    setRows(catalog.services);
+    setRows(fromCatalog(catalog.services));
     setSelected([]);
     setDirty(false);
     toast.success("Cambios descartados");
