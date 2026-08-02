@@ -84,6 +84,7 @@ export function AdminList() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
   const [selected, setSelected] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<string[]>([]);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
