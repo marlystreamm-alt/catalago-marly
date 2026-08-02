@@ -496,8 +496,8 @@ function CatalogPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lista">Vista lista (editar)</SelectItem>
-                  <SelectItem value="tarjetas">Vista tarjetas</SelectItem>
+                  <SelectItem value="lista">Editar (lista)</SelectItem>
+                  <SelectItem value="tarjetas">Vista pública (tarjetas)</SelectItem>
                   <SelectItem value="tabla">Vista tabla</SelectItem>
                 </SelectContent>
               </Select>
@@ -646,7 +646,7 @@ function CatalogPage() {
         <div className="mt-5 grid gap-6">
           {isAdmin && viewMode === "lista" ? (
             <AdminList />
-          ) : viewMode === "tabla" ? (
+          ) : isAdmin && viewMode === "tabla" ? (
             <ServiceTable
               services={sorted}
               selectedIds={selectedIds}
