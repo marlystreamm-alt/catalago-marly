@@ -646,7 +646,7 @@ function CatalogPage() {
         <div className="mt-5 grid gap-6">
           {isAdmin && viewMode === "lista" ? (
             <AdminList />
-          ) : viewMode === "tabla" ? (
+          ) : isAdmin && viewMode === "tabla" ? (
             <ServiceTable
               services={sorted}
               selectedIds={selectedIds}
