@@ -11,7 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { buildWhatsappLink, buildWhatsappMessage, formatMXN } from "@/lib/catalog/whatsapp";
+import {
+  buildWhatsappLink,
+  buildWhatsappMessage,
+  displayPrice,
+  serviceFacts,
+} from "@/lib/catalog/whatsapp";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { buildServiceLink } from "@/lib/catalog/links";
@@ -42,10 +47,7 @@ export function ServiceDetailDialog({
     ["Catálogo", catalog.name],
     ["Categoría", category?.name ?? "—"],
     ["Subsección", subsection?.name ?? "—"],
-    ["Dispositivos", service.devices || "—"],
-    ["Perfiles", service.profiles || "—"],
-    ["Entrega", service.delivery || "—"],
-    ["Garantía", service.warranty || "—"],
+    ...serviceFacts(service).map((f) => [f.label, f.value.trim()] as [string, string]),
     ["Estado", service.active ? "Disponible" : "No disponible"],
   ];
 
@@ -62,7 +64,7 @@ export function ServiceDetailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <p className="text-3xl font-bold text-primary">{formatMXN(service.price)}</p>
+        <p className="text-3xl font-bold text-primary">{displayPrice(service)}</p>
 
         <dl className="grid gap-1.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
           {rows.map(([label, value]) => (
