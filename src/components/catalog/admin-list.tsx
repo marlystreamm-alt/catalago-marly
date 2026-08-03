@@ -214,6 +214,7 @@ export function AdminList() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
   const [selected, setSelected] = useState<string[]>([]);
+  const [showPreview, setShowPreview] = useState(true);
   const [expandedMap, setExpandedMap] = useState<Record<string, string[]>>(() => loadExpanded());
   const expanded = expandedMap[catalog.id] ?? [];
   const dirtyRef = useRef(dirty);
