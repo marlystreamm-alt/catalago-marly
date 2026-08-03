@@ -19,7 +19,7 @@ import {
   verifyPassword,
 } from "./auth";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
-import { createSeedState } from "./seed";
+import { createEmptyCatalog, createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
 import {
   CATALOG_IDS,
@@ -65,6 +65,9 @@ interface StoreValue {
   catalogId: CatalogId;
   catalog: Catalog;
   visibleCatalogIds: CatalogId[];
+  allCatalogIds: CatalogId[];
+  addCatalog: (data: { name: string; subtitle: string }) => void;
+  deleteCatalog: (id: CatalogId) => void;
   setCatalogId: (id: CatalogId) => void;
   isAdmin: boolean;
   mustChangePassword: boolean;
@@ -132,11 +135,13 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated]);
 
+  const allCatalogIds = useMemo(() => Object.keys(state.catalogs), [state]);
+
   const visibleCatalogIds = useMemo(() => {
-    if (isAdmin) return CATALOG_IDS;
-    const shown = CATALOG_IDS.filter((id) => !state.catalogs[id].hidden);
-    return shown.length ? shown : [CATALOG_IDS[0]];
-  }, [state, isAdmin]);
+    if (isAdmin) return allCatalogIds;
+    const shown = allCatalogIds.filter((id) => !state.catalogs[id].hidden);
+    return shown.length ? shown : [allCatalogIds[0]];
+  }, [state, isAdmin, allCatalogIds]);
 
   // Si el catálogo actual queda oculto en modo público, se cambia al primero visible.
   useEffect(() => {
@@ -181,6 +186,46 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       catalogId: activeId,
       catalog,
       visibleCatalogIds,
+      allCatalogIds,
+      addCatalog: ({ name, subtitle }) =>
+        guard(() => {
+          const clean = name.trim();
+          if (!clean) {
+            toast.error("Escribe un nombre para el catálogo");
+            return;
+          }
+          const slug =
+            clean
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "") || "catalogo";
+          let id = slug;
+          let n = 2;
+          while (state.catalogs[id]) id = `${slug}-${n++}`;
+          const fresh = createEmptyCatalog(id, clean, subtitle.trim());
+          fresh.log = [entry("catalogo", clean, "Catálogo creado")];
+          setState((prev) => ({ ...prev, catalogs: { ...prev.catalogs, [id]: fresh } }));
+          setCatalogIdRaw(id);
+          toast.success(`Catálogo "${clean}" creado`);
+        }),
+      deleteCatalog: (id) =>
+        guard(() => {
+          if (CATALOG_IDS.includes(id)) {
+            toast.error("Los catálogos base no se pueden eliminar");
+            return;
+          }
+          const target = state.catalogs[id];
+          if (!target) return;
+          setState((prev) => {
+            const catalogs = { ...prev.catalogs };
+            delete catalogs[id];
+            return { ...prev, catalogs };
+          });
+          setCatalogIdRaw((prev) => (prev === id ? CATALOG_IDS[0] : prev));
+          toast.success(`Catálogo "${target.name}" eliminado`);
+        }),
       setCatalogId: (id: CatalogId) => {
         if (!visibleCatalogIds.includes(id)) return;
         setCatalogIdRaw(id);
@@ -553,7 +598,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           mutate((c) => ({ ...c, log: [] }), entry("sistema", catalog.name, "Historial vaciado"));
           toast.success("Historial vaciado");
         }),
-      auditLog: CATALOG_IDS.flatMap((id) =>
+      auditLog: allCatalogIds.flatMap((id) =>
         state.catalogs[id].log.map((e) => ({
           ...e,
           catalogId: id,
@@ -588,7 +633,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           const parsed = normalizeState(JSON.parse(json));
           const stamped: AppState = {
             ...parsed,
-            catalogs: CATALOG_IDS.reduce(
+            catalogs: Object.keys(parsed.catalogs).reduce(
               (acc, id) => {
                 const c = parsed.catalogs[id];
                 acc[id] = {
