@@ -1,4 +1,7 @@
-export type CatalogId = "clientes" | "cyberdoc" | "revendedores";
+/** Identificador de catálogo: los tres base y cualquiera creado por el administrador. */
+export type CatalogId = string;
+
+export type SeedCatalogId = "clientes" | "cyberdoc" | "revendedores";
 
 export interface Subsection {
   id: string;
