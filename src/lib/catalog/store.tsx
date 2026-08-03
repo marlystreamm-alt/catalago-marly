@@ -673,6 +673,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     prefsMap,
     mutate,
     visibleCatalogIds,
+    allCatalogIds,
   ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
