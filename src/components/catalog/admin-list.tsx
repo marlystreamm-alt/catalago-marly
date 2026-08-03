@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  ImagePlus,
   Plus,
   RotateCcw,
   Save,
