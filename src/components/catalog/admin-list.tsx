@@ -462,7 +462,36 @@ export function AdminList() {
             Eliminar seleccionados
           </Button>
         </ConfirmButton>
+        <Button size="sm" variant="outline" onClick={() => setShowPreview((v) => !v)}>
+          {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          {showPreview ? "Ocultar vista previa" : "Ver vista previa"}
+        </Button>
       </div>
+
+      {showPreview ? (
+        <div
+          className="card-soft rounded-2xl border border-border bg-card/70 p-3"
+          aria-label="Vista previa en tarjetas"
+        >
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">
+            Vista previa en vivo ({visibleRows.length}) — se actualiza mientras editas
+          </p>
+          {visibleRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin servicios que mostrar.</p>
+          ) : (
+            <div className="flex snap-x gap-3 overflow-x-auto pb-1">
+              {visibleRows.map((s) => (
+                <PreviewCard
+                  key={s.id}
+                  service={s}
+                  categoryName={catalog.categories.find((c) => c.id === s.categoryId)?.name}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
 
       <div className="grid gap-3">
         {visibleRows.length === 0 ? (
