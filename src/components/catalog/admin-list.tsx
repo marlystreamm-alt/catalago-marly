@@ -427,14 +427,8 @@ export function AdminList() {
               {expanded.includes(s.id) ? (
                 <>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                    <Input
-                      className="h-9 w-14 text-center"
-                      type="text"
-                      aria-label="Icono o imagen"
-                      placeholder="🎬"
-                      value={s.icon ?? ""}
-                      onChange={(e) => patch(s.id, { icon: e.target.value })}
-                    />
+                    <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+
                     <Button
                       size="sm"
                       variant="outline"
