@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { formatMXN } from "@/lib/catalog/whatsapp";
+import { displayPrice, formatMXN, serviceFacts } from "@/lib/catalog/whatsapp";
 import { fileToCompressedDataUrl, isImageValue } from "@/lib/catalog/image";
 import type { Service } from "@/lib/catalog/types";
 
@@ -159,6 +159,53 @@ function ImageField({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+/** Tarjeta de solo lectura que refleja cómo se verá el servicio en el catálogo público. */
+function PreviewCard({ service, categoryName }: { service: Service; categoryName?: string }) {
+  const meta = serviceFacts(service).map((f) => `${f.label}: ${f.value.trim()}`);
+  return (
+    <article className="card-soft w-[15rem] shrink-0 rounded-2xl border border-border bg-card p-3">
+      <div className="flex items-start gap-2">
+        {service.icon ? (
+          <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-xl">
+            {isImageValue(service.icon) ? (
+              <img src={service.icon} alt="" className="size-full object-cover" />
+            ) : (
+              <span aria-hidden>{service.icon}</span>
+            )}
+          </div>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <h4 className="truncate text-sm font-semibold text-card-foreground">
+            {service.name || "Sin nombre"}
+          </h4>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {categoryName ? (
+              <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground">
+                {categoryName}
+              </span>
+            ) : null}
+            {!service.active ? (
+              <span className="rounded-md bg-destructive px-1.5 py-0.5 text-[10px] text-destructive-foreground">
+                Oculto
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <p className="shrink-0 text-sm font-bold text-primary">{displayPrice(service)}</p>
+      </div>
+      {service.description ? (
+        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{service.description}</p>
+      ) : null}
+      {meta.length ? (
+        <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">{meta.join(" · ")}</p>
+      ) : null}
+      <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1 text-center text-[11px] font-medium text-primary">
+        Pedir por WhatsApp
+      </div>
+    </article>
+  );
+}
+
 export function AdminList() {
   const { catalog, isAdmin, replaceServices } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
@@ -167,6 +214,7 @@ export function AdminList() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
   const [selected, setSelected] = useState<string[]>([]);
+  const [showPreview, setShowPreview] = useState(true);
   const [expandedMap, setExpandedMap] = useState<Record<string, string[]>>(() => loadExpanded());
   const expanded = expandedMap[catalog.id] ?? [];
   const dirtyRef = useRef(dirty);
@@ -415,7 +463,36 @@ export function AdminList() {
             Eliminar seleccionados
           </Button>
         </ConfirmButton>
+        <Button size="sm" variant="outline" onClick={() => setShowPreview((v) => !v)}>
+          {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          {showPreview ? "Ocultar vista previa" : "Ver vista previa"}
+        </Button>
       </div>
+
+      {showPreview ? (
+        <div
+          className="card-soft rounded-2xl border border-border bg-card/70 p-3"
+          aria-label="Vista previa en tarjetas"
+        >
+          <p className="mb-2 text-xs font-semibold text-muted-foreground">
+            Vista previa en vivo ({visibleRows.length}) — se actualiza mientras editas
+          </p>
+          {visibleRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin servicios que mostrar.</p>
+          ) : (
+            <div className="flex snap-x gap-3 overflow-x-auto pb-1">
+              {visibleRows.map((s) => (
+                <PreviewCard
+                  key={s.id}
+                  service={s}
+                  categoryName={catalog.categories.find((c) => c.id === s.categoryId)?.name}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
 
       <div className="grid gap-3">
         {visibleRows.length === 0 ? (
