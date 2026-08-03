@@ -61,7 +61,22 @@ export function ServiceCard({
               onChange={() => onToggleSelect(service.id)}
             />
           ) : null}
+          {service.icon ? (
+            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-2xl">
+              {isImageValue(service.icon) ? (
+                <img
+                  src={service.icon}
+                  alt={service.name}
+                  loading="lazy"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <span aria-hidden>{service.icon}</span>
+              )}
+            </div>
+          ) : null}
           <div className="min-w-0">
+
             <h3 className="truncate text-base font-semibold text-card-foreground">
               {service.name}
             </h3>
