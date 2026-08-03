@@ -29,6 +29,7 @@ import {
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { formatMXN } from "@/lib/catalog/whatsapp";
+import { fileToCompressedDataUrl, isImageValue } from "@/lib/catalog/image";
 import type { Service } from "@/lib/catalog/types";
 
 type TabKey = "perfiles" | "completas" | "tramites";
