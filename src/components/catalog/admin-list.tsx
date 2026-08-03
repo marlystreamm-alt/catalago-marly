@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { formatMXN } from "@/lib/catalog/whatsapp";
+import { displayPrice, formatMXN, serviceFacts } from "@/lib/catalog/whatsapp";
 import { fileToCompressedDataUrl, isImageValue } from "@/lib/catalog/image";
 import type { Service } from "@/lib/catalog/types";
 
