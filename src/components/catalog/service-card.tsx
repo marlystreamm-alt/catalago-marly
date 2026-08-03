@@ -13,6 +13,7 @@ import { buildServiceLink } from "@/lib/catalog/links";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
 import type { Service } from "@/lib/catalog/types";
+import { isImageValue } from "@/lib/catalog/image";
 import { ConfirmButton } from "./confirm-button";
 
 
