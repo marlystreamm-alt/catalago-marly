@@ -45,6 +45,35 @@ const fromCatalog = (services: Service[]): Service[] =>
     priceText: s.priceText ?? (s.price ? formatMXN(s.price) : ""),
   }));
 
+const EXPANDED_KEY = "ma2-admin-expandidos-v1";
+
+/** El estado expandido/colapsado de cada fila se recuerda por catálogo en el dispositivo. */
+function loadExpanded(): Record<string, string[]> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(EXPANDED_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return {};
+    const map: Record<string, string[]> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (Array.isArray(value)) map[key] = value.filter((v): v is string => typeof v === "string");
+    }
+    return map;
+  } catch (error) {
+    console.error("No se pudo leer el estado de las filas:", error);
+    return {};
+  }
+}
+
+function saveExpanded(map: Record<string, string[]>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(map));
+  } catch (error) {
+    console.error("No se pudo guardar el estado de las filas:", error);
+  }
+}
+
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -84,7 +113,8 @@ export function AdminList() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
   const [selected, setSelected] = useState<string[]>([]);
-  const [expanded, setExpanded] = useState<string[]>([]);
+  const [expandedMap, setExpandedMap] = useState<Record<string, string[]>>(() => loadExpanded());
+  const expanded = expandedMap[catalog.id] ?? [];
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
@@ -93,6 +123,11 @@ export function AdminList() {
     if (dirtyRef.current) return;
     setRows(fromCatalog(catalog.services));
   }, [catalog.services, catalog.id]);
+
+  // Recupera lo guardado al montar (evita desajustes de hidratación en SSR).
+  useEffect(() => {
+    setExpandedMap(loadExpanded());
+  }, []);
 
   useEffect(() => {
     setDirty(false);
@@ -242,7 +277,15 @@ export function AdminList() {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const toggleExpand = (id: string) =>
-    setExpanded((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setExpandedMap((prev) => {
+      const current = prev[catalog.id] ?? [];
+      const next = {
+        ...prev,
+        [catalog.id]: current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+      };
+      saveExpanded(next);
+      return next;
+    });
 
   return (
     <section className="grid gap-3" aria-label="Vista lista del administrador">
