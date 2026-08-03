@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  ImagePlus,
   Plus,
   RotateCcw,
   Save,
@@ -28,6 +29,7 @@ import {
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { formatMXN } from "@/lib/catalog/whatsapp";
+import { fileToCompressedDataUrl, isImageValue } from "@/lib/catalog/image";
 import type { Service } from "@/lib/catalog/types";
 
 type TabKey = "perfiles" | "completas" | "tramites";
@@ -102,6 +104,58 @@ function TextField({
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
+  );
+}
+
+/** Control para insertar una imagen (archivo o URL) o un emoji para la tarjeta. */
+function ImageField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const hasImage = isImageValue(value);
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-dashed border-border p-2">
+      <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-xl">
+        {hasImage ? (
+          <img src={value} alt="Imagen del servicio" className="size-full object-cover" />
+        ) : (
+          <span>{value || "🖼️"}</span>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          try {
+            onChange(await fileToCompressedDataUrl(file));
+            toast.success("Imagen insertada");
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "No se pudo insertar la imagen");
+          }
+        }}
+      />
+      <Button size="sm" variant="outline" onClick={() => inputRef.current?.click()}>
+        <ImagePlus className="size-4" />
+        Insertar imagen
+      </Button>
+      <Input
+        className="h-9 min-w-[9rem] flex-1"
+        type="text"
+        aria-label="Imagen (URL) o emoji"
+        placeholder="URL de imagen o emoji 🎬"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value ? (
+        <Button size="sm" variant="ghost" onClick={() => onChange("")}>
+          Quitar
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -427,14 +481,8 @@ export function AdminList() {
               {expanded.includes(s.id) ? (
                 <>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                    <Input
-                      className="h-9 w-14 text-center"
-                      type="text"
-                      aria-label="Icono o imagen"
-                      placeholder="🎬"
-                      value={s.icon ?? ""}
-                      onChange={(e) => patch(s.id, { icon: e.target.value })}
-                    />
+                    <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+
                     <Button
                       size="sm"
                       variant="outline"
