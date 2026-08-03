@@ -451,14 +451,14 @@ function buildCatalog(id: CatalogId): Catalog {
   const services: Service[] = baseSeeds().map((seed, i) => ({
     ...seed,
     id: `${id}-${i + 1}`,
-    price: roundPrice(seed.price * ratio[id]),
+    price: roundPrice(seed.price * (ratio[id] ?? 1)),
     active: true,
     favorite: false,
   }));
   return {
     id,
-    name: meta[id].name,
-    subtitle: meta[id].subtitle,
+    name: meta[id]?.name ?? id,
+    subtitle: meta[id]?.subtitle ?? "",
     whatsappNumber: "5215500000000",
     whatsappTemplate: DEFAULT_TEMPLATE,
     hidden: false,
@@ -478,5 +478,20 @@ export function createSeedState(): AppState {
       cyberdoc: buildCatalog("cyberdoc"),
       revendedores: buildCatalog("revendedores"),
     },
+  };
+}
+
+/** Catálogo nuevo creado por el administrador: sin servicios, con las categorías base. */
+export function createEmptyCatalog(id: CatalogId, name: string, subtitle: string): Catalog {
+  return {
+    id,
+    name,
+    subtitle,
+    whatsappNumber: "5215500000000",
+    whatsappTemplate: DEFAULT_TEMPLATE,
+    hidden: false,
+    categories: baseCategories(),
+    services: [],
+    log: [],
   };
 }
