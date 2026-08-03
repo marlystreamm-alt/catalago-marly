@@ -47,7 +47,7 @@ function normalize(raw: unknown): PrefsMap {
   }, {} as PrefsMap);
   if (!raw || typeof raw !== "object") return base;
   const input = raw as Partial<Record<CatalogId, Partial<CatalogPrefs>>>;
-  for (const id of CATALOG_IDS) {
+  for (const id of Array.from(new Set([...CATALOG_IDS, ...Object.keys(input)]))) {
     const p = input[id];
     if (!p) continue;
     base[id] = {
