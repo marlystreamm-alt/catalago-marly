@@ -24,13 +24,18 @@ export function normalizeState(raw: unknown): AppState {
   const catalogs = (input.catalogs ?? {}) as Partial<Record<CatalogId, Catalog>>;
   const result = { version: seed.version, catalogs: { ...seed.catalogs } } as AppState;
 
-  for (const id of CATALOG_IDS) {
+  const ids = Array.from(new Set([...CATALOG_IDS, ...Object.keys(catalogs)]));
+  for (const id of ids) {
     const c = catalogs[id];
-    if (!c || !Array.isArray(c.services) || c.services.length === 0) continue;
+    const base = seed.catalogs[id];
+    // Los catálogos base se conservan aunque vengan vacíos; los creados por el
+    // administrador se aceptan aunque todavía no tengan servicios.
+    if (!c) continue;
+    if (base && (!Array.isArray(c.services) || c.services.length === 0)) continue;
     result.catalogs[id] = {
       id,
-      name: typeof c.name === "string" && c.name.trim() ? c.name : seed.catalogs[id].name,
-      subtitle: typeof c.subtitle === "string" ? c.subtitle : seed.catalogs[id].subtitle,
+      name: typeof c.name === "string" && c.name.trim() ? c.name : (base?.name ?? id),
+      subtitle: typeof c.subtitle === "string" ? c.subtitle : (base?.subtitle ?? ""),
       whatsappNumber: typeof c.whatsappNumber === "string" ? c.whatsappNumber : "",
       whatsappTemplate:
         typeof c.whatsappTemplate === "string" && c.whatsappTemplate.trim()
@@ -48,8 +53,8 @@ export function normalizeState(raw: unknown): AppState {
                   }))
                 : [],
             }))
-          : seed.catalogs[id].categories,
-      services: c.services.map((sv, i) => {
+          : (base?.categories ?? []),
+      services: (Array.isArray(c.services) ? c.services : []).map((sv, i) => {
         const opt = (v: unknown) =>
           typeof v === "string" && v.trim() ? String(v) : undefined;
         return {

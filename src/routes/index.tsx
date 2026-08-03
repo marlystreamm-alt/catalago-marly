@@ -51,6 +51,7 @@ import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/s
 import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
+import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
 
 /** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
@@ -424,6 +425,7 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
+          <CatalogManager />
         </header>
 
         {!online ? (
