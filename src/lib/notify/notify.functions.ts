@@ -1,7 +1,13 @@
 /** Funciones de servidor del panel de avisos (protegidas con el código del administrador). */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { DEFAULT_SETTINGS, type CloudOrder, type NotifySettings } from "./types";
+import {
+  DEFAULT_SETTINGS,
+  type CloudOrder,
+  type NotifyDevice,
+  type NotifyLogEntry,
+  type NotifySettings,
+} from "./types";
 
 const codeSchema = z.object({ code: z.string().min(4) });
 
