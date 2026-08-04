@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BellRing, Check, Loader2, RefreshCw, Send } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  Check,
+  Loader2,
+  RefreshCw,
+  Send,
+  Smartphone,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,16 +33,28 @@ import {
 } from "@/components/ui/select";
 import {
   notifyChangeCode,
+  notifyDeleteDevice,
+  notifyListDevices,
+  notifyListLog,
   notifyListOrders,
   notifyLogin,
   notifySavePush,
   notifySaveSettings,
+  notifySetDeviceActive,
   notifySetOrderStatus,
   notifyStatus,
   notifyTest,
 } from "@/lib/notify/notify.functions";
 import { getSavedCode, saveCode, subscribeToPush } from "@/lib/notify/client";
-import { DEFAULT_SETTINGS, type CloudOrder, type NotifySettings } from "@/lib/notify/types";
+import {
+  CHANNEL_TEXT,
+  DEFAULT_SETTINGS,
+  KIND_TEXT,
+  type CloudOrder,
+  type NotifyDevice,
+  type NotifyLogEntry,
+  type NotifySettings,
+} from "@/lib/notify/types";
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })
@@ -51,6 +72,9 @@ export function NotificationsDialog() {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState<NotifySettings>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<CloudOrder[]>([]);
+  const [devices, setDevices] = useState<NotifyDevice[]>([]);
+  const [log, setLog] = useState<NotifyLogEntry[]>([]);
+  const [logFilter, setLogFilter] = useState("todos");
   const [newCode, setNewCode] = useState("");
 
   useEffect(() => {
