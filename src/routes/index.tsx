@@ -783,7 +783,43 @@ function CatalogPage() {
           if (!v) setDetailId(null);
         }}
       />
+      <BackNav />
     </main>
+  );
+}
+
+/** Botones visibles para regresar arriba del catálogo o a la pantalla anterior. */
+function BackNav() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setShow(window.scrollY > 400);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  if (!show) return null;
+  return (
+    <div className="fixed bottom-4 left-3 z-40 flex gap-2 sm:left-6">
+      {typeof window !== "undefined" && window.history.length > 1 ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full bg-card shadow-lg"
+          onClick={() => window.history.back()}
+        >
+          <ArrowLeft className="size-4" />
+          Atrás
+        </Button>
+      ) : null}
+      <Button
+        size="sm"
+        className="rounded-full shadow-lg"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      >
+        <ArrowUp className="size-4" />
+        Volver al catálogo
+      </Button>
+    </div>
   );
 }
 
