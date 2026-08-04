@@ -10,6 +10,8 @@ En el panel de administrador se agrega una sección "Avisos de pedidos" con:
 - Un interruptor por canal: notificación al celular, correo, WhatsApp a tu número, panel dentro de la app.
 - Campo para tu correo y tu número de WhatsApp de avisos.
 - Interruptor "Recordarme cada 15 minutos hasta marcar como atendido".
+- **Horario de avisos**: hora de inicio y hora de fin configurables (por ejemplo 8:00 a 00:00, zona horaria de México). Fuera de ese horario no se envía ningún aviso ni recordatorio; los pedidos se siguen registrando y aparecen en el panel, y los pendientes se avisan al llegar la hora de inicio.
+- Interruptor "Apagar automáticamente a las 12 de la noche" (activado por defecto, con la hora editable) y opción de encender o apagar los avisos manualmente en cualquier momento sin importar el horario.
 
 ## 2. Registro del pedido
 
