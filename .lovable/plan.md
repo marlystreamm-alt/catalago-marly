@@ -38,7 +38,7 @@ Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "
 - Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro, `quiet_start`, `quiet_end`, `timezone` = America/Monterrey), `push_subscriptions` (endpoints Web Push del admin).
 - Endpoint público `src/routes/api/public/orders.ts` (POST) para registrar el pedido desde el cliente, con validación Zod y sin PII; lectura del panel vía server functions protegidas con `requireSupabaseAuth` o clave de admin existente.
 - Web Push con VAPID: se generan las llaves como secretos, service worker de mensajería aparte del app-shell (no toca el PWA actual).
-- Correo vía conector Resend; WhatsApp vía Twilio (secretos añadidos solo si lo activas).
+- Correo vía conector Resend; WhatsApp vía Twilio (secretos añadidos solo si lo activas); Alexa vía POST a Notify Me (`https://api.notifymyecho.com/v1/NotifyMe`) o Voice Monkey, con el código de acceso guardado como secreto del proyecto.
 - Recordatorios: `pg_cron` llamando a `api/public/notify-pending` protegido con secreto.
 - El código cliente solo publica el pedido cuando el interruptor maestro está encendido; si falla la red, el pedido queda en la cola local existente y se publica al reconectar.
 
