@@ -26,7 +26,7 @@ Al enviar un pedido (individual o múltiple, en línea o desde la cola offline),
 
 ## 4. Recordatorios cada 15 minutos
 
-Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "nuevo" y reenvía el aviso por los canales activos hasta que lo marques como atendido. Puedes desactivar el recordatorio y dejar solo el primer aviso.
+Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "nuevo" y reenvía el aviso por los canales activos hasta que lo marques como atendido, siempre dentro del horario configurado. Puedes desactivar el recordatorio y dejar solo el primer aviso.
 
 ## Detalles técnicos
 
