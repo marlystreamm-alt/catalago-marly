@@ -95,6 +95,22 @@ export function NotificationsDialog() {
     }
   }, []);
 
+  const loadDevices = useCallback(async (theCode: string) => {
+    try {
+      setDevices(await notifyListDevices({ data: { code: theCode } }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron leer los dispositivos");
+    }
+  }, []);
+
+  const loadLog = useCallback(async (theCode: string) => {
+    try {
+      setLog(await notifyListLog({ data: { code: theCode } }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo leer el historial");
+    }
+  }, []);
+
   const login = async () => {
     setBusy(true);
     try {
@@ -103,7 +119,7 @@ export function NotificationsDialog() {
       setLogged(true);
       setHasCode(true);
       saveCode(code.trim());
-      await loadOrders(code.trim());
+      await Promise.all([loadOrders(code.trim()), loadDevices(code.trim()), loadLog(code.trim())]);
       toast.success("Panel de avisos abierto");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Código incorrecto");
