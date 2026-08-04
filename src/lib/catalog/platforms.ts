@@ -110,7 +110,7 @@ export const PLATFORMS: PlatformMeta[] = [
     keys: ["canva"],
     image: canva.url,
     description:
-      "Diseño profesional con plantillas premium, quita fondos y миллones de recursos listos para usar.",
+      "Diseño profesional con plantillas premium, quita fondos y millones de recursos listos para usar.",
   },
   {
     keys: ["gemini"],
