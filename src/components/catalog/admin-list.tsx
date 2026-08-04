@@ -636,7 +636,7 @@ export function AdminList() {
                       label="Tiempo de entrega"
                       value={s.delivery}
                       onChange={(v) => patch(s.id, { delivery: v })}
-                      placeholder="10 a 40 min, Inmediato…"
+                      placeholder="20 a 25 min…"
                     />
                     {tab !== "tramites" ? (
                       <>
@@ -678,7 +678,7 @@ export function AdminList() {
                         label="Vigencia o duración"
                         value={s.vigencia ?? ""}
                         onChange={(v) => patch(s.id, { vigencia: v })}
-                        placeholder="1 mes, 30 días…"
+                        placeholder="25 días…"
                       />
                     ) : null}
                   </div>
