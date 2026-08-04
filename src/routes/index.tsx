@@ -666,7 +666,11 @@ function CatalogPage() {
         </section>
 
         <div className="mt-5 grid gap-6">
-          {isAdmin && viewMode === "lista" ? (
+          {!hydrated ? (
+            <ServiceListSkeleton count={5} />
+          ) : refreshing ? (
+            <ServiceListSkeleton count={3} label="Actualizando resultados…" />
+          ) : isAdmin && viewMode === "lista" ? (
             <AdminList />
           ) : isAdmin && viewMode === "tabla" ? (
             <ServiceTable
