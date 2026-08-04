@@ -18,6 +18,7 @@ import {
   formatMXN,
 } from "@/lib/catalog/whatsapp";
 import { recipientFromLink } from "@/lib/catalog/orders";
+import { reportOrder } from "@/lib/notify/client";
 import type { Service } from "@/lib/catalog/types";
 
 /** Barra fija para pedir varias plataformas seleccionadas en un solo mensaje. */
