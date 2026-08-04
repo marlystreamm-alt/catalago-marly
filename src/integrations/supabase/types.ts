@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      notification_log: {
+        Row: {
+          attempt: number
+          channel: string
+          created_at: string
+          detail: string
+          id: string
+          kind: string
+          order_id: string | null
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          channel?: string
+          created_at?: string
+          detail?: string
+          id?: string
+          kind?: string
+          order_id?: string | null
+          status?: string
+        }
+        Update: {
+          attempt?: number
+          channel?: string
+          created_at?: string
+          detail?: string
+          id?: string
+          kind?: string
+          order_id?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       notification_settings: {
         Row: {
           admin_code_hash: string
@@ -28,6 +61,9 @@ export type Database = {
           channel_whatsapp: boolean
           email: string
           enabled: boolean
+          escalate_channel: string
+          escalate_enabled: boolean
+          escalate_minutes: number
           id: number
           quiet_end: string
           quiet_start: string
@@ -50,6 +86,9 @@ export type Database = {
           channel_whatsapp?: boolean
           email?: string
           enabled?: boolean
+          escalate_channel?: string
+          escalate_enabled?: boolean
+          escalate_minutes?: number
           id?: number
           quiet_end?: string
           quiet_start?: string
@@ -72,6 +111,9 @@ export type Database = {
           channel_whatsapp?: boolean
           email?: string
           enabled?: boolean
+          escalate_channel?: string
+          escalate_enabled?: boolean
+          escalate_minutes?: number
           id?: number
           quiet_end?: string
           quiet_start?: string
@@ -89,6 +131,7 @@ export type Database = {
           catalog_id: string
           catalog_name: string
           created_at: string
+          escalated_at: string | null
           id: string
           items: Json
           link: string
@@ -105,6 +148,7 @@ export type Database = {
           catalog_id?: string
           catalog_name?: string
           created_at?: string
+          escalated_at?: string | null
           id?: string
           items?: Json
           link?: string
@@ -121,6 +165,7 @@ export type Database = {
           catalog_id?: string
           catalog_name?: string
           created_at?: string
+          escalated_at?: string | null
           id?: string
           items?: Json
           link?: string
@@ -136,27 +181,33 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
+          active: boolean
           auth: string
           created_at: string
           endpoint: string
           id: string
           label: string
+          last_seen_at: string
           p256dh: string
         }
         Insert: {
+          active?: boolean
           auth: string
           created_at?: string
           endpoint: string
           id?: string
           label?: string
+          last_seen_at?: string
           p256dh: string
         }
         Update: {
+          active?: boolean
           auth?: string
           created_at?: string
           endpoint?: string
           id?: string
           label?: string
+          last_seen_at?: string
           p256dh?: string
         }
         Relationships: []
