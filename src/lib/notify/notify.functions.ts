@@ -290,3 +290,42 @@ export const notifyTest = createServerFn({ method: "POST" })
   });
 
 export const NOTIFY_DEFAULTS = DEFAULT_SETTINGS;
+
+/** Valida el código de acceso de Alexa enviando un anuncio de prueba y lo guarda si funciona. */
+export const notifyVerifyAlexa = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    codeSchema
+      .extend({
+        provider: z.enum(["notifyme", "voicemonkey"]),
+        token: z.string().trim().min(4, "El código es demasiado corto").max(500),
+        device: z.string().trim().max(120).default(""),
+        save: z.boolean().default(true),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean; message: string }> => {
+    const { requireAdminCode, sendAlexaText, admin, logEvent } = await import("./notify.server");
+    await requireAdminCode(data.code);
+    const result = await sendAlexaText(
+      "Prueba de MA². Si escuchas esto, los avisos de pedidos ya están conectados con Alexa.",
+      data.provider,
+      data.token,
+      data.device,
+    );
+    await logEvent(null, "alexa", "prueba", 1, result.ok ? "enviado" : "error", result.message);
+    if (result.ok && data.save) {
+      const db = await admin();
+      const { error } = await db
+        .from("notification_settings")
+        .update({
+          channel_alexa: true,
+          alexa_provider: data.provider,
+          alexa_token: data.token.trim(),
+          alexa_device: data.device.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
+      if (error) return { ok: false, message: `Se validó, pero no se pudo guardar: ${error.message}` };
+    }
+    return result;
+  });
