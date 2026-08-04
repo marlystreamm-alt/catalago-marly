@@ -433,6 +433,60 @@ export function NotificationsDialog() {
                 )}
               </div>
 
+              <div className="space-y-3 rounded-2xl border p-3">
+                <p className="text-sm font-medium">Escalamiento automático</p>
+                <p className="text-xs text-muted-foreground">
+                  Si no marcas el pedido como atendido, se avisa por otro canal.
+                </p>
+                <Row
+                  label="Activar escalamiento"
+                  checked={settings.escalateEnabled}
+                  onChange={(v) => void save({ ...settings, escalateEnabled: v })}
+                />
+                {settings.escalateEnabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Después de (minutos)</Label>
+                      <Input
+                        type="number"
+                        min={5}
+                        max={720}
+                        value={settings.escalateMinutes}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            escalateMinutes: Number(e.target.value) || 30,
+                          })
+                        }
+                        onBlur={() => void save(settings)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Avisar por</Label>
+                      <Select
+                        value={settings.escalateChannel}
+                        onValueChange={(v) =>
+                          void save({
+                            ...settings,
+                            escalateChannel: v as NotifySettings["escalateChannel"],
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="push">Push</SelectItem>
+                          <SelectItem value="email">Correo</SelectItem>
+                          <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                          <SelectItem value="alexa">Alexa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2 rounded-2xl border p-3">
                 <p className="text-sm font-medium">Seguridad</p>
                 <Input
