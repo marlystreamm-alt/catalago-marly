@@ -22,6 +22,7 @@ import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { buildServiceLink } from "@/lib/catalog/links";
 import type { Service } from "@/lib/catalog/types";
+import { isImageValue } from "@/lib/catalog/image";
 
 /**
  * Detalle de un servicio, listo para "Pedir por WhatsApp".
