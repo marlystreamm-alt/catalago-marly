@@ -1,4 +1,4 @@
-import { Link2, MessageCircle, Star } from "lucide-react";
+import { ArrowLeft, Link2, MessageCircle, Star } from "lucide-react";
 import { toast } from "sonner";
 import { reportOrder } from "@/lib/notify/client";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { buildServiceLink } from "@/lib/catalog/links";
 import type { Service } from "@/lib/catalog/types";
 import { isImageValue } from "@/lib/catalog/image";
+import { resolveServiceMedia } from "@/lib/catalog/platforms";
 
 /**
  * Detalle de un servicio, listo para "Pedir por WhatsApp".
@@ -43,6 +44,7 @@ export function ServiceDetailDialog({
 
   if (!service) return null;
 
+  const media = resolveServiceMedia(service);
   const category = catalog.categories.find((c) => c.id === service.categoryId);
   const subsection = category?.subsections.find((s) => s.id === service.subsectionId);
   const rows: [string, string][] = [
@@ -56,17 +58,39 @@ export function ServiceDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl sm:max-w-md">
-        {service.icon ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              onOpenChange(false);
+              if (window.history.length > 1) window.history.back();
+            }}
+          >
+            <ArrowLeft className="size-4" />
+            Atrás
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => onOpenChange(false)}
+          >
+            Volver al catálogo
+          </Button>
+        </div>
+        {media.icon ? (
           <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-muted text-6xl ring-1 ring-border/60">
-            {isImageValue(service.icon) ? (
+            {isImageValue(media.icon) ? (
               <img
-                src={service.icon}
+                src={media.icon}
                 alt={service.name}
                 className="size-full object-cover"
                 loading="lazy"
               />
             ) : (
-              <span aria-hidden>{service.icon}</span>
+              <span aria-hidden>{media.icon}</span>
             )}
           </div>
         ) : null}
@@ -77,7 +101,7 @@ export function ServiceDetailDialog({
             {service.favorite ? <Star className="size-4 fill-primary text-primary" /> : null}
           </DialogTitle>
           <DialogDescription className="leading-relaxed">
-            {service.description || "Detalle del servicio seleccionado."}
+            {media.description || "Detalle del servicio seleccionado."}
           </DialogDescription>
         </DialogHeader>
 

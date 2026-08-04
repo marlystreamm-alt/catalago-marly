@@ -15,6 +15,7 @@ import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { reportOrder } from "@/lib/notify/client";
 import type { Service } from "@/lib/catalog/types";
 import { isImageValue } from "@/lib/catalog/image";
+import { resolveServiceMedia } from "@/lib/catalog/platforms";
 import { ConfirmButton } from "./confirm-button";
 
 
@@ -45,6 +46,7 @@ export function ServiceCard({
 
   // Etiqueta fija + valor; los campos vacíos no se muestran.
   const facts = serviceFacts(service);
+  const media = resolveServiceMedia(service);
 
   return (
     <article
@@ -63,17 +65,17 @@ export function ServiceCard({
           />
         ) : null}
 
-        {service.icon ? (
+        {media.icon ? (
           <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-3xl ring-1 ring-border/60 sm:size-24 sm:text-4xl">
-            {isImageValue(service.icon) ? (
+            {isImageValue(media.icon) ? (
               <img
-                src={service.icon}
+                src={media.icon}
                 alt={service.name}
                 loading="lazy"
                 className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
-              <span aria-hidden>{service.icon}</span>
+              <span aria-hidden>{media.icon}</span>
             )}
           </div>
         ) : null}
@@ -125,8 +127,8 @@ export function ServiceCard({
         </div>
       </div>
 
-      {service.description ? (
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{service.description}</p>
+      {media.description ? (
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{media.description}</p>
       ) : null}
 
       {facts.length ? (

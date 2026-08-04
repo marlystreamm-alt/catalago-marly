@@ -5,7 +5,12 @@ const MAX_SIDE = 160;
 export function isImageValue(value?: string) {
   if (!value) return false;
   const v = value.trim();
-  return v.startsWith("http://") || v.startsWith("https://") || v.startsWith("data:image");
+  return (
+    v.startsWith("http://") ||
+    v.startsWith("https://") ||
+    v.startsWith("data:image") ||
+    v.startsWith("/")
+  );
 }
 
 /** Lee un archivo de imagen y lo reduce a un cuadrado máximo para que quepa en localStorage. */
