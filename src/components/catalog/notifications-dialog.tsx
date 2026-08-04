@@ -559,6 +559,107 @@ export function NotificationsDialog() {
                 </div>
               ))}
             </TabsContent>
+
+            <TabsContent value="dispositivos" className="space-y-2 pt-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void loadDevices(code.trim())}
+                >
+                  <RefreshCw className="size-4" /> Actualizar
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-xl"
+                  disabled={busy}
+                  onClick={() => void activarPush()}
+                >
+                  <Smartphone className="size-4" /> Registrar este equipo
+                </Button>
+              </div>
+              {!devices.length && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Aún no hay dispositivos registrados.
+                </p>
+              )}
+              {devices.map((d) => (
+                <div key={d.id} className="flex items-center gap-2 rounded-2xl border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {d.label || "Dispositivo sin nombre"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Registrado el {when(d.createdAt)}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={d.active}
+                    onCheckedChange={(v) => void cambiarDispositivo(d, v)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => void borrarDispositivo(d)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="historial" className="space-y-2 pt-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void loadLog(code.trim())}
+                >
+                  <RefreshCw className="size-4" /> Actualizar
+                </Button>
+                <Select value={logFilter} onValueChange={setLogFilter}>
+                  <SelectTrigger className="h-9 flex-1 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los canales</SelectItem>
+                    <SelectItem value="push">Push</SelectItem>
+                    <SelectItem value="email">Correo</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="alexa">Alexa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {!filteredLog.length && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Todavía no hay avisos registrados.
+                </p>
+              )}
+              {filteredLog.map((l) => (
+                <div key={l.id} className="rounded-2xl border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {CHANNEL_TEXT[l.channel] ?? l.channel} ·{" "}
+                        <span className="font-normal text-muted-foreground">
+                          {KIND_TEXT[l.kind] ?? l.kind}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {when(l.createdAt)} · intento {l.attempt}
+                      </p>
+                    </div>
+                    <Badge variant={l.status === "enviado" ? "default" : "destructive"}>
+                      {l.status === "enviado" ? "Enviado" : "Pendiente"}
+                    </Badge>
+                  </div>
+                  {l.detail && <p className="mt-1 text-xs text-muted-foreground">{l.detail}</p>}
+                </div>
+              ))}
+            </TabsContent>
           </Tabs>
         )}
       </DialogContent>
