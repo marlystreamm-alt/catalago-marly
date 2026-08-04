@@ -107,15 +107,20 @@ function write(record: AuthRecord) {
   }
 }
 
-/** Crea el registro inicial (contraseña temporal) si aún no existe. */
+/**
+ * Crea el registro inicial (contraseña temporal) si aún no existe.
+ * Si el registro guardado usa más iteraciones de las que soporta este navegador,
+ * no se intenta recalcular (fallaría): se regenera con la contraseña inicial temporal.
+ */
 export async function ensureAuthRecord(): Promise<AuthRecord | null> {
   if (!isBrowser()) return null;
   const existing = read();
-  if (existing) return existing;
+  if (existing && (existing.iterations || ITERATIONS) <= MAX_ITERATIONS) return existing;
   const created = await build(INITIAL_PASSWORD, true);
   write(created);
   return created;
 }
+
 
 export function generateRecoveryCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
