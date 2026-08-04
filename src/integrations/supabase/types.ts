@@ -14,7 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      notification_settings: {
+        Row: {
+          admin_code_hash: string
+          admin_code_salt: string
+          alexa_device: string
+          alexa_provider: string
+          alexa_token: string
+          auto_off_midnight: boolean
+          channel_alexa: boolean
+          channel_email: boolean
+          channel_push: boolean
+          channel_whatsapp: boolean
+          email: string
+          enabled: boolean
+          id: number
+          quiet_end: string
+          quiet_start: string
+          repeat_enabled: boolean
+          repeat_minutes: number
+          timezone: string
+          updated_at: string
+          whatsapp_number: string
+        }
+        Insert: {
+          admin_code_hash?: string
+          admin_code_salt?: string
+          alexa_device?: string
+          alexa_provider?: string
+          alexa_token?: string
+          auto_off_midnight?: boolean
+          channel_alexa?: boolean
+          channel_email?: boolean
+          channel_push?: boolean
+          channel_whatsapp?: boolean
+          email?: string
+          enabled?: boolean
+          id?: number
+          quiet_end?: string
+          quiet_start?: string
+          repeat_enabled?: boolean
+          repeat_minutes?: number
+          timezone?: string
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Update: {
+          admin_code_hash?: string
+          admin_code_salt?: string
+          alexa_device?: string
+          alexa_provider?: string
+          alexa_token?: string
+          auto_off_midnight?: boolean
+          channel_alexa?: boolean
+          channel_email?: boolean
+          channel_push?: boolean
+          channel_whatsapp?: boolean
+          email?: string
+          enabled?: boolean
+          id?: number
+          quiet_end?: string
+          quiet_start?: string
+          repeat_enabled?: boolean
+          repeat_minutes?: number
+          timezone?: string
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          attended_at: string | null
+          catalog_id: string
+          catalog_name: string
+          created_at: string
+          id: string
+          items: Json
+          link: string
+          message: string
+          notified_at: string | null
+          notify_attempts: number
+          recipient: string
+          service_name: string
+          status: string
+          total: number
+        }
+        Insert: {
+          attended_at?: string | null
+          catalog_id?: string
+          catalog_name?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          link?: string
+          message?: string
+          notified_at?: string | null
+          notify_attempts?: number
+          recipient?: string
+          service_name?: string
+          status?: string
+          total?: number
+        }
+        Update: {
+          attended_at?: string | null
+          catalog_id?: string
+          catalog_name?: string
+          created_at?: string
+          id?: string
+          items?: Json
+          link?: string
+          message?: string
+          notified_at?: string | null
+          notify_attempts?: number
+          recipient?: string
+          service_name?: string
+          status?: string
+          total?: number
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          label: string
+          p256dh: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          label?: string
+          p256dh: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          label?: string
+          p256dh?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
