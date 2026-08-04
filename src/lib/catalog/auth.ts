@@ -10,7 +10,10 @@
 
 const KEY = "ma2-auth-v1";
 const INITIAL_PASSWORD = "Artu1802";
-const ITERATIONS = 150_000;
+/** Safari/iOS y Workers no soportan más de 100 000 iteraciones de PBKDF2. */
+const ITERATIONS = 100_000;
+const MAX_ITERATIONS = 100_000;
+
 
 export interface AuthRecord {
   version: 1;
