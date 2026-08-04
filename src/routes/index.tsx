@@ -466,7 +466,10 @@ function CatalogPage() {
         <PendingOrdersBar />
 
         {isAdmin ? (
-          <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
+          <section
+            className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5"
+            aria-label="Estadísticas"
+          >
             <StatCard label="Total" value={stats.total} />
             <StatCard label="Activos" value={stats.activos} />
             <StatCard label="Categorías" value={stats.categorias} />
@@ -479,13 +482,18 @@ function CatalogPage() {
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-9"
+              className="h-11 rounded-full pl-9 text-base"
               placeholder="Buscar servicio…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Buscar servicio"
             />
           </div>
+          {refreshing ? (
+            <div className="mt-2">
+              <InlineLoader />
+            </div>
+          ) : null}
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
