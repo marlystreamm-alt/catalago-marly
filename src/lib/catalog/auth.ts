@@ -44,17 +44,19 @@ function randomHex(bytes: number) {
 }
 
 async function derive(secret: string, salt: string, iterations = ITERATIONS) {
+  const safeIterations = Math.min(Math.max(1, Math.floor(iterations)), MAX_ITERATIONS);
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, [
     "deriveBits",
   ]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations },
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: safeIterations },
     key,
     256,
   );
   return toHex(bits);
 }
+
 
 /** Comparación en tiempo constante para no filtrar información por tiempos. */
 function safeEqual(a: string, b: string) {
