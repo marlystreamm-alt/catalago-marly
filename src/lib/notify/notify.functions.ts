@@ -75,6 +75,9 @@ export const notifySaveSettings = createServerFn({ method: "POST" })
         quiet_end: s.quietEnd,
         auto_off_midnight: s.autoOffMidnight,
         timezone: s.timezone,
+        escalate_enabled: s.escalateEnabled,
+        escalate_minutes: s.escalateMinutes,
+        escalate_channel: s.escalateChannel,
         updated_at: new Date().toISOString(),
       })
       .eq("id", 1);
