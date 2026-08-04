@@ -151,6 +151,16 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
               lastAttemptAt: at,
               error: undefined,
             });
+            reportOrder({
+              catalogId: order.catalogId,
+              catalogName: order.catalogName,
+              serviceName: order.serviceName,
+              total: order.price,
+              items: order.items ?? [{ name: order.serviceName, price: order.price }],
+              message: order.message,
+              link: order.link,
+              recipient: order.recipient ?? "",
+            });
             toast.success(`Enviado: ${order.serviceName}`);
           } else {
             patch(order.id, {
