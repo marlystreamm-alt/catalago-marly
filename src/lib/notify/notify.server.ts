@@ -121,7 +121,7 @@ async function sendPush(order: CloudOrder, repeat: boolean) {
 
   setWebCrypto(globalThis.crypto);
   const db = await admin();
-  const { data } = await db.from("push_subscriptions").select("*");
+  const { data } = await db.from("push_subscriptions").select("*").eq("active", true);
   const subs = (data ?? []) as Row[];
   if (!subs.length) return "Sin dispositivos registrados";
 
