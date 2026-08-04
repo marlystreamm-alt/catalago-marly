@@ -166,6 +166,19 @@ function CatalogPage() {
   const [auditOpen, setAuditOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  // Loader breve al buscar o cambiar filtros para que la lista nunca "parpadee" vacía.
+  const [refreshing, setRefreshing] = useState(false);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setRefreshing(true);
+    const t = setTimeout(() => setRefreshing(false), 260);
+    return () => clearTimeout(t);
+  }, [query, categoryFilter, onlyActive, onlyFavorites, sortMode, catalogId]);
+
   // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
   const search = Route.useSearch();
   const targetCatalog =
