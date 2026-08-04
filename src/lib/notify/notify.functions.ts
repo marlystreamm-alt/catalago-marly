@@ -312,7 +312,13 @@ export const notifyVerifyAlexa = createServerFn({ method: "POST" })
       data.token,
       data.device,
     );
-    await logEvent(null, "alexa", "prueba", 1, result.ok ? "enviado" : "error", result.message);
+    await logEvent({
+      orderId: null,
+      channel: "alexa",
+      kind: "prueba",
+      attempt: 1,
+      detail: result.message,
+    });
     if (result.ok && data.save) {
       const db = await admin();
       const { error } = await db
