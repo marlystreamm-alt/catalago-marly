@@ -232,6 +232,7 @@ export function NotificationsDialog() {
   };
 
   const pendientes = orders.filter((o) => o.status === "nuevo").length;
+  const filteredLog = log.filter((l) => logFilter === "todos" || l.channel === logFilter);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
