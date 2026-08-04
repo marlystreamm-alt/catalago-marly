@@ -48,7 +48,7 @@ export function ServiceCard({
 
   return (
     <article
-      className={`card-soft group relative overflow-hidden rounded-3xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
+      className={`card-soft group relative overflow-hidden rounded-3xl border bg-card p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border/70"
       } ${!service.active ? "opacity-80" : ""}`}
     >
