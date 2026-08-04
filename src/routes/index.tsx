@@ -3,7 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
+  ArrowLeft,
+  ArrowUp,
   ArrowUpDown,
+
   FileDown,
   FileText,
   History,
