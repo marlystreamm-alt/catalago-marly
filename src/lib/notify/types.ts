@@ -20,9 +20,50 @@ export interface NotifySettings {
   quietEnd: string;
   autoOffMidnight: boolean;
   timezone: string;
+  /** Escalamiento: avisar por otro canal si no se atiende a tiempo. */
+  escalateEnabled: boolean;
+  escalateMinutes: number;
+  escalateChannel: EscalateChannel;
   /** true cuando ya existe un código de acceso configurado. */
   hasCode: boolean;
 }
+
+export type EscalateChannel = "push" | "email" | "whatsapp" | "alexa";
+
+/** Dispositivo registrado para avisos push. */
+export interface NotifyDevice {
+  id: string;
+  label: string;
+  endpoint: string;
+  active: boolean;
+  createdAt: string;
+}
+
+/** Entrada del historial de avisos. */
+export interface NotifyLogEntry {
+  id: string;
+  createdAt: string;
+  orderId: string | null;
+  channel: string;
+  kind: string;
+  attempt: number;
+  status: string;
+  detail: string;
+}
+
+export const CHANNEL_TEXT: Record<string, string> = {
+  push: "Teléfono (push)",
+  email: "Correo",
+  whatsapp: "WhatsApp",
+  alexa: "Alexa",
+};
+
+export const KIND_TEXT: Record<string, string> = {
+  nuevo: "Pedido nuevo",
+  recordatorio: "Recordatorio",
+  escalamiento: "Escalamiento",
+  prueba: "Prueba",
+};
 
 export const DEFAULT_SETTINGS: NotifySettings = {
   enabled: true,
@@ -41,6 +82,9 @@ export const DEFAULT_SETTINGS: NotifySettings = {
   quietEnd: "00:00",
   autoOffMidnight: true,
   timezone: "America/Monterrey",
+  escalateEnabled: false,
+  escalateMinutes: 30,
+  escalateChannel: "whatsapp",
   hasCode: false,
 };
 

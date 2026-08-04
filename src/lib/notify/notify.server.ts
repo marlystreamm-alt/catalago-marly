@@ -35,6 +35,13 @@ export function rowToSettings(row: Row | null): NotifySettings {
     quietEnd: s("quiet_end", "00:00"),
     autoOffMidnight: b("auto_off_midnight", true),
     timezone: s("timezone", "America/Monterrey"),
+    escalateEnabled: b("escalate_enabled", false),
+    escalateMinutes: Number(row["escalate_minutes"] ?? 30) || 30,
+    escalateChannel: (["push", "email", "whatsapp", "alexa"] as const).includes(
+      s("escalate_channel", "whatsapp") as NotifySettings["escalateChannel"],
+    )
+      ? (s("escalate_channel", "whatsapp") as NotifySettings["escalateChannel"])
+      : "whatsapp",
     hasCode: !!s("admin_code_hash", ""),
   };
 }
@@ -114,7 +121,7 @@ async function sendPush(order: CloudOrder, repeat: boolean) {
 
   setWebCrypto(globalThis.crypto);
   const db = await admin();
-  const { data } = await db.from("push_subscriptions").select("*");
+  const { data } = await db.from("push_subscriptions").select("*").eq("active", true);
   const subs = (data ?? []) as Row[];
   if (!subs.length) return "Sin dispositivos registrados";
 
@@ -264,27 +271,96 @@ export function rowToOrder(row: Row): CloudOrder {
   };
 }
 
+export type NotifyKind = "nuevo" | "recordatorio" | "escalamiento" | "prueba";
+
+const FAILED = /(fall|falta|no configurado|no se pudo|sin dispositivos)/i;
+
+/** Guarda una línea en el historial de avisos. */
+async function logEvent(entry: {
+  orderId: string | null;
+  channel: string;
+  kind: NotifyKind;
+  attempt: number;
+  detail: string;
+}) {
+  try {
+    const db = await admin();
+    await db.from("notification_log").insert({
+      order_id: entry.orderId,
+      channel: entry.channel,
+      kind: entry.kind,
+      attempt: entry.attempt,
+      status: FAILED.test(entry.detail) ? "pendiente" : "enviado",
+      detail: entry.detail,
+    });
+  } catch (error) {
+    console.error("No se pudo guardar el historial de avisos:", error);
+  }
+}
+
+/** Envía por un solo canal y devuelve el detalle. */
+export async function sendByChannel(
+  channel: "push" | "email" | "whatsapp" | "alexa",
+  order: CloudOrder,
+  settings: NotifySettings,
+  repeat: boolean,
+) {
+  if (channel === "push") return sendPush(order, repeat);
+  if (channel === "email") return sendEmail(order, settings, repeat);
+  if (channel === "whatsapp") return sendWhatsapp(order, settings, repeat);
+  return sendAlexa(order, settings, repeat);
+}
+
 /** Envía el aviso por todos los canales activos y devuelve el detalle de cada uno. */
 export async function notifyOrder(
   order: CloudOrder,
   settings: NotifySettings,
   repeat = false,
+  kind: NotifyKind = repeat ? "recordatorio" : "nuevo",
 ): Promise<string[]> {
+  const attempt = order.notifyAttempts + 1;
+  const orderId = kind === "prueba" ? null : order.id;
   const results: string[] = [];
-  if (settings.channelPush) results.push(`Push: ${await sendPush(order, repeat)}`);
-  if (settings.channelEmail) results.push(`Correo: ${await sendEmail(order, settings, repeat)}`);
-  if (settings.channelWhatsapp)
-    results.push(`WhatsApp: ${await sendWhatsapp(order, settings, repeat)}`);
-  if (settings.channelAlexa) results.push(`Alexa: ${await sendAlexa(order, settings, repeat)}`);
+  const channels = [
+    ["push", settings.channelPush, "Push"],
+    ["email", settings.channelEmail, "Correo"],
+    ["whatsapp", settings.channelWhatsapp, "WhatsApp"],
+    ["alexa", settings.channelAlexa, "Alexa"],
+  ] as const;
+
+  for (const [channel, on, label] of channels) {
+    if (!on) continue;
+    const detail = await sendByChannel(channel, order, settings, repeat);
+    results.push(`${label}: ${detail}`);
+    await logEvent({ orderId, channel, kind, attempt, detail });
+  }
   if (!results.length) results.push("No hay canales activos");
 
-  const db = await admin();
-  await db
-    .from("orders")
-    .update({ notified_at: new Date().toISOString(), notify_attempts: order.notifyAttempts + 1 })
-    .eq("id", order.id);
+  if (kind !== "prueba") {
+    const db = await admin();
+    await db
+      .from("orders")
+      .update({ notified_at: new Date().toISOString(), notify_attempts: attempt })
+      .eq("id", order.id);
+  }
 
   return results;
+}
+
+/** Escalamiento: avisa por el canal alterno si el pedido sigue sin atenderse. */
+export async function escalateOrder(order: CloudOrder, settings: NotifySettings) {
+  const channel = settings.escalateChannel;
+  const detail = await sendByChannel(channel, order, settings, true);
+  await logEvent({
+    orderId: order.id,
+    channel,
+    kind: "escalamiento",
+    attempt: order.notifyAttempts + 1,
+    detail,
+  });
+  const db = await admin();
+  await db.from("orders").update({ escalated_at: new Date().toISOString() }).eq("id", order.id);
+  return detail;
 }
 
 /* ------------------------- Código de acceso admin --------------------------- */

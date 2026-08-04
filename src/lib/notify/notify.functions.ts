@@ -1,7 +1,13 @@
 /** Funciones de servidor del panel de avisos (protegidas con el código del administrador). */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { DEFAULT_SETTINGS, type CloudOrder, type NotifySettings } from "./types";
+import {
+  DEFAULT_SETTINGS,
+  type CloudOrder,
+  type NotifyDevice,
+  type NotifyLogEntry,
+  type NotifySettings,
+} from "./types";
 
 const codeSchema = z.object({ code: z.string().min(4) });
 
@@ -23,6 +29,9 @@ const settingsSchema = codeSchema.extend({
     quietEnd: z.string(),
     autoOffMidnight: z.boolean(),
     timezone: z.string(),
+    escalateEnabled: z.boolean(),
+    escalateMinutes: z.number().int().min(5).max(720),
+    escalateChannel: z.enum(["push", "email", "whatsapp", "alexa"]),
   }),
 });
 
@@ -72,6 +81,9 @@ export const notifySaveSettings = createServerFn({ method: "POST" })
         quiet_end: s.quietEnd,
         auto_off_midnight: s.autoOffMidnight,
         timezone: s.timezone,
+        escalate_enabled: s.escalateEnabled,
+        escalate_minutes: s.escalateMinutes,
+        escalate_channel: s.escalateChannel,
         updated_at: new Date().toISOString(),
       })
       .eq("id", 1);
@@ -147,11 +159,99 @@ export const notifySavePush = createServerFn({ method: "POST" })
     const { error } = await db
       .from("push_subscriptions")
       .upsert(
-        { endpoint: data.endpoint, p256dh: data.p256dh, auth: data.auth, label: data.label },
+        {
+          endpoint: data.endpoint,
+          p256dh: data.p256dh,
+          auth: data.auth,
+          label: data.label,
+          active: true,
+          last_seen_at: new Date().toISOString(),
+        },
         { onConflict: "endpoint" },
       );
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+/** Lista los dispositivos registrados para avisos push. */
+export const notifyListDevices = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .handler(async ({ data }): Promise<NotifyDevice[]> => {
+    const { requireAdminCode, admin } = await import("./notify.server");
+    await requireAdminCode(data.code);
+    const db = await admin();
+    const { data: rows, error } = await db
+      .from("push_subscriptions")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row["id"]),
+        label: String(row["label"] ?? ""),
+        endpoint: String(row["endpoint"] ?? ""),
+        active: row["active"] !== false,
+        createdAt: String(row["created_at"] ?? ""),
+      };
+    });
+  });
+
+/** Activa o desactiva un dispositivo. */
+export const notifySetDeviceActive = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    codeSchema.extend({ id: z.string().uuid(), active: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { requireAdminCode, admin } = await import("./notify.server");
+    await requireAdminCode(data.code);
+    const db = await admin();
+    const { error } = await db
+      .from("push_subscriptions")
+      .update({ active: data.active })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Elimina un dispositivo registrado. */
+export const notifyDeleteDevice = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => codeSchema.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { requireAdminCode, admin } = await import("./notify.server");
+    await requireAdminCode(data.code);
+    const db = await admin();
+    const { error } = await db.from("push_subscriptions").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Historial de avisos enviados. */
+export const notifyListLog = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .handler(async ({ data }): Promise<NotifyLogEntry[]> => {
+    const { requireAdminCode, admin } = await import("./notify.server");
+    await requireAdminCode(data.code);
+    const db = await admin();
+    const { data: rows, error } = await db
+      .from("notification_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(150);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: String(row["id"]),
+        createdAt: String(row["created_at"] ?? ""),
+        orderId: (row["order_id"] as string) ?? null,
+        channel: String(row["channel"] ?? ""),
+        kind: String(row["kind"] ?? ""),
+        attempt: Number(row["attempt"] ?? 1),
+        status: String(row["status"] ?? ""),
+        detail: String(row["detail"] ?? ""),
+      };
+    });
   });
 
 /** Envía un aviso de prueba por los canales activos. */
@@ -183,7 +283,9 @@ export const notifyTest = createServerFn({ method: "POST" })
     if (!withinSchedule(settings))
       results.push("Aviso: estás fuera del horario configurado (se envió de todos modos)");
     // No se actualiza ningún pedido real: se envía directamente por canal.
-    const detail = await notifyOrder(demo, settings, false).catch((e: unknown) => [String(e)]);
+    const detail = await notifyOrder(demo, settings, false, "prueba").catch((e: unknown) => [
+      String(e),
+    ]);
     return { results: [...results, ...detail] };
   });
 

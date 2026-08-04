@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, BellRing, Check, Loader2, RefreshCw, Send } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  Check,
+  Loader2,
+  RefreshCw,
+  Send,
+  Smartphone,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,16 +33,28 @@ import {
 } from "@/components/ui/select";
 import {
   notifyChangeCode,
+  notifyDeleteDevice,
+  notifyListDevices,
+  notifyListLog,
   notifyListOrders,
   notifyLogin,
   notifySavePush,
   notifySaveSettings,
+  notifySetDeviceActive,
   notifySetOrderStatus,
   notifyStatus,
   notifyTest,
 } from "@/lib/notify/notify.functions";
 import { getSavedCode, saveCode, subscribeToPush } from "@/lib/notify/client";
-import { DEFAULT_SETTINGS, type CloudOrder, type NotifySettings } from "@/lib/notify/types";
+import {
+  CHANNEL_TEXT,
+  DEFAULT_SETTINGS,
+  KIND_TEXT,
+  type CloudOrder,
+  type NotifyDevice,
+  type NotifyLogEntry,
+  type NotifySettings,
+} from "@/lib/notify/types";
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })
@@ -51,6 +72,9 @@ export function NotificationsDialog() {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState<NotifySettings>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<CloudOrder[]>([]);
+  const [devices, setDevices] = useState<NotifyDevice[]>([]);
+  const [log, setLog] = useState<NotifyLogEntry[]>([]);
+  const [logFilter, setLogFilter] = useState("todos");
   const [newCode, setNewCode] = useState("");
 
   useEffect(() => {
@@ -71,6 +95,22 @@ export function NotificationsDialog() {
     }
   }, []);
 
+  const loadDevices = useCallback(async (theCode: string) => {
+    try {
+      setDevices(await notifyListDevices({ data: { code: theCode } }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron leer los dispositivos");
+    }
+  }, []);
+
+  const loadLog = useCallback(async (theCode: string) => {
+    try {
+      setLog(await notifyListLog({ data: { code: theCode } }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo leer el historial");
+    }
+  }, []);
+
   const login = async () => {
     setBusy(true);
     try {
@@ -79,7 +119,7 @@ export function NotificationsDialog() {
       setLogged(true);
       setHasCode(true);
       saveCode(code.trim());
-      await loadOrders(code.trim());
+      await Promise.all([loadOrders(code.trim()), loadDevices(code.trim()), loadLog(code.trim())]);
       toast.success("Panel de avisos abierto");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Código incorrecto");
@@ -121,10 +161,31 @@ export function NotificationsDialog() {
         },
       });
       toast.success("Este dispositivo recibirá los avisos");
+      await loadDevices(code.trim());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo activar el aviso");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const cambiarDispositivo = async (device: NotifyDevice, active: boolean) => {
+    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, active } : d)));
+    try {
+      await notifySetDeviceActive({ data: { code: code.trim(), id: device.id, active } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el dispositivo");
+      await loadDevices(code.trim());
+    }
+  };
+
+  const borrarDispositivo = async (device: NotifyDevice) => {
+    try {
+      await notifyDeleteDevice({ data: { code: code.trim(), id: device.id } });
+      setDevices((prev) => prev.filter((d) => d.id !== device.id));
+      toast.success("Dispositivo eliminado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
     }
   };
 
@@ -133,6 +194,7 @@ export function NotificationsDialog() {
     try {
       const { results } = await notifyTest({ data: { code: code.trim() } });
       toast.success("Prueba enviada", { description: results.join(" · ") });
+      await loadLog(code.trim());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo enviar la prueba");
     } finally {
@@ -170,6 +232,7 @@ export function NotificationsDialog() {
   };
 
   const pendientes = orders.filter((o) => o.status === "nuevo").length;
+  const filteredLog = log.filter((l) => logFilter === "todos" || l.channel === logFilter);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -211,12 +274,18 @@ export function NotificationsDialog() {
           </div>
         ) : (
           <Tabs defaultValue="config">
-            <TabsList className="w-full">
-              <TabsTrigger value="config" className="flex-1">
-                Configuración
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="config" className="text-xs">
+                Ajustes
               </TabsTrigger>
-              <TabsTrigger value="pedidos" className="flex-1">
+              <TabsTrigger value="pedidos" className="text-xs">
                 Pedidos {pendientes ? `(${pendientes})` : ""}
+              </TabsTrigger>
+              <TabsTrigger value="dispositivos" className="text-xs">
+                Equipos
+              </TabsTrigger>
+              <TabsTrigger value="historial" className="text-xs">
+                Historial
               </TabsTrigger>
             </TabsList>
 
@@ -365,6 +434,60 @@ export function NotificationsDialog() {
                 )}
               </div>
 
+              <div className="space-y-3 rounded-2xl border p-3">
+                <p className="text-sm font-medium">Escalamiento automático</p>
+                <p className="text-xs text-muted-foreground">
+                  Si no marcas el pedido como atendido, se avisa por otro canal.
+                </p>
+                <Row
+                  label="Activar escalamiento"
+                  checked={settings.escalateEnabled}
+                  onChange={(v) => void save({ ...settings, escalateEnabled: v })}
+                />
+                {settings.escalateEnabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Después de (minutos)</Label>
+                      <Input
+                        type="number"
+                        min={5}
+                        max={720}
+                        value={settings.escalateMinutes}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            escalateMinutes: Number(e.target.value) || 30,
+                          })
+                        }
+                        onBlur={() => void save(settings)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Avisar por</Label>
+                      <Select
+                        value={settings.escalateChannel}
+                        onValueChange={(v) =>
+                          void save({
+                            ...settings,
+                            escalateChannel: v as NotifySettings["escalateChannel"],
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="push">Push</SelectItem>
+                          <SelectItem value="email">Correo</SelectItem>
+                          <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                          <SelectItem value="alexa">Alexa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2 rounded-2xl border p-3">
                 <p className="text-sm font-medium">Seguridad</p>
                 <Input
@@ -434,6 +557,107 @@ export function NotificationsDialog() {
                     <Check className="size-4" />
                     {o.status === "nuevo" ? "Marcar como atendido" : "Volver a pendiente"}
                   </Button>
+                </div>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="dispositivos" className="space-y-2 pt-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void loadDevices(code.trim())}
+                >
+                  <RefreshCw className="size-4" /> Actualizar
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-xl"
+                  disabled={busy}
+                  onClick={() => void activarPush()}
+                >
+                  <Smartphone className="size-4" /> Registrar este equipo
+                </Button>
+              </div>
+              {!devices.length && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Aún no hay dispositivos registrados.
+                </p>
+              )}
+              {devices.map((d) => (
+                <div key={d.id} className="flex items-center gap-2 rounded-2xl border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {d.label || "Dispositivo sin nombre"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Registrado el {when(d.createdAt)}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={d.active}
+                    onCheckedChange={(v) => void cambiarDispositivo(d, v)}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => void borrarDispositivo(d)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="historial" className="space-y-2 pt-3">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void loadLog(code.trim())}
+                >
+                  <RefreshCw className="size-4" /> Actualizar
+                </Button>
+                <Select value={logFilter} onValueChange={setLogFilter}>
+                  <SelectTrigger className="h-9 flex-1 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los canales</SelectItem>
+                    <SelectItem value="push">Push</SelectItem>
+                    <SelectItem value="email">Correo</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="alexa">Alexa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {!filteredLog.length && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Todavía no hay avisos registrados.
+                </p>
+              )}
+              {filteredLog.map((l) => (
+                <div key={l.id} className="rounded-2xl border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {CHANNEL_TEXT[l.channel] ?? l.channel} ·{" "}
+                        <span className="font-normal text-muted-foreground">
+                          {KIND_TEXT[l.kind] ?? l.kind}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {when(l.createdAt)} · intento {l.attempt}
+                      </p>
+                    </div>
+                    <Badge variant={l.status === "enviado" ? "default" : "destructive"}>
+                      {l.status === "enviado" ? "Enviado" : "Pendiente"}
+                    </Badge>
+                  </div>
+                  {l.detail && <p className="mt-1 text-xs text-muted-foreground">{l.detail}</p>}
                 </div>
               ))}
             </TabsContent>
