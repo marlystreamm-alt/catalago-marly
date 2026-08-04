@@ -298,7 +298,7 @@ export type NotifyKind = "nuevo" | "recordatorio" | "escalamiento" | "prueba";
 const FAILED = /(fall|falta|no configurado|no se pudo|sin dispositivos)/i;
 
 /** Guarda una línea en el historial de avisos. */
-async function logEvent(entry: {
+export async function logEvent(entry: {
   orderId: string | null;
   channel: string;
   kind: NotifyKind;
