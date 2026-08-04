@@ -10,7 +10,10 @@
 
 const KEY = "ma2-auth-v1";
 const INITIAL_PASSWORD = "Artu1802";
-const ITERATIONS = 150_000;
+/** Safari/iOS y Workers no soportan más de 100 000 iteraciones de PBKDF2. */
+const ITERATIONS = 100_000;
+const MAX_ITERATIONS = 100_000;
+
 
 export interface AuthRecord {
   version: 1;
@@ -41,17 +44,19 @@ function randomHex(bytes: number) {
 }
 
 async function derive(secret: string, salt: string, iterations = ITERATIONS) {
+  const safeIterations = Math.min(Math.max(1, Math.floor(iterations)), MAX_ITERATIONS);
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, [
     "deriveBits",
   ]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations },
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: safeIterations },
     key,
     256,
   );
   return toHex(bits);
 }
+
 
 /** Comparación en tiempo constante para no filtrar información por tiempos. */
 function safeEqual(a: string, b: string) {
@@ -102,15 +107,20 @@ function write(record: AuthRecord) {
   }
 }
 
-/** Crea el registro inicial (contraseña temporal) si aún no existe. */
+/**
+ * Crea el registro inicial (contraseña temporal) si aún no existe.
+ * Si el registro guardado usa más iteraciones de las que soporta este navegador,
+ * no se intenta recalcular (fallaría): se regenera con la contraseña inicial temporal.
+ */
 export async function ensureAuthRecord(): Promise<AuthRecord | null> {
   if (!isBrowser()) return null;
   const existing = read();
-  if (existing) return existing;
+  if (existing && (existing.iterations || ITERATIONS) <= MAX_ITERATIONS) return existing;
   const created = await build(INITIAL_PASSWORD, true);
   write(created);
   return created;
 }
+
 
 export function generateRecoveryCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
