@@ -116,7 +116,23 @@ export function ServiceCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {online ? (
           <Button asChild className="flex-1 min-w-[10rem]">
-            <a href={buildWhatsappLink(service, catalog)} target="_blank" rel="noopener noreferrer">
+            <a
+              href={buildWhatsappLink(service, catalog)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                reportOrder({
+                  catalogId: catalog.id,
+                  catalogName: catalog.name,
+                  serviceName: service.name,
+                  total: service.price,
+                  items: [{ name: service.name, price: service.price }],
+                  message: buildWhatsappMessage(service, catalog),
+                  link: buildWhatsappLink(service, catalog),
+                  recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
+                })
+              }
+            >
               <MessageCircle className="size-4" />
               Pedir por WhatsApp
             </a>
