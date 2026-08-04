@@ -30,7 +30,7 @@ Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "
 
 ## Detalles técnicos
 
-- Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro), `push_subscriptions` (endpoints Web Push del admin).
+- Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro, `quiet_start`, `quiet_end`, `timezone` = America/Monterrey), `push_subscriptions` (endpoints Web Push del admin).
 - Endpoint público `src/routes/api/public/orders.ts` (POST) para registrar el pedido desde el cliente, con validación Zod y sin PII; lectura del panel vía server functions protegidas con `requireSupabaseAuth` o clave de admin existente.
 - Web Push con VAPID: se generan las llaves como secretos, service worker de mensajería aparte del app-shell (no toca el PWA actual).
 - Correo vía conector Resend; WhatsApp vía Twilio (secretos añadidos solo si lo activas).
