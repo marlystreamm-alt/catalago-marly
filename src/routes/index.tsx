@@ -32,6 +32,7 @@ import {
 import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
+import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-skeletons";
 import {
   AuditDialog,
   CatalogVisibilityDialog,
