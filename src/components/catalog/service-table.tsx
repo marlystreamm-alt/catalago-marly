@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { buildWhatsappLink, formatMXN } from "@/lib/catalog/whatsapp";
+import { reportOrder } from "@/lib/notify/client";
 import type { Service } from "@/lib/catalog/types";
 
 type PriceUndo = { services: { id: string; price: number; name: string }[]; label: string };
@@ -328,6 +329,18 @@ export function ServiceTable({
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Pedir ${s.name} por WhatsApp`}
+                        onClick={() =>
+                          reportOrder({
+                            catalogId: catalog.id,
+                            catalogName: catalog.name,
+                            serviceName: s.name,
+                            total: s.price,
+                            items: [{ name: s.name, price: s.price }],
+                            message: "",
+                            link: buildWhatsappLink(s, catalog),
+                            recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
+                          })
+                        }
                       >
                         <MessageCircle className="size-4 text-primary" />
                       </a>

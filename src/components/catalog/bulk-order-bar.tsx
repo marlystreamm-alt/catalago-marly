@@ -78,6 +78,17 @@ export function BulkOrderBar({
     setConfirmOpen(false);
     if (online) {
       window.open(link, "_blank", "noopener,noreferrer");
+      reportOrder({
+        catalogId: catalog.id,
+        catalogName: catalog.name,
+        serviceName:
+          valid.length === 1 ? valid[0].name : `${valid.length} servicios seleccionados`,
+        total,
+        items: valid.map((s) => ({ name: s.name, price: s.price })),
+        message,
+        link,
+        recipient: recipientFromLink(link),
+      });
       onClear();
       return;
     }
