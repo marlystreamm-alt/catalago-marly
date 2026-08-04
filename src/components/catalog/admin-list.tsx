@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { findPlatform } from "@/lib/catalog/platforms";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -193,8 +194,10 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
         </div>
         <p className="shrink-0 text-sm font-bold text-primary">{displayPrice(service)}</p>
       </div>
-      {service.description ? (
-        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{service.description}</p>
+      {(service.description || findPlatform(service.name)?.description) ? (
+        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+          {service.description || findPlatform(service.name)?.description}
+        </p>
       ) : null}
       {meta.length ? (
         <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">{meta.join(" · ")}</p>
@@ -688,10 +691,45 @@ export function AdminList() {
                       {tab === "tramites" ? "Descripción corta" : "Descripción"}
                     </span>
                     <Textarea
-                      rows={2}
+                      rows={3}
                       value={s.description}
+                      placeholder={
+                        findPlatform(s.name)?.description ??
+                        "Escribe la descripción que verán tus clientes…"
+                      }
                       onChange={(e) => patch(s.id, { description: e.target.value })}
                     />
+                    {findPlatform(s.name) && !s.description.trim() ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground">
+                          Sin texto propio se muestra la descripción sugerida.
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 rounded-full text-[11px]"
+                          onClick={() =>
+                            patch(s.id, {
+                              description: findPlatform(s.name)?.description ?? "",
+                            })
+                          }
+                        >
+                          Usar sugerida y editar
+                        </Button>
+                      </div>
+                    ) : null}
+                    {s.description.trim() ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-fit rounded-full text-[11px]"
+                        onClick={() => patch(s.id, { description: "" })}
+                      >
+                        Quitar descripción personalizada
+                      </Button>
+                    ) : null}
                   </label>
                 </>
               ) : null}
