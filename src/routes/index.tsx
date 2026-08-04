@@ -32,6 +32,7 @@ import {
 import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
+import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-skeletons";
 import {
   AuditDialog,
   CatalogVisibilityDialog,
@@ -164,6 +165,19 @@ function CatalogPage() {
   const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  // Loader breve al buscar o cambiar filtros para que la lista nunca "parpadee" vacía.
+  const [refreshing, setRefreshing] = useState(false);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setRefreshing(true);
+    const t = setTimeout(() => setRefreshing(false), 260);
+    return () => clearTimeout(t);
+  }, [query, categoryFilter, onlyActive, onlyFavorites, sortMode, catalogId]);
 
   // Los enlaces públicos con parámetros aplican catálogo y filtros al abrir.
   const search = Route.useSearch();
@@ -391,16 +405,18 @@ function CatalogPage() {
   };
 
   return (
-    <main className="app-gradient min-h-screen pb-16">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <header className="card-soft rounded-3xl border border-border bg-card/90 p-4 backdrop-blur">
+    <main className="app-gradient min-h-screen pb-24">
+      <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+        <header className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-[0.2em] text-primary">MA²</p>
-              <h1 className="text-2xl font-bold text-balance text-card-foreground">
+              <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
+              <h1 className="text-xl font-bold leading-tight text-balance text-card-foreground sm:text-2xl">
                 {catalog.name}
               </h1>
-              <p className="text-sm text-muted-foreground">{catalog.subtitle}</p>
+              <p className="text-[13px] leading-snug text-muted-foreground sm:text-sm">
+                {catalog.subtitle}
+              </p>
             </div>
             <AdminBar />
           </div>
@@ -450,7 +466,10 @@ function CatalogPage() {
         <PendingOrdersBar />
 
         {isAdmin ? (
-          <section className="mt-4 grid grid-cols-5 gap-2" aria-label="Estadísticas">
+          <section
+            className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5"
+            aria-label="Estadísticas"
+          >
             <StatCard label="Total" value={stats.total} />
             <StatCard label="Activos" value={stats.activos} />
             <StatCard label="Categorías" value={stats.categorias} />
@@ -463,13 +482,18 @@ function CatalogPage() {
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-9"
+              className="h-11 rounded-full pl-9 text-base"
               placeholder="Buscar servicio…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Buscar servicio"
             />
           </div>
+          {refreshing ? (
+            <div className="mt-2">
+              <InlineLoader />
+            </div>
+          ) : null}
           {isAdmin ? (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -652,7 +676,11 @@ function CatalogPage() {
         </section>
 
         <div className="mt-5 grid gap-6">
-          {isAdmin && viewMode === "lista" ? (
+          {!hydrated ? (
+            <ServiceListSkeleton count={5} />
+          ) : refreshing ? (
+            <ServiceListSkeleton count={3} label="Actualizando resultados…" />
+          ) : isAdmin && viewMode === "lista" ? (
             <AdminList />
           ) : isAdmin && viewMode === "tabla" ? (
             <ServiceTable

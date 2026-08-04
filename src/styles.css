@@ -159,3 +159,12 @@
 @utility card-soft {
   box-shadow: var(--shadow-card);
 }
+
+@keyframes loader-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@utility loader-sweep {
+  animation: loader-sweep 1.1s ease-in-out infinite;
+}
