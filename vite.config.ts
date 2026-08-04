@@ -38,6 +38,7 @@ export default defineConfig({
           ],
         },
         workbox: {
+          importScripts: ["/push-sw.js"],
           navigateFallback: "/",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],

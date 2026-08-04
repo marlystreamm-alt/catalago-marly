@@ -12,6 +12,7 @@ import {
 import { buildServiceLink } from "@/lib/catalog/links";
 import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
+import { reportOrder } from "@/lib/notify/client";
 import type { Service } from "@/lib/catalog/types";
 import { isImageValue } from "@/lib/catalog/image";
 import { ConfirmButton } from "./confirm-button";
@@ -116,7 +117,23 @@ export function ServiceCard({
       <div className="mt-3 flex flex-wrap gap-2">
         {online ? (
           <Button asChild className="flex-1 min-w-[10rem]">
-            <a href={buildWhatsappLink(service, catalog)} target="_blank" rel="noopener noreferrer">
+            <a
+              href={buildWhatsappLink(service, catalog)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                reportOrder({
+                  catalogId: catalog.id,
+                  catalogName: catalog.name,
+                  serviceName: service.name,
+                  total: service.price,
+                  items: [{ name: service.name, price: service.price }],
+                  message: buildWhatsappMessage(service, catalog),
+                  link: buildWhatsappLink(service, catalog),
+                  recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
+                })
+              }
+            >
               <MessageCircle className="size-4" />
               Pedir por WhatsApp
             </a>

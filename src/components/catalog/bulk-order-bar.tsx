@@ -18,6 +18,7 @@ import {
   formatMXN,
 } from "@/lib/catalog/whatsapp";
 import { recipientFromLink } from "@/lib/catalog/orders";
+import { reportOrder } from "@/lib/notify/client";
 import type { Service } from "@/lib/catalog/types";
 
 /** Barra fija para pedir varias plataformas seleccionadas en un solo mensaje. */
@@ -78,6 +79,17 @@ export function BulkOrderBar({
     setConfirmOpen(false);
     if (online) {
       window.open(link, "_blank", "noopener,noreferrer");
+      reportOrder({
+        catalogId: catalog.id,
+        catalogName: catalog.name,
+        serviceName:
+          valid.length === 1 ? valid[0].name : `${valid.length} servicios seleccionados`,
+        total,
+        items: valid.map((s) => ({ name: s.name, price: s.price })),
+        message,
+        link,
+        recipient: recipientFromLink(link),
+      });
       onClear();
       return;
     }

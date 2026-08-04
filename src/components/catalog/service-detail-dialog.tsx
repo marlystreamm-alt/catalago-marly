@@ -1,5 +1,6 @@
 import { Link2, MessageCircle, Star } from "lucide-react";
 import { toast } from "sonner";
+import { reportOrder } from "@/lib/notify/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,6 +102,18 @@ export function ServiceDetailDialog({
                 href={buildWhatsappLink(service, catalog)}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  reportOrder({
+                    catalogId: catalog.id,
+                    catalogName: catalog.name,
+                    serviceName: service.name,
+                    total: service.price,
+                    items: [{ name: service.name, price: service.price }],
+                    message: buildWhatsappMessage(service, catalog),
+                    link: buildWhatsappLink(service, catalog),
+                    recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
+                  })
+                }
               >
                 <MessageCircle className="size-4" />
                 Pedir por WhatsApp

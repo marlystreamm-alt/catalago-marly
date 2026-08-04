@@ -52,6 +52,7 @@ import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
 import { CatalogManager } from "@/components/catalog/catalog-manager";
+import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
 
 /** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
@@ -425,7 +426,12 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
-          <CatalogManager />
+          {isAdmin ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <CatalogManager />
+              <NotificationsDialog />
+            </div>
+          ) : null}
         </header>
 
         {!online ? (
