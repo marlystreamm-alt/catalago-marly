@@ -114,7 +114,7 @@ export function ServiceDetailDialog({
             Copiar enlace
           </Button>
           {online ? (
-            <Button asChild className="flex-1">
+            <Button asChild size="lg" className="flex-1 rounded-full shadow-sm">
               <a
                 href={buildWhatsappLink(service, catalog)}
                 target="_blank"
@@ -138,7 +138,7 @@ export function ServiceDetailDialog({
             </Button>
           ) : (
             <Button
-              className="flex-1"
+              className="flex-1 rounded-full shadow-sm"
               onClick={() => {
                 enqueue({
                   catalogId: catalog.id,
