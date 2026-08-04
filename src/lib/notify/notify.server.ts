@@ -35,6 +35,13 @@ export function rowToSettings(row: Row | null): NotifySettings {
     quietEnd: s("quiet_end", "00:00"),
     autoOffMidnight: b("auto_off_midnight", true),
     timezone: s("timezone", "America/Monterrey"),
+    escalateEnabled: b("escalate_enabled", false),
+    escalateMinutes: Number(row["escalate_minutes"] ?? 30) || 30,
+    escalateChannel: (["push", "email", "whatsapp", "alexa"] as const).includes(
+      s("escalate_channel", "whatsapp") as NotifySettings["escalateChannel"],
+    )
+      ? (s("escalate_channel", "whatsapp") as NotifySettings["escalateChannel"])
+      : "whatsapp",
     hasCode: !!s("admin_code_hash", ""),
   };
 }
