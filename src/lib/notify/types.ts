@@ -82,6 +82,9 @@ export const DEFAULT_SETTINGS: NotifySettings = {
   quietEnd: "00:00",
   autoOffMidnight: true,
   timezone: "America/Monterrey",
+  escalateEnabled: false,
+  escalateMinutes: 30,
+  escalateChannel: "whatsapp",
   hasCode: false,
 };
 
