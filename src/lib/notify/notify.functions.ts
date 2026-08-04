@@ -182,12 +182,8 @@ export const notifyTest = createServerFn({ method: "POST" })
     const results: string[] = [];
     if (!withinSchedule(settings))
       results.push("Aviso: estás fuera del horario configurado (se envió de todos modos)");
-    const db = (await import("./notify.server")).admin;
-    void db;
     // No se actualiza ningún pedido real: se envía directamente por canal.
-    const detail = await notifyOrder({ ...demo }, settings, false).catch((e: unknown) => [
-      String(e),
-    ]);
+    const detail = await notifyOrder(demo, settings, false).catch((e: unknown) => [String(e)]);
     return { results: [...results, ...detail] };
   });
 
