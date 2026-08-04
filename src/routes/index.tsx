@@ -405,16 +405,18 @@ function CatalogPage() {
   };
 
   return (
-    <main className="app-gradient min-h-screen pb-16">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        <header className="card-soft rounded-3xl border border-border bg-card/90 p-4 backdrop-blur">
+    <main className="app-gradient min-h-screen pb-24">
+      <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+        <header className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-[0.2em] text-primary">MA²</p>
-              <h1 className="text-2xl font-bold text-balance text-card-foreground">
+              <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
+              <h1 className="text-xl font-bold leading-tight text-balance text-card-foreground sm:text-2xl">
                 {catalog.name}
               </h1>
-              <p className="text-sm text-muted-foreground">{catalog.subtitle}</p>
+              <p className="text-[13px] leading-snug text-muted-foreground sm:text-sm">
+                {catalog.subtitle}
+              </p>
             </div>
             <AdminBar />
           </div>
