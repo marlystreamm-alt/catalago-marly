@@ -44,79 +44,104 @@ export function ServiceCard({
 
 
   // Etiqueta fija + valor; los campos vacíos no se muestran.
-  const meta = serviceFacts(service).map((f) => `${f.label}: ${f.value.trim()}`);
+  const facts = serviceFacts(service);
 
   return (
     <article
-      className={`card-soft rounded-2xl border bg-card p-4 ${
-        selected ? "border-primary ring-2 ring-primary/30" : "border-border"
-      }`}
+      className={`card-soft group relative overflow-hidden rounded-3xl border bg-card p-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
+        selected ? "border-primary ring-2 ring-primary/30" : "border-border/70"
+      } ${!service.active ? "opacity-80" : ""}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          {onToggleSelect ? (
-            <input
-              type="checkbox"
-              className="mt-1 size-4 shrink-0 accent-primary"
-              checked={!!selected}
-              aria-label={`Seleccionar ${service.name}`}
-              onChange={() => onToggleSelect(service.id)}
-            />
-          ) : null}
-          {service.icon ? (
-            <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-2xl">
-              {isImageValue(service.icon) ? (
-                <img
-                  src={service.icon}
-                  alt={service.name}
-                  loading="lazy"
-                  className="size-full object-cover"
-                />
-              ) : (
-                <span aria-hidden>{service.icon}</span>
-              )}
-            </div>
-          ) : null}
-          <div className="min-w-0">
+      <div className="flex items-start gap-3 sm:gap-4">
+        {onToggleSelect ? (
+          <input
+            type="checkbox"
+            className="mt-2 size-4 shrink-0 accent-primary"
+            checked={!!selected}
+            aria-label={`Seleccionar ${service.name}`}
+            onChange={() => onToggleSelect(service.id)}
+          />
+        ) : null}
 
-            <h3 className="truncate text-base font-semibold text-card-foreground">
+        {service.icon ? (
+          <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-4xl ring-1 ring-border/60 sm:size-24">
+            {isImageValue(service.icon) ? (
+              <img
+                src={service.icon}
+                alt={service.name}
+                loading="lazy"
+                className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <span aria-hidden>{service.icon}</span>
+            )}
+          </div>
+        ) : null}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-base font-semibold leading-tight tracking-tight text-card-foreground sm:text-lg">
               {service.name}
             </h3>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {category ? <Badge variant="secondary">{category.name}</Badge> : null}
-              {subsection ? <Badge variant="outline">{subsection.name}</Badge> : null}
-              {!service.active ? <Badge variant="destructive">Oculto</Badge> : null}
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-mr-2 -mt-1 shrink-0 rounded-full transition-transform hover:scale-110"
+              aria-pressed={service.favorite}
+              aria-label={service.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
+              onClick={() => toggleFavorite(service.id)}
+            >
+              <Star
+                className={`size-5 ${service.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
+              />
+            </Button>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          <p className="text-lg font-bold text-primary">{displayPrice(service)}</p>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-pressed={service.favorite}
-            aria-label={service.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
-            onClick={() => toggleFavorite(service.id)}
-          >
-            <Star
-              className={`size-5 ${service.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
-            />
-          </Button>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-primary">
+            {displayPrice(service)}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {category ? (
+              <Badge variant="secondary" className="rounded-full font-medium">
+                {category.name}
+              </Badge>
+            ) : null}
+            {subsection ? (
+              <Badge variant="outline" className="rounded-full font-medium">
+                {subsection.name}
+              </Badge>
+            ) : null}
+            {service.favorite ? (
+              <Badge className="rounded-full font-medium">Favorito</Badge>
+            ) : null}
+            {!service.active ? (
+              <Badge variant="destructive" className="rounded-full font-medium">
+                Oculto
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </div>
 
       {service.description ? (
-        <p className="mt-2 text-sm text-muted-foreground">{service.description}</p>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{service.description}</p>
       ) : null}
 
-      {meta.length ? (
-        <p className="mt-2 text-xs text-muted-foreground">{meta.join(" · ")}</p>
+      {facts.length ? (
+        <dl className="mt-3 grid gap-1.5 rounded-2xl bg-muted/50 p-3 text-xs sm:grid-cols-2">
+          {facts.map((f) => (
+            <div key={f.label} className="flex items-baseline justify-between gap-2">
+              <dt className="text-muted-foreground">{f.label}</dt>
+              <dd className="text-right font-medium text-card-foreground">{f.value.trim()}</dd>
+            </div>
+          ))}
+        </dl>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {online ? (
-          <Button asChild className="flex-1 min-w-[10rem]">
+          <Button asChild size="lg" className="flex-1 min-w-[10rem] rounded-full shadow-sm">
             <a
               href={buildWhatsappLink(service, catalog)}
               target="_blank"
@@ -140,7 +165,8 @@ export function ServiceCard({
           </Button>
         ) : (
           <Button
-            className="flex-1 min-w-[10rem]"
+            size="lg"
+            className="flex-1 min-w-[10rem] rounded-full shadow-sm"
             onClick={async () => {
               const message = buildWhatsappMessage(service, catalog);
               enqueue({
@@ -165,42 +191,56 @@ export function ServiceCard({
 
         <div className="flex flex-wrap gap-1.5">
           {onOpenDetail && showDetail ? (
-            <Button variant="outline" size="sm" onClick={() => onOpenDetail(service.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => onOpenDetail(service.id)}
+            >
               <Info className="size-4" />
               Ver detalle
             </Button>
           ) : null}
           {showShare ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const url = buildServiceLink(catalog.id, service.id);
-              navigator.clipboard
-                .writeText(url)
-                .then(() => toast.success("Enlace del servicio copiado"))
-                .catch(() => toast.error("No se pudo copiar el enlace"));
-            }}
-          >
-            <Link2 className="size-4" />
-            Compartir
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => {
+                const url = buildServiceLink(catalog.id, service.id);
+                navigator.clipboard
+                  .writeText(url)
+                  .then(() => toast.success("Enlace del servicio copiado"))
+                  .catch(() => toast.error("No se pudo copiar el enlace"));
+              }}
+            >
+              <Link2 className="size-4" />
+              Compartir
+            </Button>
           ) : null}
         </div>
 
-
-
         {isAdmin ? (
-          <div className="flex flex-wrap gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => onEdit(service)}>
+          <div className="mt-1 flex w-full flex-wrap gap-1.5 border-t border-border/60 pt-3">
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => onEdit(service)}>
               <Pencil className="size-4" />
               Editar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => duplicateService(service.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => duplicateService(service.id)}
+            >
               <Copy className="size-4" />
               Duplicar
             </Button>
-            <Button variant="outline" size="sm" onClick={() => toggleService(service.id)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => toggleService(service.id)}
+            >
               {service.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               {service.active ? "Desactivar" : "Activar"}
             </Button>
@@ -210,7 +250,7 @@ export function ServiceCard({
               confirmLabel="Eliminar"
               onConfirm={() => deleteService(service.id)}
             >
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="rounded-full">
                 <Trash2 className="size-4 text-destructive" />
                 Eliminar
               </Button>

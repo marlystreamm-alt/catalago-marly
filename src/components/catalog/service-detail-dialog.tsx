@@ -22,6 +22,7 @@ import { useOnline } from "@/hooks/use-online";
 import { useOrderQueue } from "@/lib/catalog/order-queue";
 import { buildServiceLink } from "@/lib/catalog/links";
 import type { Service } from "@/lib/catalog/types";
+import { isImageValue } from "@/lib/catalog/image";
 
 /**
  * Detalle de un servicio, listo para "Pedir por WhatsApp".
@@ -54,20 +55,35 @@ export function ServiceDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl sm:max-w-md">
+        {service.icon ? (
+          <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-muted text-6xl ring-1 ring-border/60">
+            {isImageValue(service.icon) ? (
+              <img
+                src={service.icon}
+                alt={service.name}
+                className="size-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <span aria-hidden>{service.icon}</span>
+            )}
+          </div>
+        ) : null}
+
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl tracking-tight">
             {service.name}
             {service.favorite ? <Star className="size-4 fill-primary text-primary" /> : null}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="leading-relaxed">
             {service.description || "Detalle del servicio seleccionado."}
           </DialogDescription>
         </DialogHeader>
 
-        <p className="text-3xl font-bold text-primary">{displayPrice(service)}</p>
+        <p className="text-4xl font-bold tracking-tight text-primary">{displayPrice(service)}</p>
 
-        <dl className="grid gap-1.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+        <dl className="grid gap-2 rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm">
           {rows.map(([label, value]) => (
             <div key={label} className="flex items-start justify-between gap-3">
               <dt className="text-muted-foreground">{label}</dt>
@@ -77,10 +93,11 @@ export function ServiceDetailDialog({
         </dl>
 
         {!service.active ? (
-          <Badge variant="destructive" className="w-fit">
+          <Badge variant="destructive" className="w-fit rounded-full">
             Este servicio está oculto en el catálogo
           </Badge>
         ) : null}
+
 
         <DialogFooter className="flex-col gap-2 sm:flex-row">
           <Button
@@ -97,7 +114,7 @@ export function ServiceDetailDialog({
             Copiar enlace
           </Button>
           {online ? (
-            <Button asChild className="flex-1">
+            <Button asChild size="lg" className="flex-1 rounded-full shadow-sm">
               <a
                 href={buildWhatsappLink(service, catalog)}
                 target="_blank"
@@ -121,7 +138,7 @@ export function ServiceDetailDialog({
             </Button>
           ) : (
             <Button
-              className="flex-1"
+              className="flex-1 rounded-full shadow-sm"
               onClick={() => {
                 enqueue({
                   catalogId: catalog.id,
