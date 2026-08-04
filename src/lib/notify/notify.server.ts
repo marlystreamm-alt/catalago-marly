@@ -389,12 +389,19 @@ export async function escalateOrder(order: CloudOrder, settings: NotifySettings)
 
 const enc = new TextEncoder();
 
-export async function hashCode(code: string, salt: string) {
+/**
+ * Límite de iteraciones soportado por el runtime (Workers/Safari topan en 100 000).
+ * LEGACY_ITERATIONS existe solo para poder leer códigos guardados antes del ajuste.
+ */
+const PBKDF2_ITERATIONS = 100_000;
+const LEGACY_ITERATIONS = 120_000;
+
+export async function hashCode(code: string, salt: string, iterations = PBKDF2_ITERATIONS) {
   const key = await crypto.subtle.importKey("raw", enc.encode(code), "PBKDF2", false, [
     "deriveBits",
   ]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: 120_000 },
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations },
     key,
     256,
   );
@@ -402,6 +409,7 @@ export async function hashCode(code: string, salt: string) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
 
 export function randomSalt() {
   const bytes = new Uint8Array(16);
@@ -427,5 +435,15 @@ export async function requireAdminCode(code: string) {
       .eq("id", 1);
     return;
   }
-  if ((await hashCode(trimmed, salt)) !== hash) throw new Error("Código incorrecto");
+  if ((await hashCode(trimmed, salt)) === hash) return;
+  // Compatibilidad: códigos guardados con el conteo anterior se revalidan y se migran.
+  if ((await hashCode(trimmed, salt, LEGACY_ITERATIONS)) === hash) {
+    await db
+      .from("notification_settings")
+      .update({ admin_code_hash: await hashCode(trimmed, salt) })
+      .eq("id", 1);
+    return;
+  }
+  throw new Error("Código incorrecto");
 }
+
