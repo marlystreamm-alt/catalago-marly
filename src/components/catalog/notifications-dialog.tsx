@@ -352,13 +352,12 @@ export function NotificationsDialog() {
                   checked={settings.channelAlexa}
                   onChange={(v) => void save({ ...settings, channelAlexa: v })}
                 />
-                {settings.channelAlexa && (
-                  <AlexaSetup
-                    code={code.trim()}
-                    settings={settings}
-                    onSaved={(next) => setSettings(next)}
-                  />
-                )}
+                <AlexaSetup
+                  code={code.trim()}
+                  settings={settings}
+                  onSaved={(next) => setSettings(next)}
+                />
+
               </div>
 
               <div className="space-y-3 rounded-2xl border p-3">
