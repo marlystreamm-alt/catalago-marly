@@ -23,6 +23,9 @@ const settingsSchema = codeSchema.extend({
     quietEnd: z.string(),
     autoOffMidnight: z.boolean(),
     timezone: z.string(),
+    escalateEnabled: z.boolean(),
+    escalateMinutes: z.number().int().min(5).max(720),
+    escalateChannel: z.enum(["push", "email", "whatsapp", "alexa"]),
   }),
 });
 
