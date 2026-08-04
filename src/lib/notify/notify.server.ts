@@ -435,5 +435,15 @@ export async function requireAdminCode(code: string) {
       .eq("id", 1);
     return;
   }
-  if ((await hashCode(trimmed, salt)) !== hash) throw new Error("Código incorrecto");
+  if ((await hashCode(trimmed, salt)) === hash) return;
+  // Compatibilidad: códigos guardados con el conteo anterior se revalidan y se migran.
+  if ((await hashCode(trimmed, salt, LEGACY_ITERATIONS)) === hash) {
+    await db
+      .from("notification_settings")
+      .update({ admin_code_hash: await hashCode(trimmed, salt) })
+      .eq("id", 1);
+    return;
+  }
+  throw new Error("Código incorrecto");
 }
+
