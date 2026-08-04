@@ -46,6 +46,7 @@ import {
   notifyTest,
 } from "@/lib/notify/notify.functions";
 import { getSavedCode, saveCode, subscribeToPush } from "@/lib/notify/client";
+import { AlexaSetup } from "./alexa-setup";
 import {
   CHANNEL_TEXT,
   DEFAULT_SETTINGS,
@@ -352,36 +353,11 @@ export function NotificationsDialog() {
                   onChange={(v) => void save({ ...settings, channelAlexa: v })}
                 />
                 {settings.channelAlexa && (
-                  <div className="space-y-2">
-                    <Select
-                      value={settings.alexaProvider}
-                      onValueChange={(v) =>
-                        void save({ ...settings, alexaProvider: v as NotifySettings["alexaProvider"] })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="notifyme">Notify Me</SelectItem>
-                        <SelectItem value="voicemonkey">Voice Monkey</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      value={settings.alexaToken}
-                      placeholder="Código de acceso de la skill"
-                      onChange={(e) => setSettings({ ...settings, alexaToken: e.target.value })}
-                      onBlur={() => void save(settings)}
-                    />
-                    {settings.alexaProvider === "voicemonkey" && (
-                      <Input
-                        value={settings.alexaDevice}
-                        placeholder="Nombre del dispositivo (Voice Monkey)"
-                        onChange={(e) => setSettings({ ...settings, alexaDevice: e.target.value })}
-                        onBlur={() => void save(settings)}
-                      />
-                    )}
-                  </div>
+                  <AlexaSetup
+                    code={code.trim()}
+                    settings={settings}
+                    onSaved={(next) => setSettings(next)}
+                  />
                 )}
               </div>
 

@@ -215,37 +215,59 @@ async function sendWhatsapp(order: CloudOrder, settings: NotifySettings, repeat:
 
 /* ---------------------------------- Alexa ---------------------------------- */
 
-async function sendAlexa(order: CloudOrder, settings: NotifySettings, repeat: boolean) {
-  if (!settings.alexaToken) return "Falta el código de la skill de Alexa";
-  const text = `${orderTitle(order, repeat)}. ${orderBody(order)}`;
+/** Envía un texto a Alexa por la skill puente. Devuelve un mensaje en español. */
+export async function sendAlexaText(
+  text: string,
+  provider: NotifySettings["alexaProvider"],
+  token: string,
+  device: string,
+): Promise<{ ok: boolean; message: string }> {
+  const clean = token.trim();
+  if (!clean) return { ok: false, message: "Falta el código de acceso de la skill de Alexa" };
+  if (provider === "voicemonkey" && !device.trim())
+    return { ok: false, message: "Falta el nombre del dispositivo de Voice Monkey" };
   try {
-    if (settings.alexaProvider === "voicemonkey") {
-      const res = await fetch("https://api.voicemonkey.io/announcement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: settings.alexaToken,
-          device: settings.alexaDevice,
-          text,
-        }),
-      });
-      if (!res.ok) return `Alexa falló [${res.status}]: ${await res.text()}`;
-    } else {
-      const res = await fetch("https://api.notifymyecho.com/v1/NotifyMe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          notification: text,
-          accessCode: settings.alexaToken,
-          title: "Pedido MA²",
-        }),
-      });
-      if (!res.ok) return `Alexa falló [${res.status}]: ${await res.text()}`;
+    const res =
+      provider === "voicemonkey"
+        ? await fetch("https://api.voicemonkey.io/announcement", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: clean, device: device.trim(), text }),
+          })
+        : await fetch("https://api.notifymyecho.com/v1/NotifyMe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ notification: text, accessCode: clean, title: "Pedido MA²" }),
+          });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 200);
+      if (res.status === 401 || res.status === 403)
+        return {
+          ok: false,
+          message: "El código de acceso no es válido. Revísalo en el correo de la skill.",
+        };
+      if (res.status === 404 && provider === "voicemonkey")
+        return {
+          ok: false,
+          message: "No se encontró ese dispositivo en Voice Monkey. Revisa el nombre.",
+        };
+      return { ok: false, message: `Alexa falló [${res.status}]: ${body}` };
     }
-    return "Alexa avisada";
+    return { ok: true, message: "Alexa avisada" };
   } catch (error) {
-    return `Alexa falló: ${String(error)}`;
+    return { ok: false, message: `No se pudo conectar con Alexa: ${String(error)}` };
   }
+}
+
+async function sendAlexa(order: CloudOrder, settings: NotifySettings, repeat: boolean) {
+  const text = `${orderTitle(order, repeat)}. ${orderBody(order)}`;
+  const r = await sendAlexaText(
+    text,
+    settings.alexaProvider,
+    settings.alexaToken,
+    settings.alexaDevice,
+  );
+  return r.message;
 }
 
 /* -------------------------------- Orquestador ------------------------------- */
@@ -276,7 +298,7 @@ export type NotifyKind = "nuevo" | "recordatorio" | "escalamiento" | "prueba";
 const FAILED = /(fall|falta|no configurado|no se pudo|sin dispositivos)/i;
 
 /** Guarda una línea en el historial de avisos. */
-async function logEvent(entry: {
+export async function logEvent(entry: {
   orderId: string | null;
   channel: string;
   kind: NotifyKind;
