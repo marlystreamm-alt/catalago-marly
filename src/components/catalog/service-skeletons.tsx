@@ -31,7 +31,12 @@ export function ServiceListSkeleton({
   label?: string;
 }) {
   return (
-    <div className="grid gap-3" role="status" aria-live="polite" aria-busy="true">
+    <div
+      className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <span className="sr-only">{label}</span>
       {Array.from({ length: count }).map((_, i) => (
         <ServiceCardSkeleton key={i} />
