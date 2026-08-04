@@ -161,10 +161,31 @@ export function NotificationsDialog() {
         },
       });
       toast.success("Este dispositivo recibirá los avisos");
+      await loadDevices(code.trim());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo activar el aviso");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const cambiarDispositivo = async (device: NotifyDevice, active: boolean) => {
+    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, active } : d)));
+    try {
+      await notifySetDeviceActive({ data: { code: code.trim(), id: device.id, active } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar el dispositivo");
+      await loadDevices(code.trim());
+    }
+  };
+
+  const borrarDispositivo = async (device: NotifyDevice) => {
+    try {
+      await notifyDeleteDevice({ data: { code: code.trim(), id: device.id } });
+      setDevices((prev) => prev.filter((d) => d.id !== device.id));
+      toast.success("Dispositivo eliminado");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
     }
   };
 
@@ -173,6 +194,7 @@ export function NotificationsDialog() {
     try {
       const { results } = await notifyTest({ data: { code: code.trim() } });
       toast.success("Prueba enviada", { description: results.join(" · ") });
+      await loadLog(code.trim());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo enviar la prueba");
     } finally {
