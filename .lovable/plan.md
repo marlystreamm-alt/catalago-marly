@@ -23,6 +23,11 @@ Al enviar un pedido (individual o múltiple, en línea o desde la cola offline),
 - **Notificación al celular (push)**: aviso aunque la app esté cerrada. En iPhone solo funciona con la app instalada en la pantalla de inicio (Compartir → Agregar a inicio) y aceptando el permiso; el sistema te pedirá autorización una vez.
 - **Correo electrónico**: correo con el detalle del pedido. Requiere conectar un servicio de envío de correo (Resend), gratuito para volúmenes bajos.
 - **WhatsApp a tu número**: mensaje automático a tu WhatsApp. Requiere un proveedor externo de pago (Twilio WhatsApp API) y verificación de número. Se deja preparado y se activa cuando decidas contratarlo; mientras tanto ese interruptor queda visible con aviso de "requiere configuración".
+- **Alexa (bocina en casa)**: sí se puede. Amazon no permite que una app cualquiera hable directo en tu Alexa, pero sí funciona con una skill puente gratuita:
+  - Instalas en la app Alexa la skill **Notify Me** (o **Voice Monkey**), te llega por correo un código de acceso y lo pegas en el panel de administrador.
+  - Con eso, cada pedido nuevo hace que tu Alexa suene y anuncie por ejemplo: "Tienes un pedido nuevo de Mis Clientes por 250 pesos".
+  - Con Notify Me la bocina da el tono de notificación y lees/escuchas el aviso al decir "Alexa, lee mis notificaciones"; con Voice Monkey el anuncio se escucha solo. El interruptor de Alexa respeta el mismo horario que los demás avisos (nada de anuncios de madrugada).
+  - Si no pegas el código, el interruptor queda visible con el aviso "requiere configuración" y no se envía nada.
 
 ## 4. Recordatorios cada 15 minutos
 
