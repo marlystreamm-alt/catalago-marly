@@ -675,7 +675,21 @@ function CatalogPage() {
           ) : null}
         </section>
 
+        {isAdmin && viewMode !== "tarjetas" ? (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => setPrefs({ viewMode: "tarjetas" })}
+            >
+              Volver al catálogo
+            </Button>
+          </div>
+        ) : null}
+
         <div className="mt-5 grid min-w-0 max-w-full gap-6">
+
           {!hydrated ? (
             <ServiceListSkeleton count={5} />
           ) : refreshing ? (
