@@ -10,6 +10,8 @@ En el panel de administrador se agrega una sección "Avisos de pedidos" con:
 - Un interruptor por canal: notificación al celular, correo, WhatsApp a tu número, panel dentro de la app.
 - Campo para tu correo y tu número de WhatsApp de avisos.
 - Interruptor "Recordarme cada 15 minutos hasta marcar como atendido".
+- **Horario de avisos**: hora de inicio y hora de fin configurables (por ejemplo 8:00 a 00:00, zona horaria de México). Fuera de ese horario no se envía ningún aviso ni recordatorio; los pedidos se siguen registrando y aparecen en el panel, y los pendientes se avisan al llegar la hora de inicio.
+- Interruptor "Apagar automáticamente a las 12 de la noche" (activado por defecto, con la hora editable) y opción de encender o apagar los avisos manualmente en cualquier momento sin importar el horario.
 
 ## 2. Registro del pedido
 
@@ -24,11 +26,11 @@ Al enviar un pedido (individual o múltiple, en línea o desde la cola offline),
 
 ## 4. Recordatorios cada 15 minutos
 
-Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "nuevo" y reenvía el aviso por los canales activos hasta que lo marques como atendido. Puedes desactivar el recordatorio y dejar solo el primer aviso.
+Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "nuevo" y reenvía el aviso por los canales activos hasta que lo marques como atendido, siempre dentro del horario configurado. Puedes desactivar el recordatorio y dejar solo el primer aviso.
 
 ## Detalles técnicos
 
-- Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro), `push_subscriptions` (endpoints Web Push del admin).
+- Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro, `quiet_start`, `quiet_end`, `timezone` = America/Monterrey), `push_subscriptions` (endpoints Web Push del admin).
 - Endpoint público `src/routes/api/public/orders.ts` (POST) para registrar el pedido desde el cliente, con validación Zod y sin PII; lectura del panel vía server functions protegidas con `requireSupabaseAuth` o clave de admin existente.
 - Web Push con VAPID: se generan las llaves como secretos, service worker de mensajería aparte del app-shell (no toca el PWA actual).
 - Correo vía conector Resend; WhatsApp vía Twilio (secretos añadidos solo si lo activas).
