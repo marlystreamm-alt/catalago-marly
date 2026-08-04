@@ -406,7 +406,7 @@ function CatalogPage() {
 
   return (
     <main className="app-gradient min-h-screen pb-24">
-      <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
+      <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6 lg:max-w-6xl lg:px-8">
         <header className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
@@ -694,7 +694,7 @@ function CatalogPage() {
                 No hay servicios que coincidan con tu búsqueda.
               </p>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                 {sorted.map((service) => (
                   <ServiceCard
                     key={service.id}
@@ -729,7 +729,7 @@ function CatalogPage() {
                         {group.title}
                       </h3>
                     ) : null}
-                    <div className="grid gap-3">
+                    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                       {group.items.map((service) => (
                         <ServiceCard
                           key={service.id}
