@@ -12,6 +12,20 @@ import {
 
 const KEY = "ma2-catalogos-v1";
 
+/** Valores anteriores que se actualizan al estándar vigente del negocio. */
+const DELIVERY_LEGACY = ["Inmediato (5 a 30 min)", "Inmediato (5 a 30 minutos)"];
+const WARRANTY_LEGACY = ["30 días", "30 dias"];
+const DELIVERY_NOW = "20 a 25 min";
+const WARRANTY_NOW = "25 días";
+
+function migrateDelivery(v: string) {
+  return DELIVERY_LEGACY.includes(v.trim()) ? DELIVERY_NOW : v;
+}
+
+function migrateWarranty(v: string) {
+  return WARRANTY_LEGACY.includes(v.trim()) ? WARRANTY_NOW : v;
+}
+
 function isBrowser() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
@@ -66,8 +80,8 @@ export function normalizeState(raw: unknown): AppState {
           description: String(sv.description ?? ""),
           devices: String(sv.devices ?? ""),
           profiles: String(sv.profiles ?? ""),
-          delivery: String(sv.delivery ?? ""),
-          warranty: String(sv.warranty ?? ""),
+          delivery: migrateDelivery(String(sv.delivery ?? "")),
+          warranty: migrateWarranty(String(sv.warranty ?? "")),
           active: sv.active !== false,
           favorite: sv.favorite === true,
           priceText: opt(sv.priceText),

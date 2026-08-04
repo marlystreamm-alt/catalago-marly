@@ -54,8 +54,8 @@ const s = (
   warranty,
 });
 
-const INMEDIATO = "Inmediato (5 a 30 min)";
-const G30 = "30 días";
+const INMEDIATO = "20 a 25 min";
+const G30 = "25 días";
 
 const baseSeeds = (): Seed[] => [
   // Streaming - perfiles
