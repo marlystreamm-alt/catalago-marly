@@ -675,7 +675,7 @@ function CatalogPage() {
           ) : null}
         </section>
 
-        <div className="mt-5 grid gap-6">
+        <div className="mt-5 grid min-w-0 max-w-full gap-6">
           {!hydrated ? (
             <ServiceListSkeleton count={5} />
           ) : refreshing ? (

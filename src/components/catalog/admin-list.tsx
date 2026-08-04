@@ -390,7 +390,7 @@ export function AdminList() {
     });
 
   return (
-    <section className="grid gap-3" aria-label="Vista lista del administrador">
+    <section className="grid min-w-0 max-w-full gap-3" aria-label="Vista lista del administrador">
       <div className="grid gap-1.5 rounded-2xl bg-muted p-1 sm:grid-cols-3">
         {TABS.map((t) => (
           <button
@@ -471,7 +471,7 @@ export function AdminList() {
 
       {showPreview ? (
         <div
-          className="card-soft rounded-2xl border border-border bg-card/70 p-3"
+          className="card-soft min-w-0 max-w-full overflow-hidden rounded-2xl border border-border bg-card/70 p-3"
           aria-label="Vista previa en tarjetas"
         >
           <p className="mb-2 text-xs font-semibold text-muted-foreground">
@@ -494,7 +494,7 @@ export function AdminList() {
       ) : null}
 
 
-      <div className="grid gap-3">
+      <div className="grid min-w-0 max-w-full gap-3">
         {visibleRows.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
             No hay servicios en esta pestaña con los filtros actuales.
