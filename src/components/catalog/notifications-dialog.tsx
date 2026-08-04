@@ -46,6 +46,7 @@ import {
   notifyTest,
 } from "@/lib/notify/notify.functions";
 import { getSavedCode, saveCode, subscribeToPush } from "@/lib/notify/client";
+import { AlexaSetup } from "./alexa-setup";
 import {
   CHANNEL_TEXT,
   DEFAULT_SETTINGS,
