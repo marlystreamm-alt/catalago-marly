@@ -1,33 +1,40 @@
-## Objetivo
+# Avisos de pedidos nuevos para el administrador
 
-Que al **editar** (modo administrador) veas una lista simple tipo la de tu captura —plataforma y precio en filas— y que el **catálogo público** siempre se vea con las tarjetas normales, sin importar la vista que hayas dejado activa.
+Hoy, cuando un cliente toca "Pedir por WhatsApp", solo se abre WhatsApp en el teléfono del cliente: el pedido no queda registrado en ningún lado, así que la app no tiene forma de avisarte. El plan agrega un registro de pedidos en la nube (activable/desactivable) y cuatro canales de aviso.
 
-## Qué cambia
+## 1. Interruptor general
 
-**1. El público siempre ve tarjetas**
-Hoy el modo de vista (tarjetas / tabla / lista) se guarda como preferencia y se sigue aplicando aunque cierres sesión de administrador, por eso el catálogo puede quedarse en modo tabla. Se forzará: si no hay sesión de administrador, siempre se renderizan las tarjetas normales. La preferencia se conserva para cuando vuelvas a entrar como admin.
+En el panel de administrador se agrega una sección "Avisos de pedidos" con:
 
-**2. La vista de edición se simplifica al estilo de tu captura**
-La "Vista lista (editar)" pasa a mostrar filas compactas: icono/estrella, nombre de la plataforma y precio (texto libre), con el resto de los campos —plan, dispositivos, perfiles, usuarios, tiempo de entrega, garantía, vigencia, requisitos, descripción— ocultos dentro de un desplegable por fila ("Más datos"). Así editas nombre y precio de corrido y solo abres el detalle cuando lo necesitas.
+- Interruptor maestro: **Registrar pedidos en la nube** (encendido/apagado). Apagado = la app funciona exactamente como hoy, sin registro ni avisos.
+- Un interruptor por canal: notificación al celular, correo, WhatsApp a tu número, panel dentro de la app.
+- Campo para tu correo y tu número de WhatsApp de avisos.
+- Interruptor "Recordarme cada 15 minutos hasta marcar como atendido".
 
-Se conservan tal cual: las tres pestañas (Perfiles, Completas, Trámites), buscar, filtrar activos/desactivados, seleccionar, agregar/duplicar/eliminar fila, activar/desactivar, reordenar y el botón único **Guardar todos los cambios**.
+## 2. Registro del pedido
 
-**3. Selector de vista más claro**
-Solo dos opciones visibles para el admin: **Editar** (lista) y **Vista pública** (tarjetas, para revisar cómo queda). La vista "tabla" actual se deja disponible pero deja de ser lo que puede "escaparse" al público.
+Al enviar un pedido (individual o múltiple, en línea o desde la cola offline), la app guarda en la nube: catálogo, servicios, precios, total, mensaje, fecha y estado (nuevo / atendido).
 
-## Lo que NO cambia
+## 3. Canales de aviso
 
-- Diseño, colores, tamaños y comportamiento de las tarjetas públicas.
-- Campos de texto libre sin mínimos ni números forzados.
-- Ocultamiento de líneas vacías en las tarjetas.
-- Toda la lógica de datos, WhatsApp, respaldos e historial.
+- **Panel dentro de la app**: lista "Pedidos recibidos" con contador de pendientes, sonido y actualización en vivo; botones "Marcar como atendido" y "Abrir WhatsApp".
+- **Notificación al celular (push)**: aviso aunque la app esté cerrada. En iPhone solo funciona con la app instalada en la pantalla de inicio (Compartir → Agregar a inicio) y aceptando el permiso; el sistema te pedirá autorización una vez.
+- **Correo electrónico**: correo con el detalle del pedido. Requiere conectar un servicio de envío de correo (Resend), gratuito para volúmenes bajos.
+- **WhatsApp a tu número**: mensaje automático a tu WhatsApp. Requiere un proveedor externo de pago (Twilio WhatsApp API) y verificación de número. Se deja preparado y se activa cuando decidas contratarlo; mientras tanto ese interruptor queda visible con aviso de "requiere configuración".
+
+## 4. Recordatorios cada 15 minutos
+
+Un proceso programado en la nube revisa cada 15 minutos los pedidos con estado "nuevo" y reenvía el aviso por los canales activos hasta que lo marques como atendido. Puedes desactivar el recordatorio y dejar solo el primer aviso.
 
 ## Detalles técnicos
 
-- `src/routes/index.tsx`: el render usa `isAdmin ? viewMode : "tarjetas"`; se ajustan las etiquetas del selector.
-- `src/components/catalog/admin-list.tsx`: se reestructura la fila a un layout de dos columnas (nombre + precio) con `Collapsible` para el resto de campos; misma lógica de estado y `replaceServices`.
-- Sin cambios en `store.tsx`, `types.ts`, `whatsapp.ts` ni `service-card.tsx`.
+- Activar Lovable Cloud. Tablas: `orders` (datos del pedido, estado, `notified_at`, `attempts`), `notification_settings` (canales, correo, número, recordatorios, interruptor maestro), `push_subscriptions` (endpoints Web Push del admin).
+- Endpoint público `src/routes/api/public/orders.ts` (POST) para registrar el pedido desde el cliente, con validación Zod y sin PII; lectura del panel vía server functions protegidas con `requireSupabaseAuth` o clave de admin existente.
+- Web Push con VAPID: se generan las llaves como secretos, service worker de mensajería aparte del app-shell (no toca el PWA actual).
+- Correo vía conector Resend; WhatsApp vía Twilio (secretos añadidos solo si lo activas).
+- Recordatorios: `pg_cron` llamando a `api/public/notify-pending` protegido con secreto.
+- El código cliente solo publica el pedido cuando el interruptor maestro está encendido; si falla la red, el pedido queda en la cola local existente y se publica al reconectar.
 
-## Verificación
+## Fuera de alcance
 
-Prueba en el navegador: entrar como admin, editar dos precios y un nombre en la lista, guardar una sola vez, abrir "Más datos" de una fila, cerrar sesión y confirmar que el catálogo público aparece con tarjetas normales.
+No se cambia el diseño ni el comportamiento del catálogo público ni de las tarjetas.
