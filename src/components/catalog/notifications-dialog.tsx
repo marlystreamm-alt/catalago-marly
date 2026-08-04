@@ -273,12 +273,18 @@ export function NotificationsDialog() {
           </div>
         ) : (
           <Tabs defaultValue="config">
-            <TabsList className="w-full">
-              <TabsTrigger value="config" className="flex-1">
-                Configuración
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="config" className="text-xs">
+                Ajustes
               </TabsTrigger>
-              <TabsTrigger value="pedidos" className="flex-1">
+              <TabsTrigger value="pedidos" className="text-xs">
                 Pedidos {pendientes ? `(${pendientes})` : ""}
+              </TabsTrigger>
+              <TabsTrigger value="dispositivos" className="text-xs">
+                Equipos
+              </TabsTrigger>
+              <TabsTrigger value="historial" className="text-xs">
+                Historial
               </TabsTrigger>
             </TabsList>
 
