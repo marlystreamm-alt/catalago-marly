@@ -10,6 +10,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useOnline } from "@/hooks/use-online";
+import { reportOrder } from "@/lib/notify/client";
 import { loadOrders, saveOrders, type OrderStatus, type PendingOrder } from "./orders";
 
 type NewOrder = Omit<PendingOrder, "id" | "at" | "status" | "attempts">;
