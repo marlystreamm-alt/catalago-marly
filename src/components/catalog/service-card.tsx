@@ -64,7 +64,7 @@ export function ServiceCard({
         ) : null}
 
         {service.icon ? (
-          <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-4xl ring-1 ring-border/60 sm:size-24">
+          <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-3xl ring-1 ring-border/60 sm:size-24 sm:text-4xl">
             {isImageValue(service.icon) ? (
               <img
                 src={service.icon}
@@ -80,13 +80,13 @@ export function ServiceCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-base font-semibold leading-tight tracking-tight text-card-foreground sm:text-lg">
+            <h3 className="min-w-0 text-[15px] font-semibold leading-tight tracking-tight text-balance text-card-foreground sm:text-lg">
               {service.name}
             </h3>
             <Button
               variant="ghost"
               size="icon"
-              className="-mr-2 -mt-1 shrink-0 rounded-full transition-transform hover:scale-110"
+              className="-mr-1.5 -mt-1 shrink-0 rounded-full transition-transform hover:scale-110"
               aria-pressed={service.favorite}
               aria-label={service.favorite ? "Quitar de favoritos" : "Marcar como favorito"}
               onClick={() => toggleFavorite(service.id)}
@@ -97,9 +97,10 @@ export function ServiceCard({
             </Button>
           </div>
 
-          <p className="mt-1 text-2xl font-bold tracking-tight text-primary">
+          <p className="mt-1 text-xl font-bold tracking-tight text-primary sm:text-2xl">
             {displayPrice(service)}
           </p>
+
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             {category ? (
