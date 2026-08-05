@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      menu_subscriptions: {
+        Row: {
+          business_name: string
+          catalog_id: string
+          created_at: string
+          expires_on: string
+          id: string
+          notes: string
+          owner_name: string
+          plan: string
+          price: number
+          slug: string
+          started_on: string
+          suspended: boolean
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          business_name: string
+          catalog_id?: string
+          created_at?: string
+          expires_on?: string
+          id?: string
+          notes?: string
+          owner_name?: string
+          plan?: string
+          price?: number
+          slug: string
+          started_on?: string
+          suspended?: boolean
+          updated_at?: string
+          whatsapp?: string
+        }
+        Update: {
+          business_name?: string
+          catalog_id?: string
+          created_at?: string
+          expires_on?: string
+          id?: string
+          notes?: string
+          owner_name?: string
+          plan?: string
+          price?: number
+          slug?: string
+          started_on?: string
+          suspended?: boolean
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       notification_log: {
         Row: {
           attempt: number
@@ -211,6 +262,44 @@ export type Database = {
           p256dh?: string
         }
         Relationships: []
+      }
+      subscription_renewals: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          new_expires: string | null
+          note: string
+          previous_expires: string | null
+          subscription_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          new_expires?: string | null
+          note?: string
+          previous_expires?: string | null
+          subscription_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          new_expires?: string | null
+          note?: string
+          previous_expires?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_renewals_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "menu_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

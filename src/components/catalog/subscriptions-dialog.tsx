@@ -61,8 +61,17 @@ type Filter = "todos" | SubStatus;
 const badgeClass: Record<SubStatus, string> = {
   activo: "bg-primary/10 text-primary",
   por_vencer: "bg-amber-500/15 text-amber-700",
-  suspendido: "bg-destructive/10 text-destructive",
+  vencido: "bg-destructive/10 text-destructive",
+  suspendido: "bg-muted text-muted-foreground",
 };
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "activo", label: "Activos" },
+  { value: "por_vencer", label: "Por vencer" },
+  { value: "vencido", label: "Vencidos" },
+  { value: "suspendido", label: "Suspendidos" },
+];
 
 interface FormState {
   id?: string;
@@ -104,7 +113,7 @@ export function SubscriptionsDialog() {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
-  const [maxDays, setMaxDays] = useState("todos");
+  
   const [form, setForm] = useState<FormState | null>(null);
   const [history, setHistory] = useState<{ id: string; rows: RenewalEntry[] } | null>(null);
 
@@ -145,24 +154,23 @@ export function SubscriptionsDialog() {
     const q = query.trim().toLowerCase();
     return subs.filter((s) => {
       if (filter !== "todos" && s.status !== filter) return false;
-      if (maxDays !== "todos" && s.daysLeft > Number(maxDays)) return false;
       if (!q) return true;
       return [s.businessName, s.ownerName, s.slug, s.whatsapp]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [subs, query, filter, maxDays]);
+  }, [subs, query, filter]);
 
-  const stats = useMemo(() => {
-    const activos = subs.filter((s) => s.status === "activo").length;
-    const porVencer = subs.filter((s) => s.status === "por_vencer").length;
-    const suspendidos = subs.filter((s) => s.status === "suspendido").length;
-    const ingreso = subs
-      .filter((s) => s.status !== "suspendido")
-      .reduce((sum, s) => sum + (s.plan === "anual" ? s.price / 12 : s.price), 0);
-    return { activos, porVencer, suspendidos, ingreso };
-  }, [subs]);
+  const stats = useMemo(
+    () => ({
+      total: subs.length,
+      activos: subs.filter((s) => s.status === "activo").length,
+      porVencer: subs.filter((s) => s.status === "por_vencer").length,
+      suspendidos: subs.filter((s) => s.status === "suspendido" || s.status === "vencido").length,
+    }),
+    [subs],
+  );
 
   if (!isAdmin) return null;
 
@@ -235,17 +243,18 @@ export function SubscriptionsDialog() {
     <>
       <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         <Store className="size-4" />
-        Suscripciones
+        Menús
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Clientes de menú</DialogTitle>
+            <DialogTitle>Suscripciones de menús</DialogTitle>
             <DialogDescription>
-              Controla las suscripciones mensuales de los menús que vendes a otros negocios.
+              Menús digitales que rentas por mensualidad a otros negocios.
             </DialogDescription>
           </DialogHeader>
+
 
           {needsCode ? (
             <form
@@ -273,51 +282,41 @@ export function SubscriptionsDialog() {
             </form>
           ) : (
             <div className="grid gap-3">
-              <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <section className="grid grid-cols-4 gap-1.5">
+                <StatBox label="Total" value={String(stats.total)} />
                 <StatBox label="Activos" value={String(stats.activos)} />
                 <StatBox label="Por vencer" value={String(stats.porVencer)} />
                 <StatBox label="Suspendidos" value={String(stats.suspendidos)} />
-                <StatBox
-                  label="Ingreso mensual"
-                  value={`$${Math.round(stats.ingreso).toLocaleString("es-MX")}`}
-                />
               </section>
 
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="h-10 rounded-full pl-9"
-                    placeholder="Buscar negocio…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    aria-label="Buscar negocio"
-                  />
-                </div>
-                <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-                  <SelectTrigger className="h-10" aria-label="Filtrar por estado">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los estados</SelectItem>
-                    <SelectItem value="activo">Activos</SelectItem>
-                    <SelectItem value="por_vencer">Por vencer</SelectItem>
-                    <SelectItem value="suspendido">Suspendidos</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={maxDays} onValueChange={setMaxDays}>
-                  <SelectTrigger className="h-10" aria-label="Filtrar por vencimiento">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Cualquier fecha</SelectItem>
-                    <SelectItem value="0">Ya vencidos</SelectItem>
-                    <SelectItem value="5">Vencen en 5 días</SelectItem>
-                    <SelectItem value="15">Vencen en 15 días</SelectItem>
-                    <SelectItem value="30">Vencen en 30 días</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-10 rounded-full pl-9"
+                  placeholder="Buscar negocio…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Buscar negocio"
+                />
               </div>
+
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+                {FILTERS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFilter(item.value)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      filter === item.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
 
               <div className="flex items-center justify-between gap-2">
                 <Button
@@ -395,7 +394,7 @@ export function SubscriptionsDialog() {
                         {sub.notes ? <span className="italic">{sub.notes}</span> : null}
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         <Button
                           type="button"
                           size="sm"
@@ -411,27 +410,11 @@ export function SubscriptionsDialog() {
                         >
                           Renovar 1 mes
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="h-10"
-                          disabled={busyId === sub.id}
-                          onClick={() =>
-                            void run(
-                              sub.id,
-                              () => subsRenew({ data: { code, id: sub.id, months: 12 } }),
-                              "Renovado 1 año",
-                            )
-                          }
-                        >
-                          Renovar 1 año
-                        </Button>
                         {sub.suspended ? (
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             className="h-10"
                             disabled={busyId === sub.id}
                             onClick={() =>
@@ -449,24 +432,30 @@ export function SubscriptionsDialog() {
                             Activar
                           </Button>
                         ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-10"
-                            disabled={busyId === sub.id}
-                            onClick={() =>
+                          <ConfirmButton
+                            title={`¿Suspender ${sub.businessName}?`}
+                            description="El menú deja de abrirse, pero no se borra nada y puedes activarlo cuando quieras."
+                            confirmLabel="Suspender"
+                            onConfirm={() => {
                               void run(
                                 sub.id,
                                 () =>
                                   subsSetSuspended({ data: { code, id: sub.id, suspended: true } }),
                                 "Menú suspendido",
-                              )
-                            }
+                              );
+                            }}
                           >
-                            <PauseCircle className="size-4" />
-                            Suspender
-                          </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-10 w-full"
+                              disabled={busyId === sub.id}
+                            >
+                              <PauseCircle className="size-4" />
+                              Suspender
+                            </Button>
+                          </ConfirmButton>
                         )}
                         <Button
                           type="button"
@@ -495,8 +484,27 @@ export function SubscriptionsDialog() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           className="h-10"
+                          disabled={busyId === sub.id}
+                          onClick={() =>
+                            void run(
+                              sub.id,
+                              () => subsRenew({ data: { code, id: sub.id, months: 12 } }),
+                              "Renovado 1 año",
+                            )
+                          }
+                        >
+                          Renovar 1 año
+                        </Button>
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs"
                           onClick={() => void openHistory(sub.id)}
                         >
                           Historial
@@ -514,12 +522,13 @@ export function SubscriptionsDialog() {
                               .catch(() => toast.error("No se pudo eliminar"));
                           }}
                         >
-                          <Button type="button" size="sm" variant="ghost" className="h-10">
-                            <Trash2 className="size-4 text-destructive" />
+                          <Button type="button" size="sm" variant="ghost" className="h-8 text-xs">
+                            <Trash2 className="size-3.5 text-destructive" />
                             Eliminar
                           </Button>
                         </ConfirmButton>
                       </div>
+
 
                       {history?.id === sub.id ? (
                         <div className="mt-3 grid gap-1 rounded-xl bg-muted/50 p-2 text-xs">

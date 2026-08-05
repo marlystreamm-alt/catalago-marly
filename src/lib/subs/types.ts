@@ -1,6 +1,6 @@
 /** Tipos y cálculo de estado de las suscripciones de menús (cliente y servidor). */
 
-export type SubStatus = "activo" | "por_vencer" | "suspendido";
+export type SubStatus = "activo" | "por_vencer" | "vencido" | "suspendido";
 
 export interface Subscription {
   id: string;
@@ -33,6 +33,7 @@ export interface RenewalEntry {
 export const STATUS_TEXT: Record<SubStatus, string> = {
   activo: "Activo",
   por_vencer: "Por vencer",
+  vencido: "Vencido",
   suspendido: "Suspendido",
 };
 
@@ -58,11 +59,11 @@ export function todayISO(timezone = "America/Monterrey"): string {
   }
 }
 
-/** Regla de negocio: vencido = suspendido; 5 días o menos = por vencer. */
+/** Regla de negocio: suspensión manual, vencido por fecha y 5 días o menos = por vencer. */
 export function computeStatus(expiresOn: string, suspended: boolean, today = todayISO()): SubStatus {
   if (suspended) return "suspendido";
   const left = daysUntil(expiresOn, today);
-  if (left < 0) return "suspendido";
+  if (left < 0) return "vencido";
   if (left <= 5) return "por_vencer";
   return "activo";
 }
