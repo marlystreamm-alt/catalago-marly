@@ -3,18 +3,43 @@ import { computeStatus, daysUntil, todayISO, type Subscription } from "./types";
 
 type Row = Record<string, unknown>;
 
+interface DbResult {
+  data: Row[] | null;
+  error: { message: string } | null;
+}
+
+interface SingleResult {
+  data: Row | null;
+  error: { message: string } | null;
+}
+
+/** Constructor de consultas mínimo (las tablas se crean por migración). */
+interface QueryBuilder extends PromiseLike<DbResult> {
+  select: (columns?: string) => QueryBuilder;
+  insert: (values: Row | Row[]) => QueryBuilder;
+  update: (values: Row) => QueryBuilder;
+  delete: () => QueryBuilder;
+  eq: (column: string, value: unknown) => QueryBuilder;
+  neq: (column: string, value: unknown) => QueryBuilder;
+  order: (column: string, options?: { ascending?: boolean }) => QueryBuilder;
+  limit: (count: number) => QueryBuilder;
+  maybeSingle: () => PromiseLike<SingleResult>;
+  single: () => PromiseLike<SingleResult>;
+}
+
+interface LooseDb {
+  from: (table: string) => QueryBuilder;
+}
+
 /**
  * Cliente con permisos de servidor. Se usa sin tipos generados porque las tablas
  * de suscripciones se crean por migración y los tipos se regeneran después.
  */
-export async function admin(): Promise<
-  ReturnType<typeof import("@supabase/supabase-js").createClient>
-> {
+export async function admin(): Promise<LooseDb> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin as unknown as ReturnType<
-    typeof import("@supabase/supabase-js").createClient
-  >;
+  return supabaseAdmin as unknown as LooseDb;
 }
+
 
 
 export function rowToSub(row: Row): Subscription {
