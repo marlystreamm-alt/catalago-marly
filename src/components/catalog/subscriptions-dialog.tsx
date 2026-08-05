@@ -154,14 +154,13 @@ export function SubscriptionsDialog() {
     const q = query.trim().toLowerCase();
     return subs.filter((s) => {
       if (filter !== "todos" && s.status !== filter) return false;
-      if (maxDays !== "todos" && s.daysLeft > Number(maxDays)) return false;
       if (!q) return true;
       return [s.businessName, s.ownerName, s.slug, s.whatsapp]
         .join(" ")
         .toLowerCase()
         .includes(q);
     });
-  }, [subs, query, filter, maxDays]);
+  }, [subs, query, filter]);
 
   const stats = useMemo(
     () => ({
