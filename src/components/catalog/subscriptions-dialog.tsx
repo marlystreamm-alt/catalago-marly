@@ -113,7 +113,7 @@ export function SubscriptionsDialog() {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("todos");
-  const [maxDays, setMaxDays] = useState("todos");
+  
   const [form, setForm] = useState<FormState | null>(null);
   const [history, setHistory] = useState<{ id: string; rows: RenewalEntry[] } | null>(null);
 
