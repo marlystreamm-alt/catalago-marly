@@ -55,7 +55,7 @@ function MenuRoute() {
     return (
       <Notice
         title="Este menú está temporalmente suspendido"
-        text="Para reactivarlo, comunícate con el propietario del negocio."
+        text="Comunícate con el negocio para más información."
         business={data.businessName}
       />
     );
