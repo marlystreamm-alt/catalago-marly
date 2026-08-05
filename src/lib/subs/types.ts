@@ -59,11 +59,11 @@ export function todayISO(timezone = "America/Monterrey"): string {
   }
 }
 
-/** Regla de negocio: vencido = suspendido; 5 días o menos = por vencer. */
+/** Regla de negocio: suspensión manual, vencido por fecha y 5 días o menos = por vencer. */
 export function computeStatus(expiresOn: string, suspended: boolean, today = todayISO()): SubStatus {
   if (suspended) return "suspendido";
   const left = daysUntil(expiresOn, today);
-  if (left < 0) return "suspendido";
+  if (left < 0) return "vencido";
   if (left <= 5) return "por_vencer";
   return "activo";
 }
