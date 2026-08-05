@@ -3,10 +3,19 @@ import { computeStatus, daysUntil, todayISO, type Subscription } from "./types";
 
 type Row = Record<string, unknown>;
 
-export async function admin() {
+/**
+ * Cliente con permisos de servidor. Se usa sin tipos generados porque las tablas
+ * de suscripciones se crean por migración y los tipos se regeneran después.
+ */
+export async function admin(): Promise<
+  ReturnType<typeof import("@supabase/supabase-js").createClient>
+> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
+  return supabaseAdmin as unknown as ReturnType<
+    typeof import("@supabase/supabase-js").createClient
+  >;
 }
+
 
 export function rowToSub(row: Row): Subscription {
   const expiresOn = String(row["expires_on"] ?? "");
