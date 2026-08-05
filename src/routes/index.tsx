@@ -57,7 +57,7 @@ import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
 import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
-import { SubscriptionsDialog } from "@/components/catalog/subscriptions-dialog";
+
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
 
@@ -451,7 +451,7 @@ function CatalogPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               <CatalogManager />
               <NotificationsDialog />
-              <SubscriptionsDialog />
+              
             </div>
           ) : null}
 
