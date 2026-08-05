@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as MSlugRouteImport } from './routes/m.$slug'
 import { Route as ApiPublicOrdersRouteImport } from './routes/api/public/orders'
 import { Route as ApiPublicNotifyPendingRouteImport } from './routes/api/public/notify-pending'
 
@@ -23,11 +22,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MSlugRoute = MSlugRouteImport.update({
-  id: '/m/$slug',
-  path: '/m/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicOrdersRoute = ApiPublicOrdersRouteImport.update({
@@ -44,14 +38,12 @@ const ApiPublicNotifyPendingRoute = ApiPublicNotifyPendingRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
 }
@@ -59,7 +51,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
 }
@@ -68,21 +59,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/sitemap.xml'
-    | '/m/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/sitemap.xml'
-    | '/m/$slug'
-    | '/api/public/notify-pending'
-    | '/api/public/orders'
+  to: '/' | '/sitemap.xml' | '/api/public/notify-pending' | '/api/public/orders'
   id:
     | '__root__'
     | '/'
     | '/sitemap.xml'
-    | '/m/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
   fileRoutesById: FileRoutesById
@@ -90,7 +74,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  MSlugRoute: typeof MSlugRoute
   ApiPublicNotifyPendingRoute: typeof ApiPublicNotifyPendingRoute
   ApiPublicOrdersRoute: typeof ApiPublicOrdersRoute
 }
@@ -109,13 +92,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/m/$slug': {
-      id: '/m/$slug'
-      path: '/m/$slug'
-      fullPath: '/m/$slug'
-      preLoaderRoute: typeof MSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/orders': {
@@ -138,20 +114,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  MSlugRoute: MSlugRoute,
   ApiPublicNotifyPendingRoute: ApiPublicNotifyPendingRoute,
   ApiPublicOrdersRoute: ApiPublicOrdersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
