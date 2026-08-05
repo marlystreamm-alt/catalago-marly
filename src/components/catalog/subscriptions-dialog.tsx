@@ -163,15 +163,15 @@ export function SubscriptionsDialog() {
     });
   }, [subs, query, filter, maxDays]);
 
-  const stats = useMemo(() => {
-    const activos = subs.filter((s) => s.status === "activo").length;
-    const porVencer = subs.filter((s) => s.status === "por_vencer").length;
-    const suspendidos = subs.filter((s) => s.status === "suspendido").length;
-    const ingreso = subs
-      .filter((s) => s.status !== "suspendido")
-      .reduce((sum, s) => sum + (s.plan === "anual" ? s.price / 12 : s.price), 0);
-    return { activos, porVencer, suspendidos, ingreso };
-  }, [subs]);
+  const stats = useMemo(
+    () => ({
+      total: subs.length,
+      activos: subs.filter((s) => s.status === "activo").length,
+      porVencer: subs.filter((s) => s.status === "por_vencer").length,
+      suspendidos: subs.filter((s) => s.status === "suspendido" || s.status === "vencido").length,
+    }),
+    [subs],
+  );
 
   if (!isAdmin) return null;
 
