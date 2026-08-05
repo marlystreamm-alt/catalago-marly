@@ -243,17 +243,18 @@ export function SubscriptionsDialog() {
     <>
       <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         <Store className="size-4" />
-        Suscripciones
+        Menús
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Clientes de menú</DialogTitle>
+            <DialogTitle>Suscripciones de menús</DialogTitle>
             <DialogDescription>
-              Controla las suscripciones mensuales de los menús que vendes a otros negocios.
+              Menús digitales que rentas por mensualidad a otros negocios.
             </DialogDescription>
           </DialogHeader>
+
 
           {needsCode ? (
             <form
