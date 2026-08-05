@@ -33,6 +33,7 @@ export interface RenewalEntry {
 export const STATUS_TEXT: Record<SubStatus, string> = {
   activo: "Activo",
   por_vencer: "Por vencer",
+  vencido: "Vencido",
   suspendido: "Suspendido",
 };
 
