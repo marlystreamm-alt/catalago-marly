@@ -393,7 +393,7 @@ export function SubscriptionsDialog() {
                         {sub.notes ? <span className="italic">{sub.notes}</span> : null}
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         <Button
                           type="button"
                           size="sm"
@@ -409,27 +409,11 @@ export function SubscriptionsDialog() {
                         >
                           Renovar 1 mes
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="h-10"
-                          disabled={busyId === sub.id}
-                          onClick={() =>
-                            void run(
-                              sub.id,
-                              () => subsRenew({ data: { code, id: sub.id, months: 12 } }),
-                              "Renovado 1 año",
-                            )
-                          }
-                        >
-                          Renovar 1 año
-                        </Button>
                         {sub.suspended ? (
                           <Button
                             type="button"
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             className="h-10"
                             disabled={busyId === sub.id}
                             onClick={() =>
@@ -447,24 +431,30 @@ export function SubscriptionsDialog() {
                             Activar
                           </Button>
                         ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-10"
-                            disabled={busyId === sub.id}
-                            onClick={() =>
+                          <ConfirmButton
+                            title={`¿Suspender ${sub.businessName}?`}
+                            description="El menú deja de abrirse, pero no se borra nada y puedes activarlo cuando quieras."
+                            confirmLabel="Suspender"
+                            onConfirm={() => {
                               void run(
                                 sub.id,
                                 () =>
                                   subsSetSuspended({ data: { code, id: sub.id, suspended: true } }),
                                 "Menú suspendido",
-                              )
-                            }
+                              );
+                            }}
                           >
-                            <PauseCircle className="size-4" />
-                            Suspender
-                          </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="h-10 w-full"
+                              disabled={busyId === sub.id}
+                            >
+                              <PauseCircle className="size-4" />
+                              Suspender
+                            </Button>
+                          </ConfirmButton>
                         )}
                         <Button
                           type="button"
@@ -493,8 +483,27 @@ export function SubscriptionsDialog() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           className="h-10"
+                          disabled={busyId === sub.id}
+                          onClick={() =>
+                            void run(
+                              sub.id,
+                              () => subsRenew({ data: { code, id: sub.id, months: 12 } }),
+                              "Renovado 1 año",
+                            )
+                          }
+                        >
+                          Renovar 1 año
+                        </Button>
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs"
                           onClick={() => void openHistory(sub.id)}
                         >
                           Historial
@@ -512,12 +521,13 @@ export function SubscriptionsDialog() {
                               .catch(() => toast.error("No se pudo eliminar"));
                           }}
                         >
-                          <Button type="button" size="sm" variant="ghost" className="h-10">
-                            <Trash2 className="size-4 text-destructive" />
+                          <Button type="button" size="sm" variant="ghost" className="h-8 text-xs">
+                            <Trash2 className="size-3.5 text-destructive" />
                             Eliminar
                           </Button>
                         </ConfirmButton>
                       </div>
+
 
                       {history?.id === sub.id ? (
                         <div className="mt-3 grid gap-1 rounded-xl bg-muted/50 p-2 text-xs">
