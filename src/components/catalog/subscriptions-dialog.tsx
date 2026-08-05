@@ -282,51 +282,41 @@ export function SubscriptionsDialog() {
             </form>
           ) : (
             <div className="grid gap-3">
-              <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <section className="grid grid-cols-4 gap-1.5">
+                <StatBox label="Total" value={String(stats.total)} />
                 <StatBox label="Activos" value={String(stats.activos)} />
                 <StatBox label="Por vencer" value={String(stats.porVencer)} />
                 <StatBox label="Suspendidos" value={String(stats.suspendidos)} />
-                <StatBox
-                  label="Ingreso mensual"
-                  value={`$${Math.round(stats.ingreso).toLocaleString("es-MX")}`}
-                />
               </section>
 
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="h-10 rounded-full pl-9"
-                    placeholder="Buscar negocio…"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    aria-label="Buscar negocio"
-                  />
-                </div>
-                <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-                  <SelectTrigger className="h-10" aria-label="Filtrar por estado">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos los estados</SelectItem>
-                    <SelectItem value="activo">Activos</SelectItem>
-                    <SelectItem value="por_vencer">Por vencer</SelectItem>
-                    <SelectItem value="suspendido">Suspendidos</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={maxDays} onValueChange={setMaxDays}>
-                  <SelectTrigger className="h-10" aria-label="Filtrar por vencimiento">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Cualquier fecha</SelectItem>
-                    <SelectItem value="0">Ya vencidos</SelectItem>
-                    <SelectItem value="5">Vencen en 5 días</SelectItem>
-                    <SelectItem value="15">Vencen en 15 días</SelectItem>
-                    <SelectItem value="30">Vencen en 30 días</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="h-10 rounded-full pl-9"
+                  placeholder="Buscar negocio…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Buscar negocio"
+                />
               </div>
+
+              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+                {FILTERS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFilter(item.value)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      filter === item.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
 
               <div className="flex items-center justify-between gap-2">
                 <Button
