@@ -61,8 +61,17 @@ type Filter = "todos" | SubStatus;
 const badgeClass: Record<SubStatus, string> = {
   activo: "bg-primary/10 text-primary",
   por_vencer: "bg-amber-500/15 text-amber-700",
-  suspendido: "bg-destructive/10 text-destructive",
+  vencido: "bg-destructive/10 text-destructive",
+  suspendido: "bg-muted text-muted-foreground",
 };
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "activo", label: "Activos" },
+  { value: "por_vencer", label: "Por vencer" },
+  { value: "vencido", label: "Vencidos" },
+  { value: "suspendido", label: "Suspendidos" },
+];
 
 interface FormState {
   id?: string;
