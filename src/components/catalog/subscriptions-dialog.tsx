@@ -394,11 +394,11 @@ export function SubscriptionsDialog() {
                         {sub.notes ? <span className="italic">{sub.notes}</span> : null}
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-2.5 grid grid-cols-2 gap-1.5">
                         <Button
                           type="button"
                           size="sm"
-                          className="h-10"
+                          className="h-9 text-xs"
                           disabled={busyId === sub.id}
                           onClick={() =>
                             void run(
@@ -415,7 +415,7 @@ export function SubscriptionsDialog() {
                             type="button"
                             size="sm"
                             variant="secondary"
-                            className="h-10"
+                            className="h-9 text-xs"
                             disabled={busyId === sub.id}
                             onClick={() =>
                               void run(
@@ -428,13 +428,13 @@ export function SubscriptionsDialog() {
                               )
                             }
                           >
-                            <CheckCircle2 className="size-4" />
+                            <CheckCircle2 className="size-3.5" />
                             Activar
                           </Button>
                         ) : (
                           <ConfirmButton
                             title={`¿Suspender ${sub.businessName}?`}
-                            description="El menú deja de abrirse, pero no se borra nada y puedes activarlo cuando quieras."
+                            description="El menú deja de abrirse, pero no se borra nada."
                             confirmLabel="Suspender"
                             onConfirm={() => {
                               void run(
@@ -449,19 +449,22 @@ export function SubscriptionsDialog() {
                               type="button"
                               size="sm"
                               variant="secondary"
-                              className="h-10 w-full"
+                              className="h-9 w-full text-xs"
                               disabled={busyId === sub.id}
                             >
-                              <PauseCircle className="size-4" />
+                              <PauseCircle className="size-3.5" />
                               Suspender
                             </Button>
                           </ConfirmButton>
                         )}
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-1">
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          className="h-10"
+                          variant="ghost"
+                          className="h-8 flex-1 text-xs"
                           onClick={() =>
                             setForm({
                               id: sub.id,
@@ -478,33 +481,14 @@ export function SubscriptionsDialog() {
                             })
                           }
                         >
-                          <Pencil className="size-4" />
+                          <Pencil className="size-3.5" />
                           Editar
                         </Button>
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          className="h-10"
-                          disabled={busyId === sub.id}
-                          onClick={() =>
-                            void run(
-                              sub.id,
-                              () => subsRenew({ data: { code, id: sub.id, months: 12 } }),
-                              "Renovado 1 año",
-                            )
-                          }
-                        >
-                          Renovar 1 año
-                        </Button>
-                      </div>
-
-                      <div className="mt-1 flex items-center justify-between">
-                        <Button
-                          type="button"
-                          size="sm"
                           variant="ghost"
-                          className="h-8 text-xs"
+                          className="h-8 flex-1 text-xs"
                           onClick={() => void openHistory(sub.id)}
                         >
                           Historial
@@ -522,12 +506,12 @@ export function SubscriptionsDialog() {
                               .catch(() => toast.error("No se pudo eliminar"));
                           }}
                         >
-                          <Button type="button" size="sm" variant="ghost" className="h-8 text-xs">
+                          <Button type="button" size="sm" variant="ghost" className="h-8 px-2">
                             <Trash2 className="size-3.5 text-destructive" />
-                            Eliminar
                           </Button>
                         </ConfirmButton>
                       </div>
+
 
 
                       {history?.id === sub.id ? (
