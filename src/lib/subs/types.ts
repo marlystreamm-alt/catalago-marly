@@ -1,6 +1,6 @@
 /** Tipos y cálculo de estado de las suscripciones de menús (cliente y servidor). */
 
-export type SubStatus = "activo" | "por_vencer" | "suspendido";
+export type SubStatus = "activo" | "por_vencer" | "vencido" | "suspendido";
 
 export interface Subscription {
   id: string;
