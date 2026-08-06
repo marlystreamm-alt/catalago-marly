@@ -7,7 +7,10 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  Lock,
+  Pencil,
   Plus,
+
   RotateCcw,
   Save,
   Search,
