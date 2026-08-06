@@ -418,8 +418,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       clientLogin: async (code: string) => {
         const result = await findClientByCode(code, loadClients());
         if (!result.ok) {
-          toast.error(result.error);
-          return false;
+          return { ok: false, error: result.error };
         }
         setClients(loadClients());
         setClientSession(result.client);
@@ -427,8 +426,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           setCatalogIdRaw(result.client.catalogId);
         }
         toast.success(`Bienvenida, ${result.client.business || "cliente"}`);
-        return true;
+        return { ok: true };
       },
+
       clientLogout: () => {
         setClientSession(null);
         toast.success("Saliste de tu menú");
