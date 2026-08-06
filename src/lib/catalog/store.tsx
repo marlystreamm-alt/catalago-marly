@@ -514,11 +514,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           );
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
-      saveService: (service) =>
+      saveService: (incoming) =>
         gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","agregarServicio"])(() => {
-          const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
+          const prev = incoming.id ? catalog.services.find((s) => s.id === incoming.id) : undefined;
+          if (!prev && !isAdmin && !can("agregarServicio")) {
+            toast.error("Tu acceso no permite agregar servicios");
+            return;
+          }
+          const service = sanitizeService(incoming, prev);
           const changes: string[] = [];
           const details: LogEntry[] = [];
+
           if (prev) {
             if (prev.name !== service.name) changes.push(`nombre → ${service.name}`);
             if (prev.price !== service.price) {
