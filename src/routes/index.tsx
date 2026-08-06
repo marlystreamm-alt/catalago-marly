@@ -474,6 +474,8 @@ function CatalogPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               <CatalogManager />
               <NotificationsDialog />
+              <MenusDialog />
+
               
             </div>
           ) : null}
