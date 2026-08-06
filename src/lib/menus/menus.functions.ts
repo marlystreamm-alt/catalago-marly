@@ -79,6 +79,13 @@ export const menusSaveBusiness = createServerFn({ method: "POST" })
     const b = data.business;
     const payload = {
       name: b.name.trim(),
+      slug: b.slug
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, ""),
       owner_name: b.ownerName,
       whatsapp: b.whatsapp,
       address: b.address,

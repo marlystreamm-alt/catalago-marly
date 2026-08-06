@@ -64,6 +64,7 @@ export async function listBusinesses(): Promise<MenuBusiness[]> {
 
 export async function loadMenu(businessId: string) {
   const db = await admin();
+
   const [biz, cats, items] = await Promise.all([
     db.from("menu_businesses").select("*").eq("id", businessId).maybeSingle(),
     db
