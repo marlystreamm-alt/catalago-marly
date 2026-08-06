@@ -398,7 +398,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         })),
       resetPrefs: () => setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
       updateCatalog: (patch) =>
-        guard(() => {
+        gp(["ajustesCatalogo"])(() => {
           const changes: string[] = [];
           const entries: LogEntry[] = [];
           if (patch.name && patch.name !== catalog.name) {
@@ -471,7 +471,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
       saveService: (service) =>
-        guard(() => {
+        gp([...["editNombre","editPrecio","editDescripcion","editImagen","editDetalles"],"agregarServicio"])(() => {
           const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
           const changes: string[] = [];
           const details: LogEntry[] = [];
@@ -544,14 +544,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
 
       replaceServices: (services, summary) =>
-        guard(() => {
+        gp([...["editNombre","editPrecio","editDescripcion","editImagen","editDetalles"],"editEstado","agregarServicio","eliminarServicio"])(() => {
           mutate(
             (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
             entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
           );
         }),
       duplicateService: (id) =>
-        guard(() => {
+        gp(["agregarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           if (!found) return;
           mutate(
@@ -567,7 +567,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success("Servicio duplicado");
         }),
       deleteService: (id) =>
-        guard(() => {
+        gp(["eliminarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           mutate(
             (c) => ({ ...c, services: c.services.filter((s) => s.id !== id) }),
@@ -576,7 +576,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success("Servicio eliminado");
         }),
       toggleService: (id) =>
-        guard(() => {
+        gp(["editEstado"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           if (!found) return;
           const nowActive = !found.active;
