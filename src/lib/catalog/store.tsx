@@ -329,6 +329,67 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setMustChangePassword(false);
         toast.success("Saliste del modo administrador");
       },
+      clientSession,
+      isClient: !!clientSession,
+      can,
+      canEdit:
+        isAdmin ||
+        (!!clientSession &&
+          Object.entries(clientSession.permissions).some(
+            ([key, on]) => on && key.startsWith("edit"),
+          )) ||
+        (!!clientSession &&
+          (clientSession.permissions.agregarServicio ||
+            clientSession.permissions.eliminarServicio ||
+            clientSession.permissions.ajustesCatalogo)),
+      clients,
+      saveClient: (client) => {
+        if (!isAdmin) {
+          toast.error("Necesitas iniciar sesión como administrador");
+          return;
+        }
+        setClients((prev) => {
+          const exists = prev.some((c) => c.id === client.id);
+          const next = exists
+            ? prev.map((c) => (c.id === client.id ? client : c))
+            : [client, ...prev];
+          saveClients(next);
+          return next;
+        });
+        setClientSession((prev) => (prev && prev.id === client.id ? client : prev));
+      },
+      deleteClient: (id) => {
+        if (!isAdmin) {
+          toast.error("Necesitas iniciar sesión como administrador");
+          return;
+        }
+        setClients((prev) => {
+          const next = prev.filter((c) => c.id !== id);
+          saveClients(next);
+          return next;
+        });
+        setClientSession((prev) => (prev && prev.id === id ? null : prev));
+        toast.success("Acceso eliminado");
+      },
+      clientLogin: async (code: string) => {
+        const result = await findClientByCode(code, loadClients());
+        if (!result.ok) {
+          toast.error(result.error);
+          return false;
+        }
+        setClients(loadClients());
+        setClientSession(result.client);
+        if (result.client.catalogId && state.catalogs[result.client.catalogId]) {
+          setCatalogIdRaw(result.client.catalogId);
+        }
+        toast.success(`Bienvenida, ${result.client.business || "cliente"}`);
+        return true;
+      },
+      clientLogout: () => {
+        setClientSession(null);
+        toast.success("Saliste de tu menú");
+      },
+
       prefs: prefsMap[activeId] ?? DEFAULT_PREFS,
       setPrefs: (patch) =>
         setPrefsMap((prev) => ({
