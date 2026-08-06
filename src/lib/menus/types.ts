@@ -2,6 +2,7 @@
 
 export type MenuBusiness = {
   id: string;
+  slug: string;
   name: string;
   ownerName: string;
   whatsapp: string;
@@ -38,6 +39,7 @@ export type MenuData = {
 };
 
 export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
+  slug: "",
   name: "",
   ownerName: "",
   whatsapp: "",

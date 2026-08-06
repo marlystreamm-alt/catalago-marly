@@ -23,6 +23,7 @@ export type Database = {
           name: string
           notes: string
           owner_name: string
+          slug: string
           sort_index: number
           updated_at: string
           whatsapp: string
@@ -35,6 +36,7 @@ export type Database = {
           name?: string
           notes?: string
           owner_name?: string
+          slug?: string
           sort_index?: number
           updated_at?: string
           whatsapp?: string
@@ -47,6 +49,7 @@ export type Database = {
           name?: string
           notes?: string
           owner_name?: string
+          slug?: string
           sort_index?: number
           updated_at?: string
           whatsapp?: string
@@ -440,7 +443,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      unaccent_fallback: { Args: { txt: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

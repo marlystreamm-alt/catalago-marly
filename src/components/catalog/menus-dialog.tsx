@@ -1,6 +1,6 @@
 /** Apartado "Menús" — solo visible dentro del modo administrador. */
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, Loader2, Plus, Store, Trash2, UtensilsCrossed } from "lucide-react";
+import { ChevronLeft, Copy, Loader2, Plus, Store, Trash2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ const money = (n: number) =>
 const errText = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
 
 export function MenusDialog() {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(getSavedCode());
   const [unlocked, setUnlocked] = useState(false);
@@ -109,6 +110,7 @@ export function MenusDialog() {
         data: {
           code,
           business: {
+            slug: "",
             name: "Negocio nuevo",
             ownerName: "",
             whatsapp: "",
@@ -387,6 +389,49 @@ export function MenusDialog() {
                     onBlur={() => void patchBusiness(business)}
                   />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="biz-slug">Enlace público</Label>
+                <Input
+                  id="biz-slug"
+                  value={business.slug}
+                  placeholder="tacos-don-beto"
+                  onChange={(e) =>
+                    setBusinesses((prev) =>
+                      prev.map((b) => (b.id === business.id ? { ...b, slug: e.target.value } : b)),
+                    )
+                  }
+                  onBlur={() => void patchBusiness(business)}
+                />
+                {business.slug ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`/m/${business.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 break-all text-xs text-primary underline"
+                    >
+                      {`${origin}/m/${business.slug}`}
+                    </a>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(`${origin}/m/${business.slug}`);
+                        toast.success("Enlace copiado");
+                      }}
+                    >
+                      <Copy className="mr-1 size-3.5" />
+                      Copiar
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Se genera solo con el nombre del negocio al guardar.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="biz-notes">Notas</Label>
