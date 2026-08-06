@@ -1,47 +1,56 @@
-# Unir MA² Connect dentro de MA² Menús
+# Unir MA² Menús dentro de MA² Connect
 
-## Situación confirmada
+## Aclaración del nombre
 
-Busqué "MA² Connect" desde este proyecto y **no es accesible**: solo alcanzo MA² Menús (este), MA² OS Hub (37) y Tailored Web Solutions. Eso pasa cuando el proyecto está en otro espacio de trabajo, o tiene desactivado el uso compartido entre proyectos.
+Ya lo confirmé revisando ambos proyectos: **este proyecto es MA² Connect** (los catálogos Mis Clientes / Cyberdoc / Revendedores, con tarjetas, "Pedir por WhatsApp", avisos de pedidos y accesos de clientes). No fue un duplicado ni un error: se ve como nuevo en tu lista porque cambió de nombre.
 
-Sin acceso no puedo leer su código ni copiar su contenido, así que la fusión no puede empezar todavía.
+**MA² Menús** es un proyecto distinto y con contenido propio. Al leerlo encontré que es otra aplicación:
 
-## Paso 1 — Darme acceso (lo haces tú, 1 minuto)
+- Sirve **menús de varios negocios**, cada uno con su propia página pública (`/m/nombre-del-negocio`).
+- Tiene panel de negocios, formulario de negocio, editor de menú y panel de WhatsApp.
+- Guarda los menús en **base de datos** (tablas de categorías y platillos por negocio), no en el navegador.
+- Entrada por **código de acceso** por negocio, con colores de marca (menta, durazno, lavanda, carbón).
 
-Abre **MA² Connect** y revisa dos cosas:
+O sea: MA² Connect es tu catálogo de servicios; MA² Menús es un sistema de menús para otros negocios. Se pueden juntar, pero es una fusión de dos apps distintas, no de dos copias.
 
-1. Que esté en el **mismo espacio de trabajo** que MA² Menús. Si no lo está: tarjeta del proyecto → menú de tres puntos → "Transferir a espacio de trabajo" y eliges el mismo.
-2. Que **no** tenga bloqueado el uso compartido entre proyectos, en Configuración del proyecto → General.
+## Cómo quedaría unido
 
-Cuando lo hagas, me avisas y vuelvo a verificar el acceso.
+MA² Connect se vuelve la app única, con una sección nueva de Menús de negocios:
 
-## Paso 2 — Inventario de lo que hay allá
+```text
+MA² Connect (esta app)
+├── Catálogos          -> lo de hoy, sin cambios
+└── Negocios (nuevo)   -> lista de negocios + editor de menú
+    └── /m/{negocio}   -> menú público de cada negocio
+```
 
-Ya con acceso, reviso MA² Connect y te entrego una lista clara de:
+## Plan por etapas
 
-- Catálogos, servicios y precios que tenga y que aquí no existan.
-- Pantallas o funciones distintas (por ejemplo su propio panel o vista de tabla).
-- Si guarda datos en el navegador o en base de datos.
+**Etapa 1 — Base de datos**
+Crear en el backend de este proyecto las tablas de negocios, categorías de menú y platillos, con sus permisos y protección de acceso. Nada de lo actual (catálogos, pedidos, avisos) se toca.
 
-No copio nada hasta que apruebes esa lista, para no pisar tus catálogos actuales.
+**Etapa 2 — Panel de negocios**
+Traer las pantallas de MA² Menús: lista de negocios, alta/edición de negocio, editor de menú (categorías, platillos, precio, foto, disponible) y ajustes de WhatsApp. Se adaptan al diseño actual lila/aqua de esta app, no al suyo.
 
-## Paso 3 — Fusión aquí
+**Etapa 3 — Página pública del menú**
+Crear la ruta `/m/{negocio}` con el menú público de cada negocio y su botón de pedido por WhatsApp.
 
-Con tu visto bueno:
+**Etapa 4 — Accesos**
+Unificar la entrada: el administrador entra con su contraseña actual, y los dueños de negocio entran con su clave desde el botón "Mi menú" que ya existe aquí, reutilizando los permisos que ya tienes.
 
-- **Datos**: traigo sus servicios/catálogos y los agrego a los de aquí. Antes de mezclar, genero un respaldo JSON del estado actual de MA² Menús para poder revertir.
-- **Duplicados**: si un servicio existe en ambos, te pregunto qué precio y descripción se quedan (o dejo el de MA² Menús por defecto y marco los distintos para que los revises).
-- **Funciones**: si MA² Connect tiene alguna pantalla útil que aquí no está, la traigo respetando el diseño actual (lila/aqua, tarjetas, catálogo público sin controles de admin).
-- **Imágenes/logos**: copio los que hagan falta.
+**Etapa 5 — Traer tus datos**
+Los negocios y menús que ya tengas cargados en MA² Menús viven en la base de datos de ese proyecto, y esa base no se puede copiar desde aquí. Los pasamos con un respaldo: en MA² Menús exportas o me pasas la lista, y aquí los cargo. Si son pocos negocios es rápido; si son muchos te preparo una pantalla de importación.
 
-Al final este proyecto queda como el único catálogo, publicado en catalago-marly.lovable.app, y MA² Connect lo puedes archivar o borrar cuando confirmes que todo quedó.
+## Antes de empezar, dime
 
-## Si prefieres no dar acceso
+1. ¿Cuántos negocios y menús tienes cargados hoy en MA² Menús? Eso define si la migración de datos es a mano o con importador.
+2. ¿Quieres las 4 primeras etapas de una vez, o empezamos solo por el panel de negocios y el menú público y lo demás después?
 
-Alternativa manual: en MA² Connect exportas el respaldo JSON del catálogo, me lo subes aquí como archivo y lo importo. Funciona igual para los datos, pero no para copiar pantallas o código.
+Sugerencia: hacerlo por etapas. Es mucho trabajo para un solo cambio y así puedes revisar cada parte funcionando antes de seguir.
 
 ## Detalles técnicos
 
-- El copiado entre proyectos es de una sola dirección: otro proyecto → este. Por eso la fusión se ejecuta desde aquí y no al revés.
-- Los datos de este proyecto viven en `localStorage` bajo el store de catálogos; la mezcla se hará por el mismo formato de respaldo JSON que ya usa la app, sin tocar las tablas de avisos/pedidos.
-- Nada se borra en MA² Connect: solo se lee.
+- El copiado entre proyectos es de una sola dirección (otro proyecto → este), por eso la fusión se ejecuta aquí y MA² Menús solo se lee; allá no se borra ni se modifica nada.
+- MA² Menús usa `subscription_id` para separar los datos de cada negocio; aquí se replica ese aislamiento con políticas de acceso por negocio.
+- Su tipo `MenuItem` incluye precio numérico y precio en texto libre; se conserva igual para no perder los precios escritos a mano.
+- Los catálogos actuales seguirán en el almacenamiento del navegador como hoy; esta fusión no los migra a base de datos.
