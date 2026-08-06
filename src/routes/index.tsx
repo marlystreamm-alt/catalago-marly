@@ -682,10 +682,11 @@ function CatalogPage() {
 
                 {isAdmin ? (
                   <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Compartir y exportar
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
+
                       <Button size="sm" variant="outline" onClick={shareLink}>
                         <Link2 className="size-4" />
                         Compartir enlace con filtros
