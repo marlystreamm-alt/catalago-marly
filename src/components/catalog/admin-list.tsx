@@ -712,6 +712,7 @@ export function AdminList() {
 
                   {can("editDetalles") ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
+
                     {tab === "tramites" ? (
                       <label className="grid gap-1 text-xs">
                         <span className="font-medium text-muted-foreground">Categoría</span>
