@@ -196,14 +196,26 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(() => {
-    // Toda acción de escritura exige modo administrador, incluso si se invoca directamente.
-    const guard = (fn: () => void) => {
-      if (!isAdmin) {
-        toast.error("Necesitas iniciar sesión como administrador");
+    const can = (perm: Permission) =>
+      isAdmin || (clientSession ? clientSession.permissions[perm] === true : false);
+
+    // Toda escritura exige administrador o un cliente con ese permiso concreto.
+    const guard = (fn: () => void, perms?: Permission[]) => {
+      if (isAdmin) {
+        fn();
         return;
       }
-      fn();
+      if (clientSession && perms?.some((p) => can(p))) {
+        fn();
+        return;
+      }
+      toast.error(
+        clientSession
+          ? "Tu acceso no tiene permiso para este cambio"
+          : "Necesitas iniciar sesión como administrador",
+      );
     };
+
 
     return {
       state,
