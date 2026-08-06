@@ -130,6 +130,8 @@ function CatalogPage() {
     catalogId,
     setCatalogId,
     isAdmin,
+    canEdit,
+    isClient,
     hydrated,
     visibleCatalogIds,
     prefs,
@@ -139,8 +141,17 @@ function CatalogPage() {
 
   const online = useOnline();
   const [query, setQuery] = useState("");
-  const { categoryFilter, onlyActive, onlyFavorites, sortMode, showDetail, showShare, viewMode } =
-    prefs;
+  const {
+    categoryFilter,
+    onlyActive,
+    onlyFavorites,
+    sortMode,
+    showDetail,
+    showShare,
+    viewMode,
+    toolsOpen,
+  } = prefs;
+
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
