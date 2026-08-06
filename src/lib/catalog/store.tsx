@@ -99,7 +99,7 @@ interface StoreValue {
   clients: ClientAccess[];
   saveClient: (client: ClientAccess) => void;
   deleteClient: (id: string) => void;
-  clientLogin: (code: string) => Promise<boolean>;
+  clientLogin: (code: string) => Promise<{ ok: boolean; error?: string }>;
   clientLogout: () => void;
 
   prefs: CatalogPrefs;
