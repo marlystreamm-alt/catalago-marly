@@ -132,6 +132,8 @@ function CatalogPage() {
     isAdmin,
     canEdit,
     isClient,
+    can,
+    clientSession,
     hydrated,
     visibleCatalogIds,
     prefs,
@@ -277,7 +279,7 @@ function CatalogPage() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return catalog.services.filter((s) => {
-      if (!isAdmin && !s.active) return false;
+      if (!isAdmin && !can("verOcultos") && !s.active) return false;
       if (onlyFavorites && !s.favorite) return false;
       if (onlyActive && !s.active) return false;
       if (categoryFilter !== ALL && s.categoryId !== categoryFilter) return false;
@@ -290,7 +292,8 @@ function CatalogPage() {
           .includes(q)
       );
     });
-  }, [catalog, query, categoryFilter, onlyActive, onlyFavorites, isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, query, categoryFilter, onlyActive, onlyFavorites, isAdmin, isClient]);
 
   const sorted = useMemo(() => {
     const list = [...visible];
@@ -491,6 +494,18 @@ function CatalogPage() {
         ) : null}
 
         <PendingOrdersBar />
+
+        {isClient ? (
+          <div className="card-soft mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
+            <p className="font-semibold text-foreground">
+              Estás en el menú de {clientSession?.business}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Solo puedes cambiar lo que MA² habilitó para tu cuenta. Tu acceso vence el{" "}
+              {clientSession?.expiresOn}.
+            </p>
+          </div>
+        ) : null}
 
         <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
           <div className="relative">
