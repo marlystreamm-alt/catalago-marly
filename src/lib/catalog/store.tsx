@@ -595,11 +595,24 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
       replaceServices: (services, summary) =>
         gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","editEstado","agregarServicio","eliminarServicio"])(() => {
+          // Se vuelve a validar campo por campo: la interfaz nunca es la única barrera.
+          let safe = services as Service[];
+          if (!isAdmin && clientSession) {
+            const byId = new Map(catalog.services.map((s) => [s.id, s]));
+            safe = services
+              .filter((s) => byId.has(s.id) || can("agregarServicio"))
+              .map((s) => sanitizeService(s, byId.get(s.id)) as Service);
+            if (!can("eliminarServicio")) {
+              const kept = new Set(safe.map((s) => s.id));
+              for (const old of catalog.services) if (!kept.has(old.id)) safe.push(old);
+            }
+          }
           mutate(
-            (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
+            (c) => ({ ...c, services: safe.map((s, i) => ({ ...s, sortIndex: i })) }),
             entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
           );
         }),
+
       duplicateService: (id) =>
         gp(["agregarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);
