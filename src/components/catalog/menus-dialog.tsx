@@ -109,6 +109,7 @@ export function MenusDialog() {
         data: {
           code,
           business: {
+            slug: "",
             name: "Negocio nuevo",
             ownerName: "",
             whatsapp: "",
