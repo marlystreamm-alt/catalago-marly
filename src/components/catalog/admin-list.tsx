@@ -651,7 +651,14 @@ export function AdminList() {
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                     {can("editImagen") ? (
                       <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+                    ) : isClient ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                        <Lock className="size-3" />
+                        Imagen bloqueada
+                      </span>
                     ) : null}
+
+
 
                     {can("editEstado") ? (
                       <Button
