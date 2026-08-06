@@ -135,13 +135,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [prefsMap, setPrefsMap] = useState<PrefsMap>(() => loadPrefs());
+  const [clients, setClients] = useState<ClientAccess[]>([]);
+  const [clientSession, setClientSession] = useState<ClientAccess | null>(null);
 
   useEffect(() => {
     setState(loadState());
     setPrefsMap(loadPrefs());
+    setClients(loadClients());
     setHydrated(true);
     void ensureAuthRecord();
   }, []);
+
 
   useEffect(() => {
     if (!hydrated) return;
