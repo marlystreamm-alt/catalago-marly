@@ -15,6 +15,7 @@ const bool = (v: unknown, d = true) => (typeof v === "boolean" ? v : d);
 export function rowToBusiness(row: Row): MenuBusiness {
   return {
     id: str(row["id"]),
+    slug: str(row["slug"]),
     name: str(row["name"]),
     ownerName: str(row["owner_name"]),
     whatsapp: str(row["whatsapp"]),

@@ -9,6 +9,7 @@ const businessSchema = z.object({
   code,
   business: z.object({
     id: z.string().optional(),
+    slug: z.string().default(""),
     name: z.string().min(1, "El nombre es obligatorio"),
     ownerName: z.string().default(""),
     whatsapp: z.string().default(""),
