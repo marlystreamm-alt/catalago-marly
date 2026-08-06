@@ -526,24 +526,26 @@ function CatalogPage() {
         </section>
 
         {isAdmin || canEdit ? (
-          <section className="card-soft mt-3 rounded-2xl border border-border bg-card p-3">
+          <section className="card-soft mt-3 overflow-hidden rounded-3xl border border-border bg-card">
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-2 text-left"
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left active:bg-muted/60"
               aria-expanded={toolsOpen}
               onClick={() => setPrefs({ toolsOpen: !toolsOpen })}
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Wrench className="size-4 text-primary" />
+                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                  <Wrench className="size-4 text-primary" />
+                </span>
                 Herramientas
               </span>
               <ChevronDown
-                className={`size-4 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
+                className={`size-4 shrink-0 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
               />
             </button>
 
             {toolsOpen ? (
-              <div className="mt-3 grid gap-4 border-t border-border pt-3">
+              <div className="grid gap-4 border-t border-border px-3 pb-4 pt-3 sm:px-4">
                 {isAdmin ? (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Estadísticas">
                     <StatCard label="Total" value={stats.total} />
@@ -554,11 +556,12 @@ function CatalogPage() {
                   </div>
                 ) : null}
 
-                <div className="grid gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="grid gap-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Filtros y vista
                   </p>
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="grid gap-2 sm:grid-cols-3">
+
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                       <SelectTrigger
                         className="min-w-[10rem] flex-1"
