@@ -448,6 +448,33 @@ export function AdminList() {
         ))}
       </div>
 
+      {isClient ? (
+        <div className="card-soft grid gap-2 rounded-2xl border border-primary/25 bg-primary/5 p-3">
+          <p className="text-xs font-semibold text-foreground">Qué puedes editar en tu menú</p>
+          <div className="flex flex-wrap gap-1.5">
+            {EDITABLE_FIELDS.map((f) => (
+              <span
+                key={f.perm}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${
+                  can(f.perm)
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground line-through decoration-muted-foreground/50"
+                }`}
+              >
+                {can(f.perm) ? <Pencil className="size-3" /> : <Lock className="size-3" />}
+                {f.label}
+              </span>
+            ))}
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Los campos con candado están bloqueados por MA². Aunque los veas, no se guardarán
+            cambios en ellos.
+          </p>
+        </div>
+      ) : null}
+
+
+
       <div className="card-soft flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
         <div className="relative min-w-[12rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
