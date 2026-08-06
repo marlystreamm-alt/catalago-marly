@@ -15,6 +15,8 @@ export interface CatalogPrefs {
   showShare: boolean;
   /** Tarjetas o tabla de plataformas y precios. */
   viewMode: ViewMode;
+  /** Panel "Herramientas" abierto o plegado. */
+  toolsOpen: boolean;
 }
 
 export type PrefsMap = Record<CatalogId, CatalogPrefs>;
@@ -31,6 +33,7 @@ export const DEFAULT_PREFS: CatalogPrefs = {
   showDetail: true,
   showShare: true,
   viewMode: "tarjetas",
+  toolsOpen: false,
 };
 
 const SORTS: SortMode[] = ["categoria", "precio", "nombre"];
@@ -59,6 +62,7 @@ function normalize(raw: unknown): PrefsMap {
       showShare: p.showShare !== false,
       viewMode:
         p.viewMode === "tabla" ? "tabla" : p.viewMode === "lista" ? "lista" : "tarjetas",
+      toolsOpen: p.toolsOpen === true,
     };
 
   }

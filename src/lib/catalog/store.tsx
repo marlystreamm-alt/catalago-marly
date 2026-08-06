@@ -18,9 +18,17 @@ import {
   rotatePassword,
   verifyPassword,
 } from "./auth";
+import {
+  findClientByCode,
+  loadClients,
+  saveClients,
+  type ClientAccess,
+  type Permission,
+} from "./client-access";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createEmptyCatalog, createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
+
 import {
   CATALOG_IDS,
   MAX_LOG_ENTRIES,
@@ -81,6 +89,19 @@ interface StoreValue {
     next: string,
   ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
   logout: () => void;
+  /** Sesión de cliente ("Mi menú") con permisos limitados. */
+  clientSession: ClientAccess | null;
+  isClient: boolean;
+  /** Permisos efectivos: el administrador puede todo. */
+  can: (perm: Permission) => boolean;
+  /** Puede realizar alguna edición (administrador o cliente con permisos). */
+  canEdit: boolean;
+  clients: ClientAccess[];
+  saveClient: (client: ClientAccess) => void;
+  deleteClient: (id: string) => void;
+  clientLogin: (code: string) => Promise<boolean>;
+  clientLogout: () => void;
+
   prefs: CatalogPrefs;
   setPrefs: (patch: Partial<CatalogPrefs>) => void;
   resetPrefs: () => void;
@@ -114,13 +135,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [prefsMap, setPrefsMap] = useState<PrefsMap>(() => loadPrefs());
+  const [clients, setClients] = useState<ClientAccess[]>([]);
+  const [clientSession, setClientSession] = useState<ClientAccess | null>(null);
 
   useEffect(() => {
     setState(loadState());
     setPrefsMap(loadPrefs());
+    setClients(loadClients());
     setHydrated(true);
     void ensureAuthRecord();
   }, []);
+
 
   useEffect(() => {
     if (!hydrated) return;
@@ -171,14 +196,30 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(() => {
-    // Toda acción de escritura exige modo administrador, incluso si se invoca directamente.
-    const guard = (fn: () => void) => {
-      if (!isAdmin) {
-        toast.error("Necesitas iniciar sesión como administrador");
+    const can = (perm: Permission) =>
+      isAdmin || (clientSession ? clientSession.permissions[perm] === true : false);
+
+    // Toda escritura exige administrador o un cliente con ese permiso concreto.
+    const guard = (fn: () => void, perms?: Permission[]) => {
+      if (isAdmin) {
+        fn();
         return;
       }
-      fn();
+      if (clientSession && perms?.some((p) => can(p))) {
+        fn();
+        return;
+      }
+      toast.error(
+        clientSession
+          ? "Tu acceso no tiene permiso para este cambio"
+          : "Necesitas iniciar sesión como administrador",
+      );
     };
+    /** Azúcar: gp(["editPrecio"])(() => { … }) */
+    const gp = (perms: Permission[]) => (fn: () => void) => guard(fn, perms);
+
+
+
 
     return {
       state,
@@ -292,6 +333,67 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setMustChangePassword(false);
         toast.success("Saliste del modo administrador");
       },
+      clientSession,
+      isClient: !!clientSession,
+      can,
+      canEdit:
+        isAdmin ||
+        (!!clientSession &&
+          Object.entries(clientSession.permissions).some(
+            ([key, on]) => on && key.startsWith("edit"),
+          )) ||
+        (!!clientSession &&
+          (clientSession.permissions.agregarServicio ||
+            clientSession.permissions.eliminarServicio ||
+            clientSession.permissions.ajustesCatalogo)),
+      clients,
+      saveClient: (client) => {
+        if (!isAdmin) {
+          toast.error("Necesitas iniciar sesión como administrador");
+          return;
+        }
+        setClients((prev) => {
+          const exists = prev.some((c) => c.id === client.id);
+          const next = exists
+            ? prev.map((c) => (c.id === client.id ? client : c))
+            : [client, ...prev];
+          saveClients(next);
+          return next;
+        });
+        setClientSession((prev) => (prev && prev.id === client.id ? client : prev));
+      },
+      deleteClient: (id) => {
+        if (!isAdmin) {
+          toast.error("Necesitas iniciar sesión como administrador");
+          return;
+        }
+        setClients((prev) => {
+          const next = prev.filter((c) => c.id !== id);
+          saveClients(next);
+          return next;
+        });
+        setClientSession((prev) => (prev && prev.id === id ? null : prev));
+        toast.success("Acceso eliminado");
+      },
+      clientLogin: async (code: string) => {
+        const result = await findClientByCode(code, loadClients());
+        if (!result.ok) {
+          toast.error(result.error);
+          return false;
+        }
+        setClients(loadClients());
+        setClientSession(result.client);
+        if (result.client.catalogId && state.catalogs[result.client.catalogId]) {
+          setCatalogIdRaw(result.client.catalogId);
+        }
+        toast.success(`Bienvenida, ${result.client.business || "cliente"}`);
+        return true;
+      },
+      clientLogout: () => {
+        setClientSession(null);
+        toast.success("Saliste de tu menú");
+      },
+
       prefs: prefsMap[activeId] ?? DEFAULT_PREFS,
       setPrefs: (patch) =>
         setPrefsMap((prev) => ({
@@ -300,7 +402,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         })),
       resetPrefs: () => setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
       updateCatalog: (patch) =>
-        guard(() => {
+        gp(["ajustesCatalogo"])(() => {
           const changes: string[] = [];
           const entries: LogEntry[] = [];
           if (patch.name && patch.name !== catalog.name) {
@@ -373,7 +475,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
       saveService: (service) =>
-        guard(() => {
+        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","agregarServicio"])(() => {
           const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
           const changes: string[] = [];
           const details: LogEntry[] = [];
@@ -446,14 +548,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
 
       replaceServices: (services, summary) =>
-        guard(() => {
+        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","editEstado","agregarServicio","eliminarServicio"])(() => {
           mutate(
             (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
             entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
           );
         }),
       duplicateService: (id) =>
-        guard(() => {
+        gp(["agregarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           if (!found) return;
           mutate(
@@ -469,7 +571,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success("Servicio duplicado");
         }),
       deleteService: (id) =>
-        guard(() => {
+        gp(["eliminarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           mutate(
             (c) => ({ ...c, services: c.services.filter((s) => s.id !== id) }),
@@ -478,7 +580,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success("Servicio eliminado");
         }),
       toggleService: (id) =>
-        guard(() => {
+        gp(["editEstado"])(() => {
           const found = catalog.services.find((s) => s.id === id);
           if (!found) return;
           const nowActive = !found.active;
@@ -674,6 +776,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     mutate,
     visibleCatalogIds,
     allCatalogIds,
+    clients,
+    clientSession,
+
   ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
