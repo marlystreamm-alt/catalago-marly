@@ -790,7 +790,13 @@ export function AdminList() {
                       />
                     ) : null}
                   </div>
+                  ) : isClient ? (
+                    <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                      <Lock className="size-3" />
+                      Detalles (entrega, garantía…) bloqueados
+                    </p>
                   ) : null}
+
 
                   {can("verDescripciones") ? (
                   <label className="mt-2 grid gap-1 text-xs">
