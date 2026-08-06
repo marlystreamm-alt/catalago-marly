@@ -599,26 +599,39 @@ export function AdminList() {
                     className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
                   />
                 </button>
-                <Input
-                  className="h-9 min-w-0 flex-1 font-semibold"
-                  type="text"
-                  aria-label="Nombre"
-                  placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
-                  value={s.name}
-                  readOnly={!can("editNombre")}
-                  onChange={(e) => patch(s.id, { name: e.target.value })}
-                />
-                {can("verPrecios") ? (
+                <div className="relative min-w-0 flex-1">
                   <Input
-                    className="h-9 w-24 shrink-0 text-right font-semibold text-primary"
+                    className={`h-9 w-full min-w-0 font-semibold ${lockedStyle(can("editNombre"))}`}
                     type="text"
-                    aria-label="Precio"
-                    placeholder="$45"
-                    value={s.priceText ?? ""}
-                    readOnly={!can("editPrecio")}
-                    onChange={(e) => patch(s.id, { priceText: e.target.value })}
+                    aria-label="Nombre"
+                    title={can("editNombre") ? undefined : "Campo bloqueado por permisos"}
+                    placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
+                    value={s.name}
+                    readOnly={!can("editNombre")}
+                    onChange={(e) => patch(s.id, { name: e.target.value })}
                   />
+                  {isClient && !can("editNombre") ? (
+                    <Lock className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  ) : null}
+                </div>
+                {can("verPrecios") ? (
+                  <div className="relative w-24 shrink-0">
+                    <Input
+                      className={`h-9 w-full text-right font-semibold text-primary ${lockedStyle(can("editPrecio"))}`}
+                      type="text"
+                      aria-label="Precio"
+                      title={can("editPrecio") ? undefined : "Campo bloqueado por permisos"}
+                      placeholder="$45"
+                      value={s.priceText ?? ""}
+                      readOnly={!can("editPrecio")}
+                      onChange={(e) => patch(s.id, { priceText: e.target.value })}
+                    />
+                    {isClient && !can("editPrecio") ? (
+                      <Lock className="pointer-events-none absolute left-1.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    ) : null}
+                  </div>
                 ) : null}
+
                 <Button
                   size="icon"
                   variant="ghost"
