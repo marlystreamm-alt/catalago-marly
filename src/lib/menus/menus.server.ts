@@ -85,3 +85,34 @@ export async function loadMenu(businessId: string) {
     items: (items.data ?? []).map((r) => rowToItem(r as Row)),
   };
 }
+
+/** Menú público de un negocio por su enlace (slug). Solo datos visibles al cliente. */
+export async function loadPublicMenu(slug: string) {
+  const db = await admin();
+  const { data: biz } = await db
+    .from("menu_businesses")
+    .select("*")
+    .eq("slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+  if (!biz) return null;
+  const business = rowToBusiness(biz as Row);
+  const [cats, items] = await Promise.all([
+    db
+      .from("menu_categories")
+      .select("*")
+      .eq("business_id", business.id)
+      .order("sort_index", { ascending: true }),
+    db
+      .from("menu_items")
+      .select("*")
+      .eq("business_id", business.id)
+      .eq("available", true)
+      .order("sort_index", { ascending: true }),
+  ]);
+  return {
+    business: { ...business, notes: "" },
+    categories: (cats.data ?? []).map((r) => rowToCategory(r as Row)),
+    items: (items.data ?? []).map((r) => rowToItem(r as Row)),
+  };
+}
