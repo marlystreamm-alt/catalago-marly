@@ -472,19 +472,6 @@ function CatalogPage() {
 
         <PendingOrdersBar />
 
-        {isAdmin ? (
-          <section
-            className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5"
-            aria-label="Estadísticas"
-          >
-            <StatCard label="Total" value={stats.total} />
-            <StatCard label="Activos" value={stats.activos} />
-            <StatCard label="Categorías" value={stats.categorias} />
-            <StatCard label="Ocultos" value={stats.ocultos} />
-            <StatCard label="Favoritos" value={stats.favoritos} />
-          </section>
-        ) : null}
-
         <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -501,186 +488,250 @@ function CatalogPage() {
               <InlineLoader />
             </div>
           ) : null}
-          {isAdmin ? (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Filtrar por categoría">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Todas las categorías</SelectItem>
-                  {catalog.categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                <SelectTrigger className="flex-1 min-w-[10rem]" aria-label="Ordenar servicios">
-                  <ArrowUpDown className="size-4 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="categoria">Por categoría</SelectItem>
-                  <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
-                  <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={viewMode}
-                onValueChange={(v) => setPrefs({ viewMode: v as "tarjetas" | "tabla" | "lista" })}
-              >
-                <SelectTrigger className="flex-1 min-w-[9rem]" aria-label="Vista del catálogo">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lista">Editar (lista)</SelectItem>
-                  <SelectItem value="tarjetas">Vista pública (tarjetas)</SelectItem>
-                  <SelectItem value="tabla">Vista tabla</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
-                <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
-                  <Star className="size-3.5" />
-                  Favoritos
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="show-detail"
-                  checked={showDetail}
-                  onCheckedChange={(v) => setPrefs({ showDetail: v })}
-                />
-                <Label htmlFor="show-detail" className="text-sm">
-                  Ver detalles
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="show-share"
-                  checked={showShare}
-                  onCheckedChange={(v) => setPrefs({ showShare: v })}
-                />
-                <Label htmlFor="show-share" className="text-sm">
-                  Compartir
-                </Label>
-              </div>
-              {isAdmin ? (
-                <div className="flex items-center gap-2">
-                  <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
-                  <Label htmlFor="only-active" className="text-sm">
-                    Solo activos
-                  </Label>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {isAdmin && activeFilters.length ? (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {activeFilters.map((f) => (
-                <Badge key={f.key} variant="secondary" className="gap-1">
-                  {f.label}
-                  <button
-                    type="button"
-                    aria-label={`Quitar filtro ${f.label}`}
-                    onClick={f.clear}
-                    className="rounded-full p-0.5 hover:bg-background"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </Badge>
-              ))}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setQuery("");
-                  resetPrefs();
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            </div>
-          ) : null}
-
-          {isAdmin ? (
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-              <Button size="sm" variant="outline" onClick={shareLink}>
-                <Link2 className="size-4" />
-                Compartir enlace con filtros
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!sorted.length}
-                onClick={() => {
-                  downloadCsv(
-                    `ma2-busqueda-${catalogId}-${stamp()}`,
-                    SEARCH_HEADERS,
-                    searchRows,
-                    exportMeta,
-                  );
-                  toast.success("Búsqueda exportada en CSV");
-                }}
-              >
-                <FileDown className="size-4" />
-                Exportar búsqueda CSV
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!sorted.length}
-                onClick={() => {
-                  const ok = printPdf(
-                    `${catalog.name} · Búsqueda`,
-                    `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
-                    SEARCH_HEADERS,
-                    searchRows,
-                    exportMeta,
-                  );
-
-                  if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
-                }}
-              >
-                <FileText className="size-4" />
-                Exportar búsqueda PDF
-              </Button>
-            </div>
-          ) : null}
-
-          {isAdmin ? (
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
-              <Button size="sm" onClick={openNew}>
-                <Plus className="size-4" />
-                Agregar servicio
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-                <Settings2 className="size-4" />
-                Ajustes del catálogo
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
-                <Tags className="size-4" />
-                Categorías
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
-                <History className="size-4" />
-                Historial
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
-                <ShieldCheck className="size-4" />
-                Bitácora
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
-                <Settings2 className="size-4" />
-                Mostrar catálogos
-              </Button>
-            </div>
-          ) : null}
         </section>
+
+        {isAdmin || canEdit ? (
+          <section className="card-soft mt-3 rounded-2xl border border-border bg-card p-3">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 text-left"
+              aria-expanded={toolsOpen}
+              onClick={() => setPrefs({ toolsOpen: !toolsOpen })}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Wrench className="size-4 text-primary" />
+                Herramientas
+              </span>
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {toolsOpen ? (
+              <div className="mt-3 grid gap-4 border-t border-border pt-3">
+                {isAdmin ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Estadísticas">
+                    <StatCard label="Total" value={stats.total} />
+                    <StatCard label="Activos" value={stats.activos} />
+                    <StatCard label="Categorías" value={stats.categorias} />
+                    <StatCard label="Ocultos" value={stats.ocultos} />
+                    <StatCard label="Favoritos" value={stats.favoritos} />
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Filtros y vista
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger
+                        className="min-w-[10rem] flex-1"
+                        aria-label="Filtrar por categoría"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL}>Todas las categorías</SelectItem>
+                        {catalog.categories.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+                      <SelectTrigger className="min-w-[10rem] flex-1" aria-label="Ordenar servicios">
+                        <ArrowUpDown className="size-4 text-muted-foreground" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="categoria">Por categoría</SelectItem>
+                        <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
+                        <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={viewMode}
+                      onValueChange={(v) =>
+                        setPrefs({ viewMode: v as "tarjetas" | "tabla" | "lista" })
+                      }
+                    >
+                      <SelectTrigger className="min-w-[9rem] flex-1" aria-label="Vista del catálogo">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lista">Editar (lista)</SelectItem>
+                        <SelectItem value="tarjetas">Vista pública (tarjetas)</SelectItem>
+                        {isAdmin ? <SelectItem value="tabla">Vista tabla</SelectItem> : null}
+                      </SelectContent>
+                    </Select>
+
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="only-fav"
+                        checked={onlyFavorites}
+                        onCheckedChange={setOnlyFavorites}
+                      />
+                      <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
+                        <Star className="size-3.5" />
+                        Favoritos
+                      </Label>
+                    </div>
+                    {isAdmin ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="show-detail"
+                            checked={showDetail}
+                            onCheckedChange={(v) => setPrefs({ showDetail: v })}
+                          />
+                          <Label htmlFor="show-detail" className="text-sm">
+                            Ver detalles
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="show-share"
+                            checked={showShare}
+                            onCheckedChange={(v) => setPrefs({ showShare: v })}
+                          />
+                          <Label htmlFor="show-share" className="text-sm">
+                            Compartir
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="only-active"
+                            checked={onlyActive}
+                            onCheckedChange={setOnlyActive}
+                          />
+                          <Label htmlFor="only-active" className="text-sm">
+                            Solo activos
+                          </Label>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {activeFilters.length ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {activeFilters.map((f) => (
+                        <Badge key={f.key} variant="secondary" className="gap-1">
+                          {f.label}
+                          <button
+                            type="button"
+                            aria-label={`Quitar filtro ${f.label}`}
+                            onClick={f.clear}
+                            className="rounded-full p-0.5 hover:bg-background"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setQuery("");
+                          resetPrefs();
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Compartir y exportar
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={shareLink}>
+                        <Link2 className="size-4" />
+                        Compartir enlace con filtros
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!sorted.length}
+                        onClick={() => {
+                          downloadCsv(
+                            `ma2-busqueda-${catalogId}-${stamp()}`,
+                            SEARCH_HEADERS,
+                            searchRows,
+                            exportMeta,
+                          );
+                          toast.success("Búsqueda exportada en CSV");
+                        }}
+                      >
+                        <FileDown className="size-4" />
+                        Exportar búsqueda CSV
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!sorted.length}
+                        onClick={() => {
+                          const ok = printPdf(
+                            `${catalog.name} · Búsqueda`,
+                            `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
+                            SEARCH_HEADERS,
+                            searchRows,
+                            exportMeta,
+                          );
+
+                          if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+                        }}
+                      >
+                        <FileText className="size-4" />
+                        Exportar búsqueda PDF
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Administrar
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={openNew}>
+                        <Plus className="size-4" />
+                        Agregar servicio
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                        <Settings2 className="size-4" />
+                        Ajustes del catálogo
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
+                        <Tags className="size-4" />
+                        Categorías
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+                        <History className="size-4" />
+                        Historial
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
+                        <ShieldCheck className="size-4" />
+                        Bitácora
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
+                        <Settings2 className="size-4" />
+                        Mostrar catálogos
+                      </Button>
+                      <ClientAccessDialog />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
 
         {isAdmin && viewMode !== "tarjetas" ? (
           <div className="mt-4">
