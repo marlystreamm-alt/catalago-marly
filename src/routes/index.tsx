@@ -561,12 +561,8 @@ function CatalogPage() {
                     Filtros y vista
                   </p>
                   <div className="grid gap-2 sm:grid-cols-3">
-
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger
-                        className="min-w-[10rem] flex-1"
-                        aria-label="Filtrar por categoría"
-                      >
+                      <SelectTrigger className="h-11 w-full" aria-label="Filtrar por categoría">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -579,8 +575,8 @@ function CatalogPage() {
                       </SelectContent>
                     </Select>
                     <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                      <SelectTrigger className="min-w-[10rem] flex-1" aria-label="Ordenar servicios">
-                        <ArrowUpDown className="size-4 text-muted-foreground" />
+                      <SelectTrigger className="h-11 w-full" aria-label="Ordenar servicios">
+                        <ArrowUpDown className="size-4 shrink-0 text-muted-foreground" />
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -595,7 +591,7 @@ function CatalogPage() {
                         setPrefs({ viewMode: v as "tarjetas" | "tabla" | "lista" })
                       }
                     >
-                      <SelectTrigger className="min-w-[9rem] flex-1" aria-label="Vista del catálogo">
+                      <SelectTrigger className="h-11 w-full" aria-label="Vista del catálogo">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -604,53 +600,56 @@ function CatalogPage() {
                         {isAdmin ? <SelectItem value="tabla">Vista tabla</SelectItem> : null}
                       </SelectContent>
                     </Select>
+                  </div>
 
-                    <div className="flex items-center gap-2">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <Label htmlFor="only-fav" className="flex items-center gap-1.5 text-sm">
+                        <Star className="size-3.5" />
+                        Favoritos
+                      </Label>
                       <Switch
                         id="only-fav"
                         checked={onlyFavorites}
                         onCheckedChange={setOnlyFavorites}
                       />
-                      <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
-                        <Star className="size-3.5" />
-                        Favoritos
-                      </Label>
                     </div>
                     {isAdmin ? (
                       <>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="show-detail" className="text-sm">
+                            Ver detalles
+                          </Label>
                           <Switch
                             id="show-detail"
                             checked={showDetail}
                             onCheckedChange={(v) => setPrefs({ showDetail: v })}
                           />
-                          <Label htmlFor="show-detail" className="text-sm">
-                            Ver detalles
-                          </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="show-share" className="text-sm">
+                            Compartir
+                          </Label>
                           <Switch
                             id="show-share"
                             checked={showShare}
                             onCheckedChange={(v) => setPrefs({ showShare: v })}
                           />
-                          <Label htmlFor="show-share" className="text-sm">
-                            Compartir
-                          </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="only-active" className="text-sm">
+                            Solo activos
+                          </Label>
                           <Switch
                             id="only-active"
                             checked={onlyActive}
                             onCheckedChange={setOnlyActive}
                           />
-                          <Label htmlFor="only-active" className="text-sm">
-                            Solo activos
-                          </Label>
                         </div>
                       </>
                     ) : null}
                   </div>
+
 
                   {activeFilters.length ? (
                     <div className="flex flex-wrap items-center gap-1.5">
