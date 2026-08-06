@@ -218,7 +218,47 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     /** Azúcar: gp(["editPrecio"])(() => { … }) */
     const gp = (perms: Permission[]) => (fn: () => void) => guard(fn, perms);
 
+    /**
+     * Segunda barrera: aunque alguien manipule la interfaz, solo se conservan
+     * los campos que el permiso de la clienta autoriza; el resto vuelve al valor previo.
+     */
+    const FIELD_PERMS: Array<[Permission, (keyof Service)[]]> = [
+      ["editNombre", ["name"]],
+      ["editPrecio", ["price", "priceText"]],
+      ["editDescripcion", ["description"]],
+      ["editImagen", ["icon"]],
+      [
+        "editDetalles",
+        [
+          "categoryId",
+          "subsectionId",
+          "devices",
+          "profiles",
+          "delivery",
+          "warranty",
+          "plan",
+          "users",
+          "vigencia",
+          "requirements",
+        ],
+      ],
+      ["editEstado", ["active"]],
+    ];
 
+    const sanitizeService = <T extends Partial<Service>>(next: T, prev?: Service): T => {
+      if (isAdmin || !clientSession || !prev) return next;
+      const out = { ...prev, ...({} as T) } as unknown as T;
+      // Campos neutros que no dependen de un permiso concreto.
+      (out as Partial<Service>).favorite = next.favorite ?? prev.favorite;
+      (out as Partial<Service>).sortIndex = next.sortIndex ?? prev.sortIndex;
+      for (const [perm, keys] of FIELD_PERMS) {
+        if (!can(perm)) continue;
+        for (const key of keys) {
+          if (key in next) (out as Record<string, unknown>)[key] = next[key as keyof T];
+        }
+      }
+      return out;
+    };
 
 
     return {
