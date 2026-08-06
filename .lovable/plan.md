@@ -1,45 +1,47 @@
-# Unificar MA² Menús y MA² OS Hub
+# Unir MA² Connect dentro de MA² Menús
 
-## Primero, la duda del nombre
+## Situación confirmada
 
-No hay dos proyectos duplicados. En tu cuenta existen:
+Busqué "MA² Connect" desde este proyecto y **no es accesible**: solo alcanzo MA² Menús (este), MA² OS Hub (37) y Tailored Web Solutions. Eso pasa cuando el proyecto está en otro espacio de trabajo, o tiene desactivado el uso compartido entre proyectos.
 
-- **MA² Menús** (este) — los catálogos públicos con "Pedir por WhatsApp", publicado en catalago-marly.lovable.app.
-- **MA² OS Hub (37)** — la plataforma interna con base de datos real: inventario, cuentas, pedidos, entregas, finanzas, usuarios, tienda.
+Sin acceso no puedo leer su código ni copiar su contenido, así que la fusión no puede empezar todavía.
 
-"MA² Connect" **no es un proyecto**: es un módulo que vive dentro de MA² OS Hub (pantallas Connect, Connect Precios y Connect Revisión) pensado justamente para sincronizar precios y catálogos con esta app. Por eso aparecía ese nombre en las conversaciones.
+## Paso 1 — Darme acceso (lo haces tú, 1 minuto)
 
-## Sí se pueden unir — la dirección importa
+Abre **MA² Connect** y revisa dos cosas:
 
-MA² OS Hub tiene ~45 pantallas y su propia base de datos con datos reales (inventario, pedidos, clientes). MA² Menús guarda casi todo en el navegador (localStorage). Traer el Hub hacia acá significaría volver a crear toda su base de datos desde cero y perder sus datos: no conviene.
+1. Que esté en el **mismo espacio de trabajo** que MA² Menús. Si no lo está: tarjeta del proyecto → menú de tres puntos → "Transferir a espacio de trabajo" y eliges el mismo.
+2. Que **no** tenga bloqueado el uso compartido entre proyectos, en Configuración del proyecto → General.
 
-La unificación correcta es al revés: **MA² OS Hub se queda como la app única**, y absorbe el catálogo público de MA² Menús.
+Cuando lo hagas, me avisas y vuelvo a verificar el acceso.
 
-```text
-   MA² Menús (catálogo público, WhatsApp)
-              |
-              v  se integra como sección pública
-   MA² OS Hub  ->  app única (admin + catálogo + tienda)
-```
+## Paso 2 — Inventario de lo que hay allá
 
-## Qué haría yo desde aquí
+Ya con acceso, reviso MA² Connect y te entrego una lista clara de:
 
-1. Preparar un **respaldo completo** de este proyecto (los 3 catálogos, servicios, precios, categorías, subsecciones, imágenes/logos, descripciones y textos) en un archivo JSON listo para importar.
-2. Dejar documentado el diseño y comportamiento del catálogo público (tarjetas, filtros, "Pedir por WhatsApp", enlaces con filtros) para reproducirlo tal cual en el Hub.
-3. Añadir en el panel admin de esta app un botón claro **"Exportar para MA² OS Hub"** que genere ese JSON en un solo clic.
+- Catálogos, servicios y precios que tenga y que aquí no existan.
+- Pantallas o funciones distintas (por ejemplo su propio panel o vista de tabla).
+- Si guarda datos en el navegador o en base de datos.
 
-## Qué sigue después (en el otro proyecto)
+No copio nada hasta que apruebes esa lista, para no pisar tus catálogos actuales.
 
-Abres **MA² OS Hub (37)** y pides ahí: "importa el catálogo público de MA² Menús con este JSON y el mismo diseño de tarjetas". Ahí sí se puede escribir código y crear las tablas del catálogo unidas al inventario existente, de modo que el stock y los precios sean los mismos en las dos vistas.
+## Paso 3 — Fusión aquí
 
-Mientras tanto, esta app sigue publicada y funcionando igual: no se apaga nada hasta que el Hub tenga el catálogo funcionando.
+Con tu visto bueno:
 
-## Alternativa (si prefieres no mover el Hub)
+- **Datos**: traigo sus servicios/catálogos y los agrego a los de aquí. Antes de mezclar, genero un respaldo JSON del estado actual de MA² Menús para poder revertir.
+- **Duplicados**: si un servicio existe en ambos, te pregunto qué precio y descripción se quedan (o dejo el de MA² Menús por defecto y marco los distintos para que los revises).
+- **Funciones**: si MA² Connect tiene alguna pantalla útil que aquí no está, la traigo respetando el diseño actual (lila/aqua, tarjetas, catálogo público sin controles de admin).
+- **Imágenes/logos**: copio los que hagan falta.
 
-Dejar los dos como están, pero conectados: esta app deja de tener precios propios y los lee del Hub por su módulo Connect. Es menos trabajo, pero seguirías administrando en dos lugares.
+Al final este proyecto queda como el único catálogo, publicado en catalago-marly.lovable.app, y MA² Connect lo puedes archivar o borrar cuando confirmes que todo quedó.
+
+## Si prefieres no dar acceso
+
+Alternativa manual: en MA² Connect exportas el respaldo JSON del catálogo, me lo subes aquí como archivo y lo importo. Funciona igual para los datos, pero no para copiar pantallas o código.
 
 ## Detalles técnicos
 
-- El copiado entre proyectos es de una sola dirección (otro proyecto → proyecto actual), por eso la fusión real se ejecuta desde MA² OS Hub.
-- El export incluiría: `catalogs`, `services`, `categories`, `subsections`, preferencias de WhatsApp (número y plantilla) y descripciones personalizadas por plataforma.
-- No se toca la base de datos actual de avisos/pedidos de esta app durante el paso 1-3.
+- El copiado entre proyectos es de una sola dirección: otro proyecto → este. Por eso la fusión se ejecuta desde aquí y no al revés.
+- Los datos de este proyecto viven en `localStorage` bajo el store de catálogos; la mezcla se hará por el mismo formato de respaldo JSON que ya usa la app, sin tocar las tablas de avisos/pedidos.
+- Nada se borra en MA² Connect: solo se lee.
