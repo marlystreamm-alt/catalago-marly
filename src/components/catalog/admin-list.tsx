@@ -7,7 +7,10 @@ import {
   Eye,
   EyeOff,
   ImagePlus,
+  Lock,
+  Pencil,
   Plus,
+
   RotateCcw,
   Save,
   Search,
@@ -209,8 +212,41 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
   );
 }
 
+/** Campos que la clienta puede tocar, según sus permisos. */
+const EDITABLE_FIELDS: { perm: Parameters<ReturnType<typeof useCatalogStore>["can"]>[0]; label: string }[] = [
+  { perm: "editNombre", label: "Nombre" },
+  { perm: "editPrecio", label: "Precio" },
+  { perm: "editDescripcion", label: "Descripción" },
+  { perm: "editImagen", label: "Imagen" },
+  { perm: "editDetalles", label: "Detalles" },
+  { perm: "editEstado", label: "Activar/ocultar" },
+  { perm: "agregarServicio", label: "Agregar" },
+  { perm: "eliminarServicio", label: "Eliminar" },
+];
+
+/** Etiqueta pequeña que marca un campo como editable o bloqueado. */
+function FieldFlag({ editable, show }: { editable: boolean; show: boolean }) {
+  if (!show) return null;
+  return editable ? (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+      <Pencil className="size-3" />
+      Editable
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      <Lock className="size-3" />
+      Bloqueado
+    </span>
+  );
+}
+
+/** Estilo de campo bloqueado: fondo apagado y borde punteado. */
+const lockedStyle = (editable: boolean) =>
+  editable ? "" : "border-dashed bg-muted/60 text-muted-foreground";
+
+
 export function AdminList() {
-  const { catalog, canEdit, can, replaceServices } = useCatalogStore();
+  const { catalog, canEdit, can, replaceServices, isClient } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
   const [rows, setRows] = useState<Service[]>(() => fromCatalog(catalog.services));
   const [dirty, setDirty] = useState(false);
@@ -412,6 +448,33 @@ export function AdminList() {
         ))}
       </div>
 
+      {isClient ? (
+        <div className="card-soft grid gap-2 rounded-2xl border border-primary/25 bg-primary/5 p-3">
+          <p className="text-xs font-semibold text-foreground">Qué puedes editar en tu menú</p>
+          <div className="flex flex-wrap gap-1.5">
+            {EDITABLE_FIELDS.map((f) => (
+              <span
+                key={f.perm}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${
+                  can(f.perm)
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground line-through decoration-muted-foreground/50"
+                }`}
+              >
+                {can(f.perm) ? <Pencil className="size-3" /> : <Lock className="size-3" />}
+                {f.label}
+              </span>
+            ))}
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Los campos con candado están bloqueados por MA². Aunque los veas, no se guardarán
+            cambios en ellos.
+          </p>
+        </div>
+      ) : null}
+
+
+
       <div className="card-soft flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-3">
         <div className="relative min-w-[12rem] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -536,26 +599,39 @@ export function AdminList() {
                     className={`size-4 ${s.favorite ? "fill-primary text-primary" : "text-muted-foreground"}`}
                   />
                 </button>
-                <Input
-                  className="h-9 min-w-0 flex-1 font-semibold"
-                  type="text"
-                  aria-label="Nombre"
-                  placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
-                  value={s.name}
-                  readOnly={!can("editNombre")}
-                  onChange={(e) => patch(s.id, { name: e.target.value })}
-                />
-                {can("verPrecios") ? (
+                <div className="relative min-w-0 flex-1">
                   <Input
-                    className="h-9 w-24 shrink-0 text-right font-semibold text-primary"
+                    className={`h-9 w-full min-w-0 font-semibold ${lockedStyle(can("editNombre"))}`}
                     type="text"
-                    aria-label="Precio"
-                    placeholder="$45"
-                    value={s.priceText ?? ""}
-                    readOnly={!can("editPrecio")}
-                    onChange={(e) => patch(s.id, { priceText: e.target.value })}
+                    aria-label="Nombre"
+                    title={can("editNombre") ? undefined : "Campo bloqueado por permisos"}
+                    placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
+                    value={s.name}
+                    readOnly={!can("editNombre")}
+                    onChange={(e) => patch(s.id, { name: e.target.value })}
                   />
+                  {isClient && !can("editNombre") ? (
+                    <Lock className="pointer-events-none absolute right-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  ) : null}
+                </div>
+                {can("verPrecios") ? (
+                  <div className="relative w-24 shrink-0">
+                    <Input
+                      className={`h-9 w-full text-right font-semibold text-primary ${lockedStyle(can("editPrecio"))}`}
+                      type="text"
+                      aria-label="Precio"
+                      title={can("editPrecio") ? undefined : "Campo bloqueado por permisos"}
+                      placeholder="$45"
+                      value={s.priceText ?? ""}
+                      readOnly={!can("editPrecio")}
+                      onChange={(e) => patch(s.id, { priceText: e.target.value })}
+                    />
+                    {isClient && !can("editPrecio") ? (
+                      <Lock className="pointer-events-none absolute left-1.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    ) : null}
+                  </div>
                 ) : null}
+
                 <Button
                   size="icon"
                   variant="ghost"
@@ -575,7 +651,14 @@ export function AdminList() {
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
                     {can("editImagen") ? (
                       <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+                    ) : isClient ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                        <Lock className="size-3" />
+                        Imagen bloqueada
+                      </span>
                     ) : null}
+
+
 
                     {can("editEstado") ? (
                       <Button
@@ -629,6 +712,7 @@ export function AdminList() {
 
                   {can("editDetalles") ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
+
                     {tab === "tramites" ? (
                       <label className="grid gap-1 text-xs">
                         <span className="font-medium text-muted-foreground">Categoría</span>
@@ -706,15 +790,23 @@ export function AdminList() {
                       />
                     ) : null}
                   </div>
+                  ) : isClient ? (
+                    <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                      <Lock className="size-3" />
+                      Detalles (entrega, garantía…) bloqueados
+                    </p>
                   ) : null}
+
 
                   {can("verDescripciones") ? (
                   <label className="mt-2 grid gap-1 text-xs">
-                    <span className="font-medium text-muted-foreground">
+                    <span className="flex items-center gap-2 font-medium text-muted-foreground">
                       {tab === "tramites" ? "Descripción corta" : "Descripción"}
+                      <FieldFlag editable={can("editDescripcion")} show={isClient} />
                     </span>
                     <Textarea
                       rows={3}
+                      className={lockedStyle(can("editDescripcion"))}
                       value={s.description}
                       placeholder={
                         findPlatform(s.name)?.description ??
@@ -723,6 +815,7 @@ export function AdminList() {
                       readOnly={!can("editDescripcion")}
                       onChange={(e) => patch(s.id, { description: e.target.value })}
                     />
+
                     {findPlatform(s.name) && !s.description.trim() ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[11px] text-muted-foreground">

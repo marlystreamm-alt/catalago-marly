@@ -99,7 +99,7 @@ interface StoreValue {
   clients: ClientAccess[];
   saveClient: (client: ClientAccess) => void;
   deleteClient: (id: string) => void;
-  clientLogin: (code: string) => Promise<boolean>;
+  clientLogin: (code: string) => Promise<{ ok: boolean; error?: string }>;
   clientLogout: () => void;
 
   prefs: CatalogPrefs;
@@ -218,7 +218,47 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     /** Azúcar: gp(["editPrecio"])(() => { … }) */
     const gp = (perms: Permission[]) => (fn: () => void) => guard(fn, perms);
 
+    /**
+     * Segunda barrera: aunque alguien manipule la interfaz, solo se conservan
+     * los campos que el permiso de la clienta autoriza; el resto vuelve al valor previo.
+     */
+    const FIELD_PERMS: Array<[Permission, (keyof Service)[]]> = [
+      ["editNombre", ["name"]],
+      ["editPrecio", ["price", "priceText"]],
+      ["editDescripcion", ["description"]],
+      ["editImagen", ["icon"]],
+      [
+        "editDetalles",
+        [
+          "categoryId",
+          "subsectionId",
+          "devices",
+          "profiles",
+          "delivery",
+          "warranty",
+          "plan",
+          "users",
+          "vigencia",
+          "requirements",
+        ],
+      ],
+      ["editEstado", ["active"]],
+    ];
 
+    const sanitizeService = <T extends Partial<Service>>(next: T, prev?: Service): T => {
+      if (isAdmin || !clientSession || !prev) return next;
+      const out = { ...prev, ...({} as T) } as unknown as T;
+      // Campos neutros que no dependen de un permiso concreto.
+      (out as Partial<Service>).favorite = next.favorite ?? prev.favorite;
+      (out as Partial<Service>).sortIndex = next.sortIndex ?? prev.sortIndex;
+      for (const [perm, keys] of FIELD_PERMS) {
+        if (!can(perm)) continue;
+        for (const key of keys) {
+          if (key in next) (out as Record<string, unknown>)[key] = next[key as keyof T];
+        }
+      }
+      return out;
+    };
 
 
     return {
@@ -378,8 +418,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       clientLogin: async (code: string) => {
         const result = await findClientByCode(code, loadClients());
         if (!result.ok) {
-          toast.error(result.error);
-          return false;
+          return { ok: false, error: result.error };
         }
         setClients(loadClients());
         setClientSession(result.client);
@@ -387,8 +426,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           setCatalogIdRaw(result.client.catalogId);
         }
         toast.success(`Bienvenida, ${result.client.business || "cliente"}`);
-        return true;
+        return { ok: true };
       },
+
       clientLogout: () => {
         setClientSession(null);
         toast.success("Saliste de tu menú");
@@ -474,11 +514,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           );
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
-      saveService: (service) =>
+      saveService: (incoming) =>
         gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","agregarServicio"])(() => {
-          const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
+          const prev = incoming.id ? catalog.services.find((s) => s.id === incoming.id) : undefined;
+          if (!prev && !isAdmin && !can("agregarServicio")) {
+            toast.error("Tu acceso no permite agregar servicios");
+            return;
+          }
+          const service = sanitizeService(incoming, prev);
           const changes: string[] = [];
           const details: LogEntry[] = [];
+
           if (prev) {
             if (prev.name !== service.name) changes.push(`nombre → ${service.name}`);
             if (prev.price !== service.price) {
@@ -549,11 +595,24 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
       replaceServices: (services, summary) =>
         gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","editEstado","agregarServicio","eliminarServicio"])(() => {
+          // Se vuelve a validar campo por campo: la interfaz nunca es la única barrera.
+          let safe = services as Service[];
+          if (!isAdmin && clientSession) {
+            const byId = new Map(catalog.services.map((s) => [s.id, s]));
+            safe = services
+              .filter((s) => byId.has(s.id) || can("agregarServicio"))
+              .map((s) => sanitizeService(s, byId.get(s.id)) as Service);
+            if (!can("eliminarServicio")) {
+              const kept = new Set(safe.map((s) => s.id));
+              for (const old of catalog.services) if (!kept.has(old.id)) safe.push(old);
+            }
+          }
           mutate(
-            (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
+            (c) => ({ ...c, services: safe.map((s, i) => ({ ...s, sortIndex: i })) }),
             entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
           );
         }),
+
       duplicateService: (id) =>
         gp(["agregarServicio"])(() => {
           const found = catalog.services.find((s) => s.id === id);

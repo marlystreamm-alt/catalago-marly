@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, KeyRound, LogOut, Plus, Store, UserCog } from "lucide-react";
+import { AlertCircle, Copy, KeyRound, LogOut, Plus, Store, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -389,25 +389,44 @@ export function ClientAccessDialog() {
 
 /** Botón "Mi menú": entrada de clientes con su clave. */
 export function ClientMenuButton() {
-  const { isAdmin, isClient, clientSession, clientLogin, clientLogout } = useCatalogStore();
+  const { isAdmin, isClient, clientSession, clientLogin, clientLogout, catalog } = useCatalogStore();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) setError("");
+  }, [open]);
 
   if (isAdmin) return null;
 
   if (isClient) {
     return (
-      <Button variant="secondary" size="sm" onClick={clientLogout}>
+      <Button variant="secondary" size="sm" className="h-10 rounded-full px-4" onClick={clientLogout}>
         <LogOut className="size-4" />
-        Salir de {clientSession?.business || "mi menú"}
+        <span className="max-w-[9rem] truncate">
+          Salir de {clientSession?.business || "mi menú"}
+        </span>
       </Button>
     );
   }
 
+  const waNumber = (catalog.whatsappNumber || "").replace(/\D/g, "");
+  const askLink = waNumber
+    ? `https://wa.me/${waNumber}?text=${encodeURIComponent(
+        "Hola MA², quiero solicitar una clave de acceso para mi menú.",
+      )}`
+    : null;
+
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-10 rounded-full border-primary/30 px-4 font-semibold text-primary"
+        onClick={() => setOpen(true)}
+      >
         <Store className="size-4" />
         Mi menú
       </Button>
@@ -424,11 +443,14 @@ export function ClientMenuButton() {
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
-              const ok = await clientLogin(code);
+              setError("");
+              const res = await clientLogin(code);
               setBusy(false);
-              if (ok) {
+              if (res.ok) {
                 setCode("");
                 setOpen(false);
+              } else {
+                setError(res.error ?? "No pudimos validar tu clave");
               }
             }}
           >
@@ -438,9 +460,59 @@ export function ClientMenuButton() {
                 id="client-code"
                 value={code}
                 placeholder="MA2-XXXX-XXXX"
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                aria-invalid={!!error}
+                className={error ? "border-destructive" : undefined}
+                onChange={(e) => {
+                  setCode(e.target.value.toUpperCase());
+                  if (error) setError("");
+                }}
               />
             </div>
+
+            {error ? (
+              <div
+                role="alert"
+                className="grid gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <p className="flex items-start gap-2 text-sm font-semibold text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  {error}
+                </p>
+                <p className="text-[12px] leading-snug text-muted-foreground">
+                  Revisa que la clave esté completa (formato MA2-XXXX-XXXX) y sin espacios. Si ya
+                  venció o sigue sin funcionar, pide a MA² que te renueve el acceso.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-full text-xs"
+                    onClick={() => {
+                      setCode("");
+                      setError("");
+                      document.getElementById("client-code")?.focus();
+                    }}
+                  >
+                    Volver a intentar
+                  </Button>
+                  {askLink ? (
+                    <Button
+                      asChild
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 rounded-full text-xs"
+                    >
+                      <a href={askLink} target="_blank" rel="noreferrer">
+                        Solicitar acceso por WhatsApp
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <DialogFooter>
               <Button type="submit" disabled={busy}>
                 {busy ? "Validando…" : "Entrar"}
@@ -452,3 +524,4 @@ export function ClientMenuButton() {
     </>
   );
 }
+

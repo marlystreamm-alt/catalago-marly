@@ -526,24 +526,26 @@ function CatalogPage() {
         </section>
 
         {isAdmin || canEdit ? (
-          <section className="card-soft mt-3 rounded-2xl border border-border bg-card p-3">
+          <section className="card-soft mt-3 overflow-hidden rounded-3xl border border-border bg-card">
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-2 text-left"
+              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left active:bg-muted/60"
               aria-expanded={toolsOpen}
               onClick={() => setPrefs({ toolsOpen: !toolsOpen })}
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Wrench className="size-4 text-primary" />
+                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10">
+                  <Wrench className="size-4 text-primary" />
+                </span>
                 Herramientas
               </span>
               <ChevronDown
-                className={`size-4 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
+                className={`size-4 shrink-0 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
               />
             </button>
 
             {toolsOpen ? (
-              <div className="mt-3 grid gap-4 border-t border-border pt-3">
+              <div className="grid gap-4 border-t border-border px-3 pb-4 pt-3 sm:px-4">
                 {isAdmin ? (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Estadísticas">
                     <StatCard label="Total" value={stats.total} />
@@ -554,16 +556,13 @@ function CatalogPage() {
                   </div>
                 ) : null}
 
-                <div className="grid gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <div className="grid gap-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Filtros y vista
                   </p>
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger
-                        className="min-w-[10rem] flex-1"
-                        aria-label="Filtrar por categoría"
-                      >
+                      <SelectTrigger className="h-11 w-full" aria-label="Filtrar por categoría">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -576,8 +575,8 @@ function CatalogPage() {
                       </SelectContent>
                     </Select>
                     <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                      <SelectTrigger className="min-w-[10rem] flex-1" aria-label="Ordenar servicios">
-                        <ArrowUpDown className="size-4 text-muted-foreground" />
+                      <SelectTrigger className="h-11 w-full" aria-label="Ordenar servicios">
+                        <ArrowUpDown className="size-4 shrink-0 text-muted-foreground" />
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -592,7 +591,7 @@ function CatalogPage() {
                         setPrefs({ viewMode: v as "tarjetas" | "tabla" | "lista" })
                       }
                     >
-                      <SelectTrigger className="min-w-[9rem] flex-1" aria-label="Vista del catálogo">
+                      <SelectTrigger className="h-11 w-full" aria-label="Vista del catálogo">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -601,53 +600,56 @@ function CatalogPage() {
                         {isAdmin ? <SelectItem value="tabla">Vista tabla</SelectItem> : null}
                       </SelectContent>
                     </Select>
+                  </div>
 
-                    <div className="flex items-center gap-2">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <Label htmlFor="only-fav" className="flex items-center gap-1.5 text-sm">
+                        <Star className="size-3.5" />
+                        Favoritos
+                      </Label>
                       <Switch
                         id="only-fav"
                         checked={onlyFavorites}
                         onCheckedChange={setOnlyFavorites}
                       />
-                      <Label htmlFor="only-fav" className="flex items-center gap-1 text-sm">
-                        <Star className="size-3.5" />
-                        Favoritos
-                      </Label>
                     </div>
                     {isAdmin ? (
                       <>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="show-detail" className="text-sm">
+                            Ver detalles
+                          </Label>
                           <Switch
                             id="show-detail"
                             checked={showDetail}
                             onCheckedChange={(v) => setPrefs({ showDetail: v })}
                           />
-                          <Label htmlFor="show-detail" className="text-sm">
-                            Ver detalles
-                          </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="show-share" className="text-sm">
+                            Compartir
+                          </Label>
                           <Switch
                             id="show-share"
                             checked={showShare}
                             onCheckedChange={(v) => setPrefs({ showShare: v })}
                           />
-                          <Label htmlFor="show-share" className="text-sm">
-                            Compartir
-                          </Label>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                          <Label htmlFor="only-active" className="text-sm">
+                            Solo activos
+                          </Label>
                           <Switch
                             id="only-active"
                             checked={onlyActive}
                             onCheckedChange={setOnlyActive}
                           />
-                          <Label htmlFor="only-active" className="text-sm">
-                            Solo activos
-                          </Label>
                         </div>
                       </>
                     ) : null}
                   </div>
+
 
                   {activeFilters.length ? (
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -680,10 +682,11 @@ function CatalogPage() {
 
                 {isAdmin ? (
                   <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Compartir y exportar
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
+
                       <Button size="sm" variant="outline" onClick={shareLink}>
                         <Link2 className="size-4" />
                         Compartir enlace con filtros
@@ -730,10 +733,11 @@ function CatalogPage() {
 
                 {isAdmin ? (
                   <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Administrar
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
+
                       <Button size="sm" onClick={openNew}>
                         <Plus className="size-4" />
                         Agregar servicio
