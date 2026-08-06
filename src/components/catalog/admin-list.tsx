@@ -209,6 +209,39 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
   );
 }
 
+/** Campos que la clienta puede tocar, según sus permisos. */
+const EDITABLE_FIELDS: { perm: Parameters<ReturnType<typeof useCatalogStore>["can"]>[0]; label: string }[] = [
+  { perm: "editNombre", label: "Nombre" },
+  { perm: "editPrecio", label: "Precio" },
+  { perm: "editDescripcion", label: "Descripción" },
+  { perm: "editImagen", label: "Imagen" },
+  { perm: "editDetalles", label: "Detalles" },
+  { perm: "editEstado", label: "Activar/ocultar" },
+  { perm: "agregarServicio", label: "Agregar" },
+  { perm: "eliminarServicio", label: "Eliminar" },
+];
+
+/** Etiqueta pequeña que marca un campo como editable o bloqueado. */
+function FieldFlag({ editable, show }: { editable: boolean; show: boolean }) {
+  if (!show) return null;
+  return editable ? (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+      <Pencil className="size-3" />
+      Editable
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      <Lock className="size-3" />
+      Bloqueado
+    </span>
+  );
+}
+
+/** Estilo de campo bloqueado: fondo apagado y borde punteado. */
+const lockedStyle = (editable: boolean) =>
+  editable ? "" : "border-dashed bg-muted/60 text-muted-foreground";
+
+
 export function AdminList() {
   const { catalog, canEdit, can, replaceServices, isClient } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
