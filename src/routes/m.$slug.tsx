@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { MapPin, MessageCircle, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { menuPublicLoad } from "@/lib/menus/public.functions";
-import type { MenuItem } from "@/lib/menus/types";
+import type { MenuData, MenuItem } from "@/lib/menus/types";
 
 export const Route = createFileRoute("/m/$slug")({
   loader: ({ params }) => menuPublicLoad({ data: { slug: params.slug } }),
@@ -67,12 +67,16 @@ function MenuMissing() {
 }
 
 function PublicMenu() {
-  const data = Route.useLoaderData();
+  const data = Route.useLoaderData() as MenuData | null;
   if (!data) return <MenuMissing />;
 
   const { business, categories, items } = data;
   const groups = [
-    ...categories.map((c) => ({ id: c.id, name: c.name, list: items.filter((i) => i.categoryId === c.id) })),
+    ...categories.map((c) => ({
+      id: c.id,
+      name: c.name,
+      list: items.filter((i) => i.categoryId === c.id),
+    })),
     { id: "none", name: "Más del menú", list: items.filter((i) => !i.categoryId) },
   ].filter((g) => g.list.length > 0);
 
