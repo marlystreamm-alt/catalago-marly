@@ -89,6 +89,19 @@ interface StoreValue {
     next: string,
   ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
   logout: () => void;
+  /** Sesión de cliente ("Mi menú") con permisos limitados. */
+  clientSession: ClientAccess | null;
+  isClient: boolean;
+  /** Permisos efectivos: el administrador puede todo. */
+  can: (perm: Permission) => boolean;
+  /** Puede realizar alguna edición (administrador o cliente con permisos). */
+  canEdit: boolean;
+  clients: ClientAccess[];
+  saveClient: (client: ClientAccess) => void;
+  deleteClient: (id: string) => void;
+  clientLogin: (code: string) => Promise<boolean>;
+  clientLogout: () => void;
+
   prefs: CatalogPrefs;
   setPrefs: (patch: Partial<CatalogPrefs>) => void;
   resetPrefs: () => void;
