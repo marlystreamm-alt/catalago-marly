@@ -776,6 +776,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     mutate,
     visibleCatalogIds,
     allCatalogIds,
+    clients,
+    clientSession,
+
   ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
