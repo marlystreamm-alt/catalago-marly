@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
+  Wrench,
 
   FileDown,
   FileText,
@@ -57,6 +59,10 @@ import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
 import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
+import {
+  ClientAccessDialog,
+  ClientMenuButton,
+} from "@/components/catalog/client-access-dialog";
 
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
