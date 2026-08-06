@@ -18,9 +18,17 @@ import {
   rotatePassword,
   verifyPassword,
 } from "./auth";
+import {
+  findClientByCode,
+  loadClients,
+  saveClients,
+  type ClientAccess,
+  type Permission,
+} from "./client-access";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createEmptyCatalog, createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
+
 import {
   CATALOG_IDS,
   MAX_LOG_ENTRIES,
