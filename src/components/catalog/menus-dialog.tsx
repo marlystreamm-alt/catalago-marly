@@ -42,6 +42,7 @@ const money = (n: number) =>
 const errText = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
 
 export function MenusDialog() {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(getSavedCode());
   const [unlocked, setUnlocked] = useState(false);
