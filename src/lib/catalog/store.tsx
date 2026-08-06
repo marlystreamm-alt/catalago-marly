@@ -475,7 +475,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
       saveService: (service) =>
-        gp([...["editNombre","editPrecio","editDescripcion","editImagen","editDetalles"],"agregarServicio"])(() => {
+        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","agregarServicio"])(() => {
           const prev = service.id ? catalog.services.find((s) => s.id === service.id) : undefined;
           const changes: string[] = [];
           const details: LogEntry[] = [];
@@ -548,7 +548,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
 
       replaceServices: (services, summary) =>
-        gp([...["editNombre","editPrecio","editDescripcion","editImagen","editDetalles"],"editEstado","agregarServicio","eliminarServicio"])(() => {
+        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","editEstado","agregarServicio","eliminarServicio"])(() => {
           mutate(
             (c) => ({ ...c, services: services.map((s, i) => ({ ...s, sortIndex: i })) }),
             entry("edicion", catalog.name, summary ?? "Se guardaron cambios desde la vista lista"),
