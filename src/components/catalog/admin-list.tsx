@@ -210,7 +210,7 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
 }
 
 export function AdminList() {
-  const { catalog, canEdit, can, replaceServices } = useCatalogStore();
+  const { catalog, canEdit, can, replaceServices, isClient } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
   const [rows, setRows] = useState<Service[]>(() => fromCatalog(catalog.services));
   const [dirty, setDirty] = useState(false);
