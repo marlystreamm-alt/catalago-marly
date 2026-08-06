@@ -215,6 +215,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           : "Necesitas iniciar sesión como administrador",
       );
     };
+    /** Azúcar: gp(["editPrecio"])(() => { … }) */
+    const gp = (perms: Permission[]) => (fn: () => void) => guard(fn, perms);
+
+
 
 
     return {
