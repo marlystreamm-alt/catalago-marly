@@ -786,11 +786,13 @@ export function AdminList() {
 
                   {can("verDescripciones") ? (
                   <label className="mt-2 grid gap-1 text-xs">
-                    <span className="font-medium text-muted-foreground">
+                    <span className="flex items-center gap-2 font-medium text-muted-foreground">
                       {tab === "tramites" ? "Descripción corta" : "Descripción"}
+                      <FieldFlag editable={can("editDescripcion")} show={isClient} />
                     </span>
                     <Textarea
                       rows={3}
+                      className={lockedStyle(can("editDescripcion"))}
                       value={s.description}
                       placeholder={
                         findPlatform(s.name)?.description ??
@@ -799,6 +801,7 @@ export function AdminList() {
                       readOnly={!can("editDescripcion")}
                       onChange={(e) => patch(s.id, { description: e.target.value })}
                     />
+
                     {findPlatform(s.name) && !s.description.trim() ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[11px] text-muted-foreground">
