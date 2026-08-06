@@ -440,7 +440,10 @@ function CatalogPage() {
                 {catalog.subtitle}
               </p>
             </div>
-            <AdminBar />
+            <div className="flex flex-wrap items-center gap-2">
+              <ClientMenuButton />
+              <AdminBar />
+            </div>
           </div>
 
           <nav
@@ -750,7 +753,7 @@ function CatalogPage() {
         ) : null}
 
 
-        {isAdmin && viewMode !== "tarjetas" ? (
+        {canEdit && viewMode !== "tarjetas" ? (
           <div className="mt-4">
             <Button
               variant="outline"
@@ -769,7 +772,7 @@ function CatalogPage() {
             <ServiceListSkeleton count={5} />
           ) : refreshing ? (
             <ServiceListSkeleton count={3} label="Actualizando resultados…" />
-          ) : isAdmin && viewMode === "lista" ? (
+          ) : canEdit && viewMode === "lista" ? (
             <AdminList />
           ) : isAdmin && viewMode === "tabla" ? (
             <ServiceTable
