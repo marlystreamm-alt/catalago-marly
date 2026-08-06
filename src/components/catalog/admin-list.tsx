@@ -210,7 +210,7 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
 }
 
 export function AdminList() {
-  const { catalog, isAdmin, replaceServices } = useCatalogStore();
+  const { catalog, canEdit, can, replaceServices } = useCatalogStore();
   const [tab, setTab] = useState<TabKey>("perfiles");
   const [rows, setRows] = useState<Service[]>(() => fromCatalog(catalog.services));
   const [dirty, setDirty] = useState(false);
@@ -273,7 +273,7 @@ export function AdminList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, catalog.categories]);
 
-  if (!isAdmin) return null;
+  if (!canEdit) return null;
 
   const patch = (id: string, changes: Partial<Service>) => {
     setDirty(true);
@@ -433,28 +433,35 @@ export function AdminList() {
             <SelectItem value="ocultos">Solo desactivados</SelectItem>
           </SelectContent>
         </Select>
-        <Button size="sm" variant="outline" onClick={addRow}>
-          <Plus className="size-4" />
-          Agregar fila
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!selected.length}
-          onClick={() => setActive(selected, true)}
-        >
-          <Eye className="size-4" />
-          Activar
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={!selected.length}
-          onClick={() => setActive(selected, false)}
-        >
-          <EyeOff className="size-4" />
-          Desactivar
-        </Button>
+        {can("agregarServicio") ? (
+          <Button size="sm" variant="outline" onClick={addRow}>
+            <Plus className="size-4" />
+            Agregar fila
+          </Button>
+        ) : null}
+        {can("editEstado") ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!selected.length}
+              onClick={() => setActive(selected, true)}
+            >
+              <Eye className="size-4" />
+              Activar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!selected.length}
+              onClick={() => setActive(selected, false)}
+            >
+              <EyeOff className="size-4" />
+              Desactivar
+            </Button>
+          </>
+        ) : null}
+        {can("eliminarServicio") ? (
         <ConfirmButton
           title={`¿Eliminar ${selected.length} servicio(s)?`}
           description="Se quitarán de la lista y del catálogo al guardar los cambios."
@@ -466,6 +473,7 @@ export function AdminList() {
             Eliminar seleccionados
           </Button>
         </ConfirmButton>
+        ) : null}
         <Button size="sm" variant="outline" onClick={() => setShowPreview((v) => !v)}>
           {showPreview ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           {showPreview ? "Ocultar vista previa" : "Ver vista previa"}
@@ -534,16 +542,20 @@ export function AdminList() {
                   aria-label="Nombre"
                   placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
                   value={s.name}
+                  readOnly={!can("editNombre")}
                   onChange={(e) => patch(s.id, { name: e.target.value })}
                 />
-                <Input
-                  className="h-9 w-24 shrink-0 text-right font-semibold text-primary"
-                  type="text"
-                  aria-label="Precio"
-                  placeholder="$45"
-                  value={s.priceText ?? ""}
-                  onChange={(e) => patch(s.id, { priceText: e.target.value })}
-                />
+                {can("verPrecios") ? (
+                  <Input
+                    className="h-9 w-24 shrink-0 text-right font-semibold text-primary"
+                    type="text"
+                    aria-label="Precio"
+                    placeholder="$45"
+                    value={s.priceText ?? ""}
+                    readOnly={!can("editPrecio")}
+                    onChange={(e) => patch(s.id, { priceText: e.target.value })}
+                  />
+                ) : null}
                 <Button
                   size="icon"
                   variant="ghost"
@@ -561,16 +573,20 @@ export function AdminList() {
               {expanded.includes(s.id) ? (
                 <>
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                    <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+                    {can("editImagen") ? (
+                      <ImageField value={s.icon ?? ""} onChange={(icon) => patch(s.id, { icon })} />
+                    ) : null}
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => patch(s.id, { active: !s.active })}
-                    >
-                      {s.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      {s.active ? "Desactivar" : "Activar"}
-                    </Button>
+                    {can("editEstado") ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => patch(s.id, { active: !s.active })}
+                      >
+                        {s.active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        {s.active ? "Desactivar" : "Activar"}
+                      </Button>
+                    ) : null}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -587,14 +603,17 @@ export function AdminList() {
                     >
                       <ArrowDown className="size-4" />
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="Duplicar fila"
-                      onClick={() => duplicateRow(s.id)}
-                    >
-                      <Copy className="size-4" />
-                    </Button>
+                    {can("agregarServicio") ? (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Duplicar fila"
+                        onClick={() => duplicateRow(s.id)}
+                      >
+                        <Copy className="size-4" />
+                      </Button>
+                    ) : null}
+                    {can("eliminarServicio") ? (
                     <ConfirmButton
                       title={`¿Eliminar ${s.name || "este servicio"}?`}
                       description="Se quitará al guardar los cambios."
@@ -605,8 +624,10 @@ export function AdminList() {
                         <Trash2 className="size-4 text-destructive" />
                       </Button>
                     </ConfirmButton>
+                    ) : null}
                   </div>
 
+                  {can("editDetalles") ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     {tab === "tramites" ? (
                       <label className="grid gap-1 text-xs">
@@ -685,7 +706,9 @@ export function AdminList() {
                       />
                     ) : null}
                   </div>
+                  ) : null}
 
+                  {can("verDescripciones") ? (
                   <label className="mt-2 grid gap-1 text-xs">
                     <span className="font-medium text-muted-foreground">
                       {tab === "tramites" ? "Descripción corta" : "Descripción"}
@@ -697,6 +720,7 @@ export function AdminList() {
                         findPlatform(s.name)?.description ??
                         "Escribe la descripción que verán tus clientes…"
                       }
+                      readOnly={!can("editDescripcion")}
                       onChange={(e) => patch(s.id, { description: e.target.value })}
                     />
                     {findPlatform(s.name) && !s.description.trim() ? (
@@ -731,6 +755,7 @@ export function AdminList() {
                       </Button>
                     ) : null}
                   </label>
+                  ) : null}
                 </>
               ) : null}
             </article>
