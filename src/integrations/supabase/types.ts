@@ -14,6 +14,140 @@ export type Database = {
   }
   public: {
     Tables: {
+      menu_businesses: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          id: string
+          name: string
+          notes: string
+          owner_name: string
+          sort_index: number
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string
+          owner_name?: string
+          sort_index?: number
+          updated_at?: string
+          whatsapp?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string
+          owner_name?: string
+          sort_index?: number
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
+      menu_categories: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_index: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_index?: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_categories_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_items: {
+        Row: {
+          available: boolean
+          business_id: string
+          category_id: string | null
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          name: string
+          price: number
+          price_text: string
+          sort_index: number
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          business_id: string
+          category_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          price?: number
+          price_text?: string
+          sort_index?: number
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          business_id?: string
+          category_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          name?: string
+          price?: number
+          price_text?: string
+          sort_index?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "menu_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_subscriptions: {
         Row: {
           business_name: string

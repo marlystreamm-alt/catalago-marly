@@ -59,6 +59,8 @@ import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
 import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
+import { MenusDialog } from "@/components/catalog/menus-dialog";
+
 import {
   ClientAccessDialog,
   ClientMenuButton,
@@ -474,6 +476,8 @@ function CatalogPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               <CatalogManager />
               <NotificationsDialog />
+              <MenusDialog />
+
               
             </div>
           ) : null}
