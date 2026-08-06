@@ -13,40 +13,36 @@ Ya lo confirmé revisando ambos proyectos: **este proyecto es MA² Connect** (lo
 
 O sea: MA² Connect es tu catálogo de servicios; MA² Menús es un sistema de menús para otros negocios. Se pueden juntar, pero es una fusión de dos apps distintas, no de dos copias.
 
-## Cómo quedaría unido
+## Cómo quedaría unido (solo administrador)
 
-MA² Connect se vuelve la app única, con una sección nueva de Menús de negocios:
+Menús entra como un **apartado exclusivo del modo administrador**. El público no lo ve ni puede llegar a él: sigue viendo únicamente el catálogo tal como está hoy.
 
 ```text
 MA² Connect (esta app)
-├── Catálogos          -> lo de hoy, sin cambios
-└── Negocios (nuevo)   -> lista de negocios + editor de menú
-    └── /m/{negocio}   -> menú público de cada negocio
+├── Catálogo público      -> lo de hoy, sin cambios
+└── Modo administrador
+    ├── Catálogos          -> lo de hoy
+    └── Menús (nuevo)      -> negocios + editor de menú
 ```
+
+El botón "Menús" aparece solo cuando la sesión de administrador está activa, junto a las demás herramientas. Si alguien escribe la dirección a mano sin ser administrador, se le regresa al catálogo.
 
 ## Plan por etapas
 
 **Etapa 1 — Base de datos**
-Crear en el backend de este proyecto las tablas de negocios, categorías de menú y platillos, con sus permisos y protección de acceso. Nada de lo actual (catálogos, pedidos, avisos) se toca.
+Crear en el backend de este proyecto las tablas de negocios, categorías de menú y platillos, con permisos cerrados: nada de lectura pública, todo pasa por el servidor validando que sea el administrador. Nada de lo actual (catálogos, pedidos, avisos) se toca.
 
-**Etapa 2 — Panel de negocios**
-Traer las pantallas de MA² Menús: lista de negocios, alta/edición de negocio, editor de menú (categorías, platillos, precio, foto, disponible) y ajustes de WhatsApp. Se adaptan al diseño actual lila/aqua de esta app, no al suyo.
+**Etapa 2 — Apartado Menús en el administrador**
+Traer las pantallas de MA² Menús: lista de negocios, alta/edición de negocio y editor de menú (categorías, platillos, precio, foto, disponible). Se adaptan al diseño actual lila/aqua de esta app, no al suyo. Todo vive dentro del panel de administrador.
 
-**Etapa 3 — Página pública del menú**
-Crear la ruta `/m/{negocio}` con el menú público de cada negocio y su botón de pedido por WhatsApp.
-
-**Etapa 4 — Accesos**
-Unificar la entrada: el administrador entra con su contraseña actual, y los dueños de negocio entran con su clave desde el botón "Mi menú" que ya existe aquí, reutilizando los permisos que ya tienes.
-
-**Etapa 5 — Traer tus datos**
+**Etapa 3 — Traer tus datos**
 Los negocios y menús que ya tengas cargados en MA² Menús viven en la base de datos de ese proyecto, y esa base no se puede copiar desde aquí. Los pasamos con un respaldo: en MA² Menús exportas o me pasas la lista, y aquí los cargo. Si son pocos negocios es rápido; si son muchos te preparo una pantalla de importación.
 
 ## Antes de empezar, dime
 
-1. ¿Cuántos negocios y menús tienes cargados hoy en MA² Menús? Eso define si la migración de datos es a mano o con importador.
-2. ¿Quieres las 4 primeras etapas de una vez, o empezamos solo por el panel de negocios y el menú público y lo demás después?
+1. Los menús de cada negocio, ¿los usas solo tú desde el administrador, o alguna vez tendrán que verlos los clientes de esos negocios? Si es solo para ti, no hago ninguna página pública de menú.
+2. ¿Cuántos negocios y menús tienes cargados hoy en MA² Menús? Eso define si la migración de datos es a mano o con importador.
 
-Sugerencia: hacerlo por etapas. Es mucho trabajo para un solo cambio y así puedes revisar cada parte funcionando antes de seguir.
 
 ## Detalles técnicos
 
