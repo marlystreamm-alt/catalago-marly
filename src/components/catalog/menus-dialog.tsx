@@ -486,6 +486,37 @@ export function MenusDialog() {
                     onBlur={() => void patchBusiness(business)}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="biz-expires">Vence el</Label>
+                  <Input
+                    id="biz-expires"
+                    type="date"
+                    value={business.expiresOn ?? ""}
+                    onChange={(e) =>
+                      setBusinesses((prev) =>
+                        prev.map((b) =>
+                          b.id === business.id ? { ...b, expiresOn: e.target.value || null } : b,
+                        ),
+                      )
+                    }
+                    onBlur={() => void patchBusiness(business)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="biz-logo">Logo (URL)</Label>
+                  <Input
+                    id="biz-logo"
+                    value={business.logoUrl}
+                    onChange={(e) =>
+                      setBusinesses((prev) =>
+                        prev.map((b) =>
+                          b.id === business.id ? { ...b, logoUrl: e.target.value } : b,
+                        ),
+                      )
+                    }
+                    onBlur={() => void patchBusiness(business)}
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="biz-slug">Enlace público</Label>
@@ -503,12 +534,12 @@ export function MenusDialog() {
                 {business.slug ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <a
-                      href={`/m/${business.slug}`}
+                      href={`/${business.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="min-w-0 break-all text-xs text-primary underline"
                     >
-                      {`${origin}/m/${business.slug}`}
+                      {`${origin}/${business.slug}`}
                     </a>
                     <Button
                       type="button"
@@ -516,7 +547,7 @@ export function MenusDialog() {
                       variant="outline"
                       className="rounded-xl"
                       onClick={() => {
-                        void navigator.clipboard.writeText(`${origin}/m/${business.slug}`);
+                        void navigator.clipboard.writeText(`${origin}/${business.slug}`);
                         toast.success("Enlace copiado");
                       }}
                     >
@@ -550,9 +581,107 @@ export function MenusDialog() {
                   checked={business.active}
                   onCheckedChange={(v) => void patchBusiness({ ...business, active: v })}
                 />
-                <Label htmlFor="biz-active">Negocio activo</Label>
+                <Label htmlFor="biz-active">Catálogo activo</Label>
+                <Badge variant="secondary" className="ml-auto capitalize">
+                  {businessStatus(business)}
+                </Badge>
               </div>
             </section>
+
+            <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
+              <h3 className="text-sm font-semibold">Lo que ve el público</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {VIEW_FEATURES.map((k) => (
+                  <label key={k} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={business.features[k]}
+                      onCheckedChange={(v) => void toggleFeature(business, k, v)}
+                      aria-label={FEATURE_LABELS[k]}
+                    />
+                    <span className="min-w-0 flex-1">{FEATURE_LABELS[k]}</span>
+                  </label>
+                ))}
+              </div>
+              <h3 className="pt-1 text-sm font-semibold">Lo que el dueño puede editar</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {EDIT_FEATURES.map((k) => (
+                  <label key={k} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={business.features[k]}
+                      onCheckedChange={(v) => void toggleFeature(business, k, v)}
+                      aria-label={FEATURE_LABELS[k]}
+                    />
+                    <span className="min-w-0 flex-1">{FEATURE_LABELS[k]}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
+              <h3 className="text-sm font-semibold">Acceso del dueño</h3>
+              <p className="text-xs text-muted-foreground">
+                Entra en {origin}/acceso con su enlace ({business.slug || "sin enlace"}) y la
+                contraseña temporal que le generes. Él la cambia al entrar.
+              </p>
+              {newPassword?.id === business.id ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary p-2">
+                  <code className="min-w-0 break-all text-sm font-semibold">
+                    {newPassword.value}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(newPassword.value);
+                      toast.success("Contraseña copiada");
+                    }}
+                  >
+                    <Copy className="mr-1 size-3.5" />
+                    Copiar
+                  </Button>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void generateAccess(business)}
+                >
+                  {business.hasAccess ? "Generar nueva contraseña" : "Generar contraseña"}
+                </Button>
+                {business.hasAccess ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() =>
+                        void patchAccess(business, { suspended: !business.accessSuspended })
+                      }
+                    >
+                      {business.accessSuspended ? "Reactivar acceso" : "Suspender acceso"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => void patchAccess(business, { revoke: true })}
+                    >
+                      Quitar acceso
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {business.hasAccess
+                  ? `${business.accessSuspended ? "Suspendido" : "Activo"}${
+                      business.accessTemp ? " · contraseña temporal sin cambiar" : ""
+                    }`
+                  : "Todavía no tiene contraseña."}
+              </p>
+            </section>
+
 
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-2">
