@@ -469,6 +469,16 @@ export function ClientMenuButton() {
               />
             </div>
 
+            <p className="text-[12px] leading-snug text-muted-foreground">
+              ¿Tienes tu propio catálogo hecho con MA² (tu enlace martgor.shop)?{" "}
+              <a href="/acceso" className="font-semibold text-primary underline">
+                Entra aquí con tu contraseña
+              </a>
+              .
+            </p>
+
+
+
             {error ? (
               <div
                 role="alert"
