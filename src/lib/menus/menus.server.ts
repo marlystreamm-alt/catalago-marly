@@ -244,7 +244,9 @@ export async function makeOwnerToken(businessId: string, actorName = "Dueño") {
   return `${payload}.${await sign(payload)}`;
 }
 
-export async function readOwnerToken(token: string): Promise<{ id: string; actor: string }> {
+export async function readOwnerToken(
+  token: string,
+): Promise<{ id: string; actor: string; kind: "dueno" | "equipo" }> {
   const raw = token ?? "";
   const cut = raw.lastIndexOf(".");
   if (cut < 1) throw new Error("Sesión no válida, vuelve a entrar");
@@ -256,14 +258,16 @@ export async function readOwnerToken(token: string): Promise<{ id: string; actor
   const actor = parts.length === 3 ? decodeURIComponent(parts[1] ?? "") : "Dueño";
   const exp = parts.length === 3 ? parts[2] : payload.split(".")[1];
   if (!id || Number(exp) < Date.now()) throw new Error("Tu sesión expiró, vuelve a entrar");
-  return { id, actor: actor || "Dueño" };
+  const kind = actor.startsWith("equipo:") ? "equipo" : "dueno";
+  const name = actor.replace(/^(equipo|dueno):/, "");
+  return { id, actor: name || "Dueño", kind };
 }
 
 /** Carga el negocio del dueño validando token, estado y vencimiento. */
 export async function requireOwnerCtx(
   token: string,
-): Promise<{ business: MenuBusiness; actor: string }> {
-  const { id, actor } = await readOwnerToken(token);
+): Promise<{ business: MenuBusiness; actor: string; kind: "dueno" | "equipo" }> {
+  const { id, actor, kind } = await readOwnerToken(token);
   const db = await admin();
   const { data } = await db.from("menu_businesses").select("*").eq("id", id).maybeSingle();
   if (!data) throw new Error("Negocio no encontrado");
@@ -272,7 +276,7 @@ export async function requireOwnerCtx(
   const status = businessStatus(business);
   if (status === "apagado") throw new Error("Tu catálogo está apagado");
   if (status === "vencido") throw new Error("Tu acceso venció");
-  return { business, actor };
+  return { business, actor, kind };
 }
 
 export async function requireOwner(token: string): Promise<MenuBusiness> {
@@ -339,7 +343,12 @@ export async function ownerLogin(slug: string, password: string) {
     field: "Entró al panel",
   });
 
-  return { token: await makeOwnerToken(business.id, actor), business, mustChange: temp, adminId };
+  return {
+    token: await makeOwnerToken(business.id, `${adminId ? "equipo" : "dueno"}:${actor}`),
+    business,
+    mustChange: temp,
+    adminId,
+  };
 }
 
 /* ------------------------------- Bitácora ------------------------------- */
