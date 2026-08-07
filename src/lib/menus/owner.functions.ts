@@ -98,10 +98,14 @@ export const ownerSaveBusiness = createServerFn({ method: "POST" })
       .eq("id", business.id);
     if (error) throw new Error(error.message);
     const changes: [string, string, string][] = [];
-    if (data.name.trim() !== business.name) changes.push(["Nombre", business.name, data.name.trim()]);
-    if (data.whatsapp !== business.whatsapp) changes.push(["WhatsApp", business.whatsapp, data.whatsapp]);
-    if (data.address !== business.address) changes.push(["Dirección", business.address, data.address]);
-    if (data.logoUrl !== business.logoUrl) changes.push(["Logo", business.logoUrl ? "sí" : "no", data.logoUrl ? "sí" : "no"]);
+    if (data.name.trim() !== business.name)
+      changes.push(["Nombre", business.name, data.name.trim()]);
+    if (data.whatsapp !== business.whatsapp)
+      changes.push(["WhatsApp", business.whatsapp, data.whatsapp]);
+    if (data.address !== business.address)
+      changes.push(["Dirección", business.address, data.address]);
+    if (data.logoUrl !== business.logoUrl)
+      changes.push(["Logo", business.logoUrl ? "sí" : "no", data.logoUrl ? "sí" : "no"]);
     for (const [field, before, after] of changes)
       await logAudit({
         businessId: business.id,
@@ -128,9 +132,8 @@ export const ownerSaveCategory = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }): Promise<MenuCategory> => {
-    const { requireOwnerCtx, requireFeature, rowToCategory, logAudit } = await import(
-      "./menus.server"
-    );
+    const { requireOwnerCtx, requireFeature, rowToCategory, logAudit } =
+      await import("./menus.server");
     const { business, actor, kind } = await requireOwnerCtx(data.token);
     requireFeature(business, "edit_categories");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

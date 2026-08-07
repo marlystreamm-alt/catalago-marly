@@ -8,7 +8,6 @@ import {
   ArrowUpDown,
   ChevronDown,
   Wrench,
-
   FileDown,
   FileText,
   History,
@@ -61,11 +60,7 @@ import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
 import { MenusDialog } from "@/components/catalog/menus-dialog";
 
-import {
-  ClientAccessDialog,
-  ClientMenuButton,
-} from "@/components/catalog/client-access-dialog";
-
+import { ClientAccessDialog, ClientMenuButton } from "@/components/catalog/client-access-dialog";
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
 
@@ -155,7 +150,6 @@ function CatalogPage() {
     viewMode,
     toolsOpen,
   } = prefs;
-
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
@@ -472,20 +466,13 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {isAdmin ? (
-              <>
-                <CatalogManager />
-                <NotificationsDialog />
-                <MenusDialog />
-              </>
-            ) : null}
-            <Button asChild variant="outline" size="sm" className="rounded-xl">
-              <a href="/acceso">Mi menú</a>
-            </Button>
-          </div>
-
-
+          {isAdmin ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <CatalogManager />
+              <NotificationsDialog />
+              <MenusDialog />
+            </div>
+          ) : null}
         </header>
 
         {!online ? (
@@ -658,7 +645,6 @@ function CatalogPage() {
                     ) : null}
                   </div>
 
-
                   {activeFilters.length ? (
                     <div className="flex flex-wrap items-center gap-1.5">
                       {activeFilters.map((f) => (
@@ -694,7 +680,6 @@ function CatalogPage() {
                       Compartir y exportar
                     </p>
                     <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-
                       <Button size="sm" variant="outline" onClick={shareLink}>
                         <Link2 className="size-4" />
                         Compartir enlace con filtros
@@ -745,7 +730,6 @@ function CatalogPage() {
                       Administrar
                     </p>
                     <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-
                       <Button size="sm" onClick={openNew}>
                         <Plus className="size-4" />
                         Agregar servicio
@@ -779,7 +763,6 @@ function CatalogPage() {
           </section>
         ) : null}
 
-
         {canEdit && viewMode !== "tarjetas" ? (
           <div className="mt-4">
             <Button
@@ -794,7 +777,6 @@ function CatalogPage() {
         ) : null}
 
         <div className="mt-5 grid min-w-0 max-w-full gap-6">
-
           {!hydrated ? (
             <ServiceListSkeleton count={5} />
           ) : refreshing ? (

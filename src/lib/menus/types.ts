@@ -128,6 +128,21 @@ export type MenuBackup = {
   }[];
 };
 
+/** Ficha de una versión guardada del respaldo de un negocio. */
+export type MenuBackupVersion = {
+  id: string;
+  businessId: string;
+  version: number;
+  /** De dónde salió: exportación manual, importación de archivo, restauración o automático. */
+  origin: "export" | "import" | "restore" | "auto";
+  label: string;
+  actorKind: "dueno" | "admin" | "equipo";
+  actorName: string;
+  categoriesCount: number;
+  itemsCount: number;
+  createdAt: string;
+};
+
 export type MenuCategory = {
   id: string;
   businessId: string;

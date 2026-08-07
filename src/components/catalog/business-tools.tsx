@@ -1,21 +1,40 @@
-/** Bitácora, respaldo JSON y administradores adicionales de un negocio vendido. */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Download, History, Loader2, Plus, Trash2, Upload, Users } from "lucide-react";
+/** Bitácora filtrable, respaldos versionados y administradores adicionales de un negocio vendido. */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Copy,
+  Download,
+  History,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   menusAddAdmin,
   menusAdminsList,
   menusAudit,
+  menusBackups,
   menusExport,
   menusImport,
+  menusRestoreBackup,
   menusSetAdmin,
   menusSetMultiAdmin,
 } from "@/lib/menus/menus.functions";
-import type { MenuAdmin, MenuAuditEntry, MenuBusiness } from "@/lib/menus/types";
+import type { MenuAdmin, MenuAuditEntry, MenuBackupVersion, MenuBusiness } from "@/lib/menus/types";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
 
@@ -30,6 +49,37 @@ const actorLabel: Record<string, string> = {
   equipo: "Equipo",
 };
 
+const originLabel: Record<string, string> = {
+  export: "Exportación",
+  import: "Importación",
+  restore: "Restauración",
+  auto: "Automático",
+};
+
+/** Clasifica un movimiento para poder filtrarlo por tipo de cambio. */
+function changeKind(e: MenuAuditEntry): string {
+  const t = `${e.action} ${e.field}`.toLowerCase();
+  if (t.includes("precio")) return "precio";
+  if (t.includes("disponib") || t.includes("activo")) return "activo";
+  if (t.includes("descrip") || t.includes("nombre") || t.includes("texto")) return "descripcion";
+  if (t.includes("foto") || t.includes("imagen") || t.includes("logo")) return "foto";
+  if (t.includes("categor")) return "categoria";
+  if (t.includes("respald") || t.includes("import") || t.includes("export")) return "respaldo";
+  if (t.includes("acceso") || t.includes("contrase") || t.includes("sesión")) return "acceso";
+  return "otros";
+}
+
+const kindLabel: Record<string, string> = {
+  precio: "Precio",
+  activo: "Disponibilidad",
+  descripcion: "Nombre y descripción",
+  foto: "Fotos",
+  categoria: "Categorías",
+  respaldo: "Respaldos",
+  acceso: "Accesos",
+  otros: "Otros",
+};
+
 export function BusinessTools({
   code,
   business,
@@ -41,21 +91,28 @@ export function BusinessTools({
 }) {
   const [audit, setAudit] = useState<MenuAuditEntry[]>([]);
   const [admins, setAdmins] = useState<MenuAdmin[]>([]);
+  const [backups, setBackups] = useState<MenuBackupVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [newAdmin, setNewAdmin] = useState("");
   const [shown, setShown] = useState<{ name: string; password: string } | null>(null);
+  const [fActor, setFActor] = useState("todos");
+  const [fKind, setFKind] = useState("todos");
+  const [fFrom, setFFrom] = useState("");
+  const [fTo, setFTo] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const businessId = business.id;
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, ad] = await Promise.all([
-        menusAudit({ data: { code, businessId, limit: 100 } }),
+      const [a, ad, bk] = await Promise.all([
+        menusAudit({ data: { code, businessId, limit: 300 } }),
         menusAdminsList({ data: { code, businessId } }),
+        menusBackups({ data: { code, businessId } }),
       ]);
       setAudit(a);
       setAdmins(ad);
+      setBackups(bk);
     } catch (e) {
       toast.error(errText(e));
     } finally {
@@ -67,6 +124,25 @@ export function BusinessTools({
     void refresh();
   }, [refresh]);
 
+  const actors = useMemo(
+    () => Array.from(new Set(audit.map((e) => e.actorName || actorLabel[e.actorKind] || "—"))),
+    [audit],
+  );
+
+  const filtered = useMemo(
+    () =>
+      audit.filter((e) => {
+        const name = e.actorName || actorLabel[e.actorKind] || "—";
+        if (fActor !== "todos" && name !== fActor) return false;
+        if (fKind !== "todos" && changeKind(e) !== fKind) return false;
+        const day = e.createdAt.slice(0, 10);
+        if (fFrom && day < fFrom) return false;
+        if (fTo && day > fTo) return false;
+        return true;
+      }),
+    [audit, fActor, fKind, fFrom, fTo],
+  );
+
   const exportJson = async () => {
     try {
       const backup = await menusExport({ data: { code, businessId } });
@@ -77,7 +153,8 @@ export function BusinessTools({
       a.download = `catalogo-${business.slug || businessId}-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Respaldo descargado");
+      toast.success("Respaldo descargado y guardado como versión");
+      await refresh();
     } catch (e) {
       toast.error(errText(e));
     }
@@ -89,8 +166,28 @@ export function BusinessTools({
     );
     try {
       const backup = JSON.parse(await file.text()) as unknown;
-      const res = await menusImport({ data: { code, businessId, replace, backup } });
-      toast.success(`Restaurado: ${res.items} productos, ${res.categories} categorías`);
+      const res = await menusImport({
+        data: { code, businessId, replace, origin: `archivo ${file.name}`, backup },
+      });
+      toast.success(`Restaurado: ${res.items} productos · cambios → ${res.resumen}`);
+      await refresh();
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  };
+
+  const restoreVersion = async (b: MenuBackupVersion) => {
+    if (
+      !window.confirm(
+        `¿Restaurar la versión v${b.version} (${b.itemsCount} productos)? Antes se guarda una versión automática con lo que tienes ahora.`,
+      )
+    )
+      return;
+    try {
+      const res = await menusRestoreBackup({
+        data: { code, businessId, backupId: b.id, replace: true },
+      });
+      toast.success(`Restaurado a v${b.version} · cambios → ${res.resumen}`);
       await refresh();
     } catch (e) {
       toast.error(errText(e));
@@ -241,12 +338,18 @@ export function BusinessTools({
       </section>
 
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
-        <h3 className="text-sm font-semibold">Respaldo de este catálogo</h3>
+        <h3 className="text-sm font-semibold">Respaldos de este catálogo</h3>
         <p className="text-xs text-muted-foreground">
-          Solo afecta a {business.name}; los demás negocios no se tocan.
+          Solo afecta a {business.name}. Cada exportación, importación y restauración queda guardada
+          como versión y anotada en el historial con su origen y resultado.
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => void exportJson()}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => void exportJson()}
+          >
             <Download className="mr-1 size-4" />
             Exportar JSON
           </Button>
@@ -271,6 +374,36 @@ export function BusinessTools({
             }}
           />
         </div>
+
+        {backups.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Todavía no hay versiones guardadas.</p>
+        ) : (
+          <ul className="max-h-64 space-y-2 overflow-y-auto">
+            {backups.map((b) => (
+              <li key={b.id} className="rounded-xl border border-border p-2 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold">v{b.version}</span>
+                  <Badge variant="secondary">{originLabel[b.origin] ?? b.origin}</Badge>
+                  <span className="text-muted-foreground">
+                    {b.itemsCount} productos · {b.categoriesCount} categorías
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  {b.label || "—"} · {when(b.createdAt)}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-1 rounded-xl"
+                  onClick={() => void restoreVersion(b)}
+                >
+                  <RotateCcw className="mr-1 size-3.5" />
+                  Restaurar a esta versión
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
@@ -284,16 +417,57 @@ export function BusinessTools({
             Actualizar
           </Button>
         </div>
-        {audit.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Todavía no hay movimientos.</p>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Select value={fActor} onValueChange={setFActor}>
+            <SelectTrigger aria-label="Filtrar por administrador">
+              <SelectValue placeholder="Quién" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los administradores</SelectItem>
+              {actors.map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={fKind} onValueChange={setFKind}>
+            <SelectTrigger aria-label="Filtrar por tipo de cambio">
+              <SelectValue placeholder="Tipo de cambio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los cambios</SelectItem>
+              {Object.entries(kindLabel).map(([k, label]) => (
+                <SelectItem key={k} value={k}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <label className="text-xs text-muted-foreground">
+            Desde
+            <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Hasta
+            <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} de {audit.length} movimientos
+        </p>
+
+        {filtered.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No hay movimientos con esos filtros.</p>
         ) : (
-          <ul className="max-h-64 space-y-2 overflow-y-auto">
-            {audit.map((e) => (
+          <ul className="max-h-72 space-y-2 overflow-y-auto">
+            {filtered.map((e) => (
               <li key={e.id} className="rounded-xl border border-border p-2 text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="font-semibold">{e.target}</span>
                   <Badge variant="secondary" className="capitalize">
-                    {e.action}
+                    {kindLabel[changeKind(e)] ?? e.action}
                   </Badge>
                   <span className="text-muted-foreground">
                     {actorLabel[e.actorKind] ?? e.actorKind}

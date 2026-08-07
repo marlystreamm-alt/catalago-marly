@@ -89,7 +89,9 @@ export function ClientAccessDialog() {
   };
 
   const setPerm = (key: keyof Permissions, value: boolean) =>
-    setDraft((prev) => (prev ? { ...prev, permissions: { ...prev.permissions, [key]: value } } : prev));
+    setDraft((prev) =>
+      prev ? { ...prev, permissions: { ...prev.permissions, [key]: value } } : prev,
+    );
 
   const submit = async () => {
     if (!draft) return;
@@ -389,7 +391,8 @@ export function ClientAccessDialog() {
 
 /** Botón "Mi menú": entrada de clientes con su clave. */
 export function ClientMenuButton() {
-  const { isAdmin, isClient, clientSession, clientLogin, clientLogout, catalog } = useCatalogStore();
+  const { isAdmin, isClient, clientSession, clientLogin, clientLogout, catalog } =
+    useCatalogStore();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -403,7 +406,12 @@ export function ClientMenuButton() {
 
   if (isClient) {
     return (
-      <Button variant="secondary" size="sm" className="h-10 rounded-full px-4" onClick={clientLogout}>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="h-10 rounded-full px-4"
+        onClick={clientLogout}
+      >
         <LogOut className="size-4" />
         <span className="max-w-[9rem] truncate">
           Salir de {clientSession?.business || "mi menú"}
@@ -469,6 +477,14 @@ export function ClientMenuButton() {
               />
             </div>
 
+            <p className="text-[12px] leading-snug text-muted-foreground">
+              ¿Tienes tu propio catálogo hecho con MA² (tu enlace martgor.shop)?{" "}
+              <a href="/acceso" className="font-semibold text-primary underline">
+                Entra aquí con tu contraseña
+              </a>
+              .
+            </p>
+
             {error ? (
               <div
                 role="alert"
@@ -524,4 +540,3 @@ export function ClientMenuButton() {
     </>
   );
 }
-
