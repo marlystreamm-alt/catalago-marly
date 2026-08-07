@@ -338,34 +338,78 @@ export function MenusDialog() {
               </p>
             ) : (
               <ul className="space-y-2">
-                {businesses.map((b) => (
-                  <li
-                    key={b.id}
-                    className="card-soft flex items-center gap-2 rounded-2xl border border-border bg-card p-3"
-                  >
-                    <Store className="size-4 shrink-0 text-primary" />
-                    <button
-                      type="button"
-                      onClick={() => void openMenu(b.id)}
-                      className="min-w-0 flex-1 text-left"
+                {businesses.map((b) => {
+                  const status = businessStatus(b);
+                  const c = counts[b.id] ?? { cats: 0, items: 0 };
+                  return (
+                    <li
+                      key={b.id}
+                      className="card-soft space-y-2 rounded-2xl border border-border bg-card p-3"
                     >
-                      <span className="block truncate text-sm font-semibold">{b.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {b.ownerName || "Sin dueño"} · {b.whatsapp || "sin WhatsApp"}
-                      </span>
-                    </button>
-                    {!b.active ? <Badge variant="secondary">Inactivo</Badge> : null}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0"
-                      aria-label={`Eliminar ${b.name}`}
-                      onClick={() => void removeBusiness(b.id)}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </li>
-                ))}
+                      <div className="flex items-center gap-2">
+                        <Store className="size-4 shrink-0 text-primary" />
+                        <button
+                          type="button"
+                          onClick={() => void openMenu(b.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-sm font-semibold">{b.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {b.ownerName || "Sin dueño"} · {b.whatsapp || "sin WhatsApp"}
+                          </span>
+                        </button>
+                        <Badge
+                          variant={status === "activo" ? "default" : "secondary"}
+                          className="shrink-0 capitalize"
+                        >
+                          {status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0"
+                          aria-label={`Eliminar ${b.name}`}
+                          onClick={() => void removeBusiness(b.id)}
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>
+                          {c.items} productos · {c.cats} categorías
+                        </span>
+                        <span>·</span>
+                        <span>{b.hasAccess ? "Clave entregada" : "Sin clave"}</span>
+                        {b.expiresOn ? <span>· vence {b.expiresOn}</span> : null}
+                      </div>
+                      {b.slug ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/${b.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="min-w-0 break-all text-xs text-primary underline"
+                          >
+                            {`${origin}/${b.slug}`}
+                          </a>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(`${origin}/${b.slug}`);
+                              toast.success("Enlace copiado");
+                            }}
+                          >
+                            <Copy className="mr-1 size-3.5" />
+                            Copiar
+                          </Button>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
