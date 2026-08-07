@@ -478,35 +478,103 @@ export function BusinessTools({
             Hasta
             <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} />
           </label>
+          <Input
+            className="sm:col-span-2"
+            placeholder="Buscar en el historial…"
+            value={fText}
+            onChange={(e) => setFText(e.target.value)}
+          />
+          <Select value={order} onValueChange={(v) => setOrder(v as "desc" | "asc")}>
+            <SelectTrigger aria-label="Ordenar por fecha">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Más recientes primero</SelectItem>
+              <SelectItem value="asc">Más antiguos primero</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={String(perPage)} onValueChange={(v) => setPerPage(Number(v))}>
+            <SelectTrigger aria-label="Movimientos por página">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 por página</SelectItem>
+              <SelectItem value="20">20 por página</SelectItem>
+              <SelectItem value="50">50 por página</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {filtered.length} de {audit.length} movimientos
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} de {audit.length} movimientos
+          </p>
+          {fActor !== "todos" || fKind !== "todos" || fFrom || fTo || fText ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                setFActor("todos");
+                setFKind("todos");
+                setFFrom("");
+                setFTo("");
+                setFText("");
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          ) : null}
+        </div>
 
         {filtered.length === 0 ? (
           <p className="text-xs text-muted-foreground">No hay movimientos con esos filtros.</p>
         ) : (
-          <ul className="max-h-72 space-y-2 overflow-y-auto">
-            {filtered.map((e) => (
-              <li key={e.id} className="rounded-xl border border-border p-2 text-xs">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold">{e.target}</span>
-                  <Badge variant="secondary" className="capitalize">
-                    {kindLabel[changeKind(e)] ?? e.action}
-                  </Badge>
-                  <span className="text-muted-foreground">
-                    {actorLabel[e.actorKind] ?? e.actorKind}
-                    {e.actorName ? ` · ${e.actorName}` : ""}
-                  </span>
-                </div>
-                <p className="text-muted-foreground">
-                  {e.field}
-                  {e.before || e.after ? `: ${e.before || "—"} → ${e.after || "—"}` : ""}
-                </p>
-                <p className="text-[11px] text-muted-foreground">{when(e.createdAt)}</p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="max-h-72 space-y-2 overflow-y-auto">
+              {pageItems.map((e) => (
+                <li key={e.id} className="rounded-xl border border-border p-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold">{e.target}</span>
+                    <Badge variant="secondary" className="capitalize">
+                      {kindLabel[changeKind(e)] ?? e.action}
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      {actorLabel[e.actorKind] ?? e.actorKind}
+                      {e.actorName ? ` · ${e.actorName}` : ""}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    {e.field}
+                    {e.before || e.after ? `: ${e.before || "—"} → ${e.after || "—"}` : ""}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{when(e.createdAt)}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                disabled={currentPage <= 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </>
         )}
       </section>
     </>
