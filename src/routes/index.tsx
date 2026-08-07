@@ -604,38 +604,16 @@ function CatalogPage() {
                       />
                     </div>
                     {isAdmin ? (
-                      <>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="show-detail" className="text-sm">
-                            Ver detalles
-                          </Label>
-                          <Switch
-                            id="show-detail"
-                            checked={showDetail}
-                            onCheckedChange={(v) => setPrefs({ showDetail: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="show-share" className="text-sm">
-                            Compartir
-                          </Label>
-                          <Switch
-                            id="show-share"
-                            checked={showShare}
-                            onCheckedChange={(v) => setPrefs({ showShare: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="only-active" className="text-sm">
-                            Solo activos
-                          </Label>
-                          <Switch
-                            id="only-active"
-                            checked={onlyActive}
-                            onCheckedChange={setOnlyActive}
-                          />
-                        </div>
-                      </>
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="only-active" className="text-sm">
+                          Solo activos
+                        </Label>
+                        <Switch
+                          id="only-active"
+                          checked={onlyActive}
+                          onCheckedChange={setOnlyActive}
+                        />
+                      </div>
                     ) : null}
                   </div>
 
@@ -667,6 +645,63 @@ function CatalogPage() {
                     </div>
                   ) : null}
                 </div>
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Botones en las tarjetas
+                    </p>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="show-detail" className="text-sm">
+                          Ver detalles
+                        </Label>
+                        <Switch
+                          id="show-detail"
+                          checked={showDetail}
+                          onCheckedChange={(v) => setPrefs({ showDetail: v })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="show-share" className="text-sm">
+                          Compartir
+                        </Label>
+                        <Switch
+                          id="show-share"
+                          checked={showShare}
+                          onCheckedChange={(v) => setPrefs({ showShare: v })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Editar
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
+                      <Button size="sm" onClick={openNew}>
+                        <Plus className="size-4" />
+                        Agregar servicio
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                        <Settings2 className="size-4" />
+                        Ajustes del catálogo
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
+                        <Tags className="size-4" />
+                        Categorías
+                      </Button>
+                      <CatalogManager />
+                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+                        <History className="size-4" />
+                        Historial
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {isAdmin ? (
                   <div className="grid gap-2 border-t border-border pt-3">
@@ -713,40 +748,6 @@ function CatalogPage() {
                       >
                         <FileText className="size-4" />
                         Exportar búsqueda PDF
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {isAdmin ? (
-                  <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Administrar
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-                      <Button size="sm" onClick={openNew}>
-                        <Plus className="size-4" />
-                        Agregar servicio
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-                        <Settings2 className="size-4" />
-                        Ajustes del catálogo
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
-                        <Tags className="size-4" />
-                        Categorías
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
-                        <History className="size-4" />
-                        Historial
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
-                        <ShieldCheck className="size-4" />
-                        Bitácora
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
-                        <Settings2 className="size-4" />
-                        Mostrar catálogos
                       </Button>
                       <ClientAccessDialog />
                     </div>
