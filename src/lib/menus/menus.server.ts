@@ -49,6 +49,7 @@ export function rowToBusiness(row: Row): MenuBusiness {
     accessTemp: bool(row["access_temp"], true),
     accessSuspended: bool(row["access_suspended"], false),
     accessUpdatedAt: row["access_updated_at"] ? str(row["access_updated_at"]) : null,
+    multiAdmin: bool(row["multi_admin"], false),
   };
 }
 
