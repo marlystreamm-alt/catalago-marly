@@ -472,18 +472,14 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {isAdmin ? (
-              <>
-                <CatalogManager />
-                <NotificationsDialog />
-                <MenusDialog />
-              </>
-            ) : null}
-            <Button asChild variant="outline" size="sm" className="rounded-xl">
-              <a href="/acceso">Mi menú</a>
-            </Button>
-          </div>
+          {isAdmin ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <CatalogManager />
+              <NotificationsDialog />
+              <MenusDialog />
+            </div>
+          ) : null}
+
 
 
         </header>
