@@ -15,9 +15,10 @@ import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { CATALOG_IDS } from "@/lib/catalog/types";
 
-/** Alta y baja de catálogos adicionales (solo administrador). */
+/** Alta, baja y visibilidad de catálogos (solo administrador). */
 export function CatalogManager() {
-  const { isAdmin, state, allCatalogIds, addCatalog, deleteCatalog } = useCatalogStore();
+  const { isAdmin, state, allCatalogIds, addCatalog, deleteCatalog, toggleCatalogHidden } =
+    useCatalogStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -28,15 +29,9 @@ export function CatalogManager() {
 
   return (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="mt-2 w-full"
-        onClick={() => setOpen(true)}
-      >
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         <FolderPlus className="size-4" />
-        Agregar catálogo
+        Catálogos
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
