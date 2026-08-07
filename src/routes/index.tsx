@@ -466,13 +466,6 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
-          {isAdmin ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <CatalogManager />
-              <NotificationsDialog />
-              <MenusDialog />
-            </div>
-          ) : null}
         </header>
 
         {!online ? (
