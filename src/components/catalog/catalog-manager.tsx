@@ -15,9 +15,10 @@ import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { CATALOG_IDS } from "@/lib/catalog/types";
 
-/** Alta y baja de catálogos adicionales (solo administrador). */
+/** Alta, baja y visibilidad de catálogos (solo administrador). */
 export function CatalogManager() {
-  const { isAdmin, state, allCatalogIds, addCatalog, deleteCatalog } = useCatalogStore();
+  const { isAdmin, state, allCatalogIds, addCatalog, deleteCatalog, toggleCatalogHidden } =
+    useCatalogStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -28,23 +29,17 @@ export function CatalogManager() {
 
   return (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="mt-2 w-full"
-        onClick={() => setOpen(true)}
-      >
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         <FolderPlus className="size-4" />
-        Agregar catálogo
+        Catálogos
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Catálogos</DialogTitle>
             <DialogDescription>
-              Crea catálogos adicionales con sus propios servicios, precios y WhatsApp.
+              Crea catálogos adicionales y decide cuáles ve el público.
             </DialogDescription>
           </DialogHeader>
 
@@ -104,6 +99,35 @@ export function CatalogManager() {
               ))}
             </div>
           ) : null}
+
+          <div className="grid gap-2 border-t border-border pt-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Mostrar u ocultar al público
+            </p>
+            {allCatalogIds.map((id) => (
+              <div
+                key={id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-card-foreground">
+                    {state.catalogs[id].name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {state.catalogs[id].hidden ? "Oculto al público" : "Visible al público"}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={state.catalogs[id].hidden ? "default" : "outline"}
+                  className="shrink-0 rounded-xl"
+                  onClick={() => toggleCatalogHidden(id)}
+                >
+                  {state.catalogs[id].hidden ? "Mostrar" : "Ocultar"}
+                </Button>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </>

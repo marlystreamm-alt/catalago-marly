@@ -12,7 +12,6 @@ import {
   FileText,
   History,
   Link2,
-  ShieldCheck,
   Plus,
   Search,
   Settings2,
@@ -37,11 +36,7 @@ import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-skeletons";
-import {
-  AuditDialog,
-  CatalogVisibilityDialog,
-  HistoryDialog,
-} from "@/components/catalog/history-dialog";
+import { HistoryDialog } from "@/components/catalog/history-dialog";
 import { PendingOrdersBar } from "@/components/catalog/pending-orders";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
@@ -182,8 +177,6 @@ function CatalogPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
   // Loader breve al buscar o cambiar filtros para que la lista nunca "parpadee" vacía.
@@ -439,8 +432,14 @@ function CatalogPage() {
                 {catalog.subtitle}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
               <ClientMenuButton />
+              {isAdmin ? (
+                <>
+                  <NotificationsDialog />
+                  <MenusDialog />
+                </>
+              ) : null}
               <AdminBar />
             </div>
           </div>
@@ -466,13 +465,6 @@ function CatalogPage() {
               </button>
             ))}
           </nav>
-          {isAdmin ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <CatalogManager />
-              <NotificationsDialog />
-              <MenusDialog />
-            </div>
-          ) : null}
         </header>
 
         {!online ? (
@@ -610,38 +602,16 @@ function CatalogPage() {
                       />
                     </div>
                     {isAdmin ? (
-                      <>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="show-detail" className="text-sm">
-                            Ver detalles
-                          </Label>
-                          <Switch
-                            id="show-detail"
-                            checked={showDetail}
-                            onCheckedChange={(v) => setPrefs({ showDetail: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="show-share" className="text-sm">
-                            Compartir
-                          </Label>
-                          <Switch
-                            id="show-share"
-                            checked={showShare}
-                            onCheckedChange={(v) => setPrefs({ showShare: v })}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                          <Label htmlFor="only-active" className="text-sm">
-                            Solo activos
-                          </Label>
-                          <Switch
-                            id="only-active"
-                            checked={onlyActive}
-                            onCheckedChange={setOnlyActive}
-                          />
-                        </div>
-                      </>
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="only-active" className="text-sm">
+                          Solo activos
+                        </Label>
+                        <Switch
+                          id="only-active"
+                          checked={onlyActive}
+                          onCheckedChange={setOnlyActive}
+                        />
+                      </div>
                     ) : null}
                   </div>
 
@@ -673,6 +643,63 @@ function CatalogPage() {
                     </div>
                   ) : null}
                 </div>
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Botones en las tarjetas
+                    </p>
+                    <div className="grid gap-1.5 sm:grid-cols-2">
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="show-detail" className="text-sm">
+                          Ver detalles
+                        </Label>
+                        <Switch
+                          id="show-detail"
+                          checked={showDetail}
+                          onCheckedChange={(v) => setPrefs({ showDetail: v })}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                        <Label htmlFor="show-share" className="text-sm">
+                          Compartir
+                        </Label>
+                        <Switch
+                          id="show-share"
+                          checked={showShare}
+                          onCheckedChange={(v) => setPrefs({ showShare: v })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {isAdmin ? (
+                  <div className="grid gap-2 border-t border-border pt-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Editar
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
+                      <Button size="sm" onClick={openNew}>
+                        <Plus className="size-4" />
+                        Agregar servicio
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                        <Settings2 className="size-4" />
+                        Ajustes del catálogo
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
+                        <Tags className="size-4" />
+                        Categorías
+                      </Button>
+                      <CatalogManager />
+                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
+                        <History className="size-4" />
+                        Historial
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {isAdmin ? (
                   <div className="grid gap-2 border-t border-border pt-3">
@@ -720,40 +747,6 @@ function CatalogPage() {
                         <FileText className="size-4" />
                         Exportar búsqueda PDF
                       </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {isAdmin ? (
-                  <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Administrar
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-                      <Button size="sm" onClick={openNew}>
-                        <Plus className="size-4" />
-                        Agregar servicio
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-                        <Settings2 className="size-4" />
-                        Ajustes del catálogo
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
-                        <Tags className="size-4" />
-                        Categorías
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
-                        <History className="size-4" />
-                        Historial
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setAuditOpen(true)}>
-                        <ShieldCheck className="size-4" />
-                        Bitácora
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setVisibilityOpen(true)}>
-                        <Settings2 className="size-4" />
-                        Mostrar catálogos
-                      </Button>
                       <ClientAccessDialog />
                     </div>
                   </div>
@@ -761,19 +754,6 @@ function CatalogPage() {
               </div>
             ) : null}
           </section>
-        ) : null}
-
-        {canEdit && viewMode !== "tarjetas" ? (
-          <div className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full"
-              onClick={() => setPrefs({ viewMode: "tarjetas" })}
-            >
-              Volver al catálogo
-            </Button>
-          </div>
         ) : null}
 
         <div className="mt-5 grid min-w-0 max-w-full gap-6">
@@ -861,8 +841,6 @@ function CatalogPage() {
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
-      <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
-      <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
       <ServiceDetailDialog
         service={detailService}
         open={!!detailService}
