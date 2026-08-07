@@ -16,10 +16,18 @@ export type Database = {
     Tables: {
       menu_businesses: {
         Row: {
+          access_hash: string
+          access_salt: string
+          access_suspended: boolean
+          access_temp: boolean
+          access_updated_at: string | null
           active: boolean
           address: string
           created_at: string
+          expires_on: string | null
+          features: Json
           id: string
+          logo_url: string
           name: string
           notes: string
           owner_name: string
@@ -29,10 +37,18 @@ export type Database = {
           whatsapp: string
         }
         Insert: {
+          access_hash?: string
+          access_salt?: string
+          access_suspended?: boolean
+          access_temp?: boolean
+          access_updated_at?: string | null
           active?: boolean
           address?: string
           created_at?: string
+          expires_on?: string | null
+          features?: Json
           id?: string
+          logo_url?: string
           name?: string
           notes?: string
           owner_name?: string
@@ -42,10 +58,18 @@ export type Database = {
           whatsapp?: string
         }
         Update: {
+          access_hash?: string
+          access_salt?: string
+          access_suspended?: boolean
+          access_temp?: boolean
+          access_updated_at?: string | null
           active?: boolean
           address?: string
           created_at?: string
+          expires_on?: string | null
+          features?: Json
           id?: string
+          logo_url?: string
           name?: string
           notes?: string
           owner_name?: string
