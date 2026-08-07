@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as AccesoRouteImport } from './routes/acceso'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MSlugRouteImport } from './routes/m.$slug'
@@ -19,6 +20,11 @@ import { Route as ApiPublicNotifyPendingRouteImport } from './routes/api/public/
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccesoRoute = AccesoRouteImport.update({
+  id: '/acceso',
+  path: '/acceso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SlugRoute = SlugRouteImport.update({
@@ -50,6 +56,7 @@ const ApiPublicNotifyPendingRoute = ApiPublicNotifyPendingRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/acceso': typeof AccesoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/acceso': typeof AccesoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/acceso': typeof AccesoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$slug'
+    | '/acceso'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$slug'
+    | '/acceso'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$slug'
+    | '/acceso'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
+  AccesoRoute: typeof AccesoRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   MSlugRoute: typeof MSlugRoute
   ApiPublicNotifyPendingRoute: typeof ApiPublicNotifyPendingRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/acceso': {
+      id: '/acceso'
+      path: '/acceso'
+      fullPath: '/acceso'
+      preLoaderRoute: typeof AccesoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$slug': {
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
+  AccesoRoute: AccesoRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   MSlugRoute: MSlugRoute,
   ApiPublicNotifyPendingRoute: ApiPublicNotifyPendingRoute,
