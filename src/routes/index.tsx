@@ -12,7 +12,6 @@ import {
   FileText,
   History,
   Link2,
-  
   Plus,
   Search,
   Settings2,

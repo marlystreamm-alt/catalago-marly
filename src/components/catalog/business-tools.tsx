@@ -103,7 +103,7 @@ export function BusinessTools({
   const [order, setOrder] = useState<"desc" | "asc">("desc");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
-  
+
   const fileRef = useRef<HTMLInputElement>(null);
   const businessId = business.id;
 
@@ -143,15 +143,14 @@ export function BusinessTools({
       const day = e.createdAt.slice(0, 10);
       if (fFrom && day < fFrom) return false;
       if (fTo && day > fTo) return false;
-      if (
-        q &&
-        !`${name} ${e.target} ${e.field} ${e.before} ${e.after}`.toLowerCase().includes(q)
-      )
+      if (q && !`${name} ${e.target} ${e.field} ${e.before} ${e.after}`.toLowerCase().includes(q))
         return false;
       return true;
     });
     list.sort((a, b) =>
-      order === "desc" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt),
+      order === "desc"
+        ? b.createdAt.localeCompare(a.createdAt)
+        : a.createdAt.localeCompare(b.createdAt),
     );
     return list;
   }, [audit, fActor, fKind, fFrom, fTo, fText, order]);
@@ -166,7 +165,6 @@ export function BusinessTools({
   useEffect(() => {
     setPage(1);
   }, [fActor, fKind, fFrom, fTo, fText, perPage, order]);
-
 
   const exportJson = async () => {
     try {
