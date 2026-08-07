@@ -294,7 +294,7 @@ export function MenusDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="rounded-xl">
           <UtensilsCrossed className="mr-1.5 size-4" />
-          Menús
+          Mis clientes
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
