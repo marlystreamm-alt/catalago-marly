@@ -496,7 +496,7 @@ export async function saveBackupVersion(input: {
       actor_name: input.actorName.slice(0, 80),
       categories_count: input.payload.categories.length,
       items_count: input.payload.items.length,
-      payload: input.payload as unknown as Record<string, unknown>,
+      payload: JSON.parse(JSON.stringify(input.payload)) as never,
     })
     .select("*")
     .single();
