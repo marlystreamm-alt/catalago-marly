@@ -25,16 +25,29 @@ import {
 } from "@/components/ui/select";
 import { getSavedCode, saveCode } from "@/lib/notify/client";
 import {
+  menusCounts,
   menusDeleteBusiness,
   menusDeleteCategory,
   menusDeleteItem,
+  menusGenerateAccess,
   menusList,
   menusLoad,
   menusSaveBusiness,
   menusSaveCategory,
   menusSaveItem,
+  menusSetAccess,
+  menusSetFeatures,
 } from "@/lib/menus/menus.functions";
-import type { MenuBusiness, MenuCategory, MenuItem } from "@/lib/menus/types";
+import {
+  businessStatus,
+  EDIT_FEATURES,
+  FEATURE_LABELS,
+  VIEW_FEATURES,
+  type FeatureKey,
+  type MenuBusiness,
+  type MenuCategory,
+  type MenuItem,
+} from "@/lib/menus/types";
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
