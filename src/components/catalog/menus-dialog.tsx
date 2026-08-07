@@ -61,17 +61,20 @@ export function MenusDialog() {
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [businesses, setBusinesses] = useState<MenuBusiness[]>([]);
+  const [counts, setCounts] = useState<Record<string, { cats: number; items: number }>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [newPassword, setNewPassword] = useState<{ id: string; value: string } | null>(null);
 
-  const refreshList = useCallback(
-    async (value: string) => {
-      const list = await menusList({ data: { code: value } });
-      setBusinesses(list);
-    },
-    [],
-  );
+  const refreshList = useCallback(async (value: string) => {
+    const [list, c] = await Promise.all([
+      menusList({ data: { code: value } }),
+      menusCounts({ data: { code: value } }),
+    ]);
+    setBusinesses(list);
+    setCounts(c);
+  }, []);
 
   const openMenu = useCallback(
     async (businessId: string) => {
