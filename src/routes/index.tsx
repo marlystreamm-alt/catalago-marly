@@ -12,7 +12,7 @@ import {
   FileText,
   History,
   Link2,
-  ShieldCheck,
+  
   Plus,
   Search,
   Settings2,
