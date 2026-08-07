@@ -155,6 +155,43 @@ export function MenusDialog() {
     }
   };
 
+  const toggleFeature = async (business: MenuBusiness, key: FeatureKey, value: boolean) => {
+    const features = { ...business.features, [key]: value };
+    setBusinesses((prev) => prev.map((b) => (b.id === business.id ? { ...b, features } : b)));
+    try {
+      const saved = await menusSetFeatures({ data: { code, id: business.id, features } });
+      setBusinesses((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
+    } catch (e) {
+      toast.error(errText(e));
+      await refreshList(code);
+    }
+  };
+
+  const generateAccess = async (business: MenuBusiness) => {
+    try {
+      const { password } = await menusGenerateAccess({ data: { code, id: business.id } });
+      setNewPassword({ id: business.id, value: password });
+      await refreshList(code);
+      toast.success("Contraseña temporal generada");
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  };
+
+  const patchAccess = async (
+    business: MenuBusiness,
+    change: { suspended?: boolean; revoke?: boolean },
+  ) => {
+    try {
+      const saved = await menusSetAccess({ data: { code, id: business.id, ...change } });
+      setBusinesses((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
+      if (change.revoke) setNewPassword(null);
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  };
+
+
   const removeBusiness = async (id: string) => {
     if (!window.confirm("¿Eliminar este negocio y todo su menú?")) return;
     try {
