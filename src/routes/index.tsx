@@ -178,8 +178,6 @@ function CatalogPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
   // Loader breve al buscar o cambiar filtros para que la lista nunca "parpadee" vacía.
