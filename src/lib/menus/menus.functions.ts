@@ -169,12 +169,17 @@ export const menusSetAccess = createServerFn({ method: "POST" })
     await gate(data.code);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { rowToBusiness } = await import("./menus.server");
-    const payload: Record<string, unknown> = {};
-    if (typeof data.suspended === "boolean") payload["access_suspended"] = data.suspended;
+    const payload: {
+      access_suspended?: boolean;
+      access_hash?: string;
+      access_salt?: string;
+      access_updated_at?: string | null;
+    } = {};
+    if (typeof data.suspended === "boolean") payload.access_suspended = data.suspended;
     if (data.revoke) {
-      payload["access_hash"] = "";
-      payload["access_salt"] = "";
-      payload["access_updated_at"] = null;
+      payload.access_hash = "";
+      payload.access_salt = "";
+      payload.access_updated_at = null;
     }
     const { data: row, error } = await supabaseAdmin
       .from("menu_businesses")
