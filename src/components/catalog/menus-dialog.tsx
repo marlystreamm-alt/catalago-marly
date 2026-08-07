@@ -299,7 +299,7 @@ export function MenusDialog() {
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
         <DialogHeader>
-          <DialogTitle>Menús de negocios</DialogTitle>
+          <DialogTitle>Mis clientes · catálogos vendidos</DialogTitle>
           <DialogDescription>
             Apartado privado del administrador. Los clientes del catálogo no lo ven.
           </DialogDescription>
