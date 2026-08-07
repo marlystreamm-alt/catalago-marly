@@ -523,15 +523,20 @@ export const menusSetAdmin = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return {};
     }
-    const payload: Record<string, unknown> = {};
-    if (typeof data.suspended === "boolean") payload["suspended"] = data.suspended;
+    const payload: {
+      suspended?: boolean;
+      access_salt?: string;
+      access_hash?: string;
+      access_temp?: boolean;
+    } = {};
+    if (typeof data.suspended === "boolean") payload.suspended = data.suspended;
     let password: string | undefined;
     if (data.regenerate) {
       password = tempPassword();
       const salt = randomSalt();
-      payload["access_salt"] = salt;
-      payload["access_hash"] = await hashPassword(password, salt);
-      payload["access_temp"] = true;
+      payload.access_salt = salt;
+      payload.access_hash = await hashPassword(password, salt);
+      payload.access_temp = true;
     }
     const { error } = await supabaseAdmin.from("menu_admins").update(payload).eq("id", data.id);
     if (error) throw new Error(error.message);
