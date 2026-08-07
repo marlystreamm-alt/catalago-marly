@@ -1,5 +1,13 @@
-/** Acceso a datos del apartado Menús (solo servidor, con clave de administrador). */
-import type { MenuBusiness, MenuCategory, MenuItem } from "./types";
+/** Acceso a datos de los catálogos de clientes (solo servidor). */
+import {
+  DEFAULT_FEATURES,
+  businessStatus,
+  type FeatureKey,
+  type Features,
+  type MenuBusiness,
+  type MenuCategory,
+  type MenuItem,
+} from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -12,6 +20,17 @@ const str = (v: unknown, d = "") => (typeof v === "string" ? v : d);
 const num = (v: unknown, d = 0) => (typeof v === "number" ? v : Number(v ?? d) || d);
 const bool = (v: unknown, d = true) => (typeof v === "boolean" ? v : d);
 
+export function parseFeatures(v: unknown): Features {
+  const out = { ...DEFAULT_FEATURES };
+  if (v && typeof v === "object") {
+    for (const key of Object.keys(out) as FeatureKey[]) {
+      const raw = (v as Record<string, unknown>)[key];
+      if (typeof raw === "boolean") out[key] = raw;
+    }
+  }
+  return out;
+}
+
 export function rowToBusiness(row: Row): MenuBusiness {
   return {
     id: str(row["id"]),
@@ -23,6 +42,13 @@ export function rowToBusiness(row: Row): MenuBusiness {
     notes: str(row["notes"]),
     active: bool(row["active"]),
     sortIndex: num(row["sort_index"]),
+    logoUrl: str(row["logo_url"]),
+    expiresOn: row["expires_on"] ? str(row["expires_on"]) : null,
+    features: parseFeatures(row["features"]),
+    hasAccess: Boolean(str(row["access_hash"])),
+    accessTemp: bool(row["access_temp"], true),
+    accessSuspended: bool(row["access_suspended"], false),
+    accessUpdatedAt: row["access_updated_at"] ? str(row["access_updated_at"]) : null,
   };
 }
 
@@ -62,6 +88,23 @@ export async function listBusinesses(): Promise<MenuBusiness[]> {
   return (data ?? []).map((r) => rowToBusiness(r as Row));
 }
 
+/** Cuántas categorías y productos tiene cada negocio (para el panel de ventas). */
+export async function countsByBusiness(): Promise<Record<string, { cats: number; items: number }>> {
+  const db = await admin();
+  const [cats, items] = await Promise.all([
+    db.from("menu_categories").select("business_id"),
+    db.from("menu_items").select("business_id"),
+  ]);
+  const out: Record<string, { cats: number; items: number }> = {};
+  const bump = (id: string, key: "cats" | "items") => {
+    out[id] = out[id] ?? { cats: 0, items: 0 };
+    out[id][key] += 1;
+  };
+  for (const r of cats.data ?? []) bump(str((r as Row)["business_id"]), "cats");
+  for (const r of items.data ?? []) bump(str((r as Row)["business_id"]), "items");
+  return out;
+}
+
 export async function loadMenu(businessId: string) {
   const db = await admin();
 
@@ -86,17 +129,19 @@ export async function loadMenu(businessId: string) {
   };
 }
 
-/** Menú público de un negocio por su enlace (slug). Solo datos visibles al cliente. */
+/** Catálogo público de un negocio por su enlace (slug), respetando sus interruptores. */
 export async function loadPublicMenu(slug: string) {
   const db = await admin();
   const { data: biz } = await db
     .from("menu_businesses")
     .select("*")
     .eq("slug", slug)
-    .eq("active", true)
     .maybeSingle();
   if (!biz) return null;
   const business = rowToBusiness(biz as Row);
+  if (businessStatus(business) !== "activo") return null;
+
+  const f = business.features;
   const [cats, items] = await Promise.all([
     db
       .from("menu_categories")
@@ -111,8 +156,137 @@ export async function loadPublicMenu(slug: string) {
       .order("sort_index", { ascending: true }),
   ]);
   return {
-    business: { ...business, notes: "" },
+    business: {
+      ...business,
+      notes: "",
+      address: f.show_address ? business.address : "",
+      whatsapp: f.show_whatsapp ? business.whatsapp : "",
+      accessTemp: false,
+      accessSuspended: false,
+      accessUpdatedAt: null,
+      hasAccess: false,
+    },
     categories: (cats.data ?? []).map((r) => rowToCategory(r as Row)),
-    items: (items.data ?? []).map((r) => rowToItem(r as Row)),
+    items: (items.data ?? []).map((r) => {
+      const it = rowToItem(r as Row);
+      return {
+        ...it,
+        price: f.show_prices ? it.price : 0,
+        priceText: f.show_prices ? it.priceText : "",
+        description: f.show_descriptions ? it.description : "",
+        imageUrl: f.show_photos ? it.imageUrl : "",
+      };
+    }),
   };
+}
+
+/* ------------------------- Acceso del dueño (clientes) ------------------------ */
+
+const enc = new TextEncoder();
+const MAX_ITER = 100_000;
+
+export async function hashPassword(password: string, salt: string) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, [
+    "deriveBits",
+  ]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: MAX_ITER },
+    key,
+    256,
+  );
+  return Array.from(new Uint8Array(bits))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export function randomSalt() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Contraseña temporal legible para mandársela al dueño. */
+export function tempPassword() {
+  const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const chars = Array.from(bytes).map((b) => abc[b % abc.length]);
+  return `MA2-${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
+}
+
+function secret() {
+  return (
+    process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["SUPABASE_URL"] ?? "ma2-fallback-secret"
+  );
+}
+
+async function sign(payload: string) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(payload));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Token firmado con el id del negocio; el navegador nunca decide de quién es la sesión. */
+export async function makeOwnerToken(businessId: string) {
+  const payload = `${businessId}.${Date.now() + 1000 * 60 * 60 * 24 * 30}`;
+  return `${payload}.${await sign(payload)}`;
+}
+
+export async function readOwnerToken(token: string): Promise<string> {
+  const parts = (token ?? "").split(".");
+  if (parts.length !== 3) throw new Error("Sesión no válida, vuelve a entrar");
+  const [id, exp, sig] = parts as [string, string, string];
+  if ((await sign(`${id}.${exp}`)) !== sig) throw new Error("Sesión no válida, vuelve a entrar");
+  if (Number(exp) < Date.now()) throw new Error("Tu sesión expiró, vuelve a entrar");
+  return id;
+}
+
+/** Carga el negocio del dueño validando token, estado y vencimiento. */
+export async function requireOwner(token: string): Promise<MenuBusiness> {
+  const id = await readOwnerToken(token);
+  const db = await admin();
+  const { data } = await db.from("menu_businesses").select("*").eq("id", id).maybeSingle();
+  if (!data) throw new Error("Negocio no encontrado");
+  const business = rowToBusiness(data as Row);
+  if (business.accessSuspended) throw new Error("Tu acceso está suspendido");
+  const status = businessStatus(business);
+  if (status === "apagado") throw new Error("Tu catálogo está apagado");
+  if (status === "vencido") throw new Error("Tu acceso venció");
+  return business;
+}
+
+export function requireFeature(business: MenuBusiness, key: FeatureKey) {
+  if (!business.features[key]) throw new Error("No tienes ese permiso autorizado");
+}
+
+/** Valida contraseña del dueño y devuelve su token de sesión. */
+export async function ownerLogin(slug: string, password: string) {
+  const db = await admin();
+  const { data } = await db
+    .from("menu_businesses")
+    .select("*")
+    .eq("slug", slug.trim().toLowerCase())
+    .maybeSingle();
+  if (!data) throw new Error("Negocio o contraseña incorrectos");
+  const business = rowToBusiness(data as Row);
+  const salt = str((data as Row)["access_salt"]);
+  const hash = str((data as Row)["access_hash"]);
+  if (!hash || !salt) throw new Error("Este negocio todavía no tiene contraseña asignada");
+  if ((await hashPassword(password, salt)) !== hash)
+    throw new Error("Negocio o contraseña incorrectos");
+  if (business.accessSuspended) throw new Error("Tu acceso está suspendido");
+  const status = businessStatus(business);
+  if (status !== "activo")
+    throw new Error(status === "vencido" ? "Tu acceso venció" : "Tu catálogo está apagado");
+  return { token: await makeOwnerToken(business.id), business };
 }
