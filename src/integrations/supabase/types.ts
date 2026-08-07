@@ -108,6 +108,56 @@ export type Database = {
           },
         ]
       }
+      menu_backups: {
+        Row: {
+          actor_kind: string
+          actor_name: string
+          business_id: string
+          categories_count: number
+          created_at: string
+          id: string
+          items_count: number
+          label: string
+          origin: string
+          payload: Json
+          version: number
+        }
+        Insert: {
+          actor_kind?: string
+          actor_name?: string
+          business_id: string
+          categories_count?: number
+          created_at?: string
+          id?: string
+          items_count?: number
+          label?: string
+          origin?: string
+          payload?: Json
+          version?: number
+        }
+        Update: {
+          actor_kind?: string
+          actor_name?: string
+          business_id?: string
+          categories_count?: number
+          created_at?: string
+          id?: string
+          items_count?: number
+          label?: string
+          origin?: string
+          payload?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_backups_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_businesses: {
         Row: {
           access_hash: string
