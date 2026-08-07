@@ -134,19 +134,39 @@ export function BusinessTools({
     [audit],
   );
 
-  const filtered = useMemo(
-    () =>
-      audit.filter((e) => {
-        const name = e.actorName || actorLabel[e.actorKind] || "—";
-        if (fActor !== "todos" && name !== fActor) return false;
-        if (fKind !== "todos" && changeKind(e) !== fKind) return false;
-        const day = e.createdAt.slice(0, 10);
-        if (fFrom && day < fFrom) return false;
-        if (fTo && day > fTo) return false;
-        return true;
-      }),
-    [audit, fActor, fKind, fFrom, fTo],
+  const filtered = useMemo(() => {
+    const q = fText.trim().toLowerCase();
+    const list = audit.filter((e) => {
+      const name = e.actorName || actorLabel[e.actorKind] || "—";
+      if (fActor !== "todos" && name !== fActor) return false;
+      if (fKind !== "todos" && changeKind(e) !== fKind) return false;
+      const day = e.createdAt.slice(0, 10);
+      if (fFrom && day < fFrom) return false;
+      if (fTo && day > fTo) return false;
+      if (
+        q &&
+        !`${name} ${e.target} ${e.field} ${e.beforeValue} ${e.afterValue}`.toLowerCase().includes(q)
+      )
+        return false;
+      return true;
+    });
+    list.sort((a, b) =>
+      order === "desc" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt),
+    );
+    return list;
+  }, [audit, fActor, fKind, fFrom, fTo, fText, order]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => filtered.slice((currentPage - 1) * perPage, currentPage * perPage),
+    [filtered, currentPage, perPage],
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [fActor, fKind, fFrom, fTo, fText, perPage, order]);
+
 
   const exportJson = async () => {
     try {
