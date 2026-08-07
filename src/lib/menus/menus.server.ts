@@ -237,24 +237,33 @@ async function sign(payload: string) {
     .join("");
 }
 
-/** Token firmado con el id del negocio; el navegador nunca decide de quién es la sesión. */
-export async function makeOwnerToken(businessId: string) {
-  const payload = `${businessId}.${Date.now() + 1000 * 60 * 60 * 24 * 30}`;
+/** Token firmado con el id del negocio y quién entró; el navegador nunca decide la sesión. */
+export async function makeOwnerToken(businessId: string, actorName = "Dueño") {
+  const clean = actorName.replace(/[~.]/g, " ").trim() || "Dueño";
+  const payload = `${businessId}~${encodeURIComponent(clean)}~${Date.now() + 1000 * 60 * 60 * 24 * 30}`;
   return `${payload}.${await sign(payload)}`;
 }
 
-export async function readOwnerToken(token: string): Promise<string> {
-  const parts = (token ?? "").split(".");
-  if (parts.length !== 3) throw new Error("Sesión no válida, vuelve a entrar");
-  const [id, exp, sig] = parts as [string, string, string];
-  if ((await sign(`${id}.${exp}`)) !== sig) throw new Error("Sesión no válida, vuelve a entrar");
-  if (Number(exp) < Date.now()) throw new Error("Tu sesión expiró, vuelve a entrar");
-  return id;
+export async function readOwnerToken(token: string): Promise<{ id: string; actor: string }> {
+  const raw = token ?? "";
+  const cut = raw.lastIndexOf(".");
+  if (cut < 1) throw new Error("Sesión no válida, vuelve a entrar");
+  const payload = raw.slice(0, cut);
+  const sig = raw.slice(cut + 1);
+  if ((await sign(payload)) !== sig) throw new Error("Sesión no válida, vuelve a entrar");
+  const parts = payload.split("~");
+  const id = parts[0] ?? "";
+  const actor = parts.length === 3 ? decodeURIComponent(parts[1] ?? "") : "Dueño";
+  const exp = parts.length === 3 ? parts[2] : payload.split(".")[1];
+  if (!id || Number(exp) < Date.now()) throw new Error("Tu sesión expiró, vuelve a entrar");
+  return { id, actor: actor || "Dueño" };
 }
 
 /** Carga el negocio del dueño validando token, estado y vencimiento. */
-export async function requireOwner(token: string): Promise<MenuBusiness> {
-  const id = await readOwnerToken(token);
+export async function requireOwnerCtx(
+  token: string,
+): Promise<{ business: MenuBusiness; actor: string }> {
+  const { id, actor } = await readOwnerToken(token);
   const db = await admin();
   const { data } = await db.from("menu_businesses").select("*").eq("id", id).maybeSingle();
   if (!data) throw new Error("Negocio no encontrado");
@@ -263,14 +272,18 @@ export async function requireOwner(token: string): Promise<MenuBusiness> {
   const status = businessStatus(business);
   if (status === "apagado") throw new Error("Tu catálogo está apagado");
   if (status === "vencido") throw new Error("Tu acceso venció");
-  return business;
+  return { business, actor };
+}
+
+export async function requireOwner(token: string): Promise<MenuBusiness> {
+  return (await requireOwnerCtx(token)).business;
 }
 
 export function requireFeature(business: MenuBusiness, key: FeatureKey) {
   if (!business.features[key]) throw new Error("No tienes ese permiso autorizado");
 }
 
-/** Valida contraseña del dueño y devuelve su token de sesión. */
+/** Valida contraseña del dueño (o de un administrador adicional) y devuelve su token. */
 export async function ownerLogin(slug: string, password: string) {
   const db = await admin();
   const { data } = await db
@@ -282,12 +295,101 @@ export async function ownerLogin(slug: string, password: string) {
   const business = rowToBusiness(data as Row);
   const salt = str((data as Row)["access_salt"]);
   const hash = str((data as Row)["access_hash"]);
-  if (!hash || !salt) throw new Error("Este negocio todavía no tiene contraseña asignada");
-  if ((await hashPassword(password, salt)) !== hash)
+
+  let actor = business.ownerName || "Dueño";
+  let temp = business.accessTemp;
+  let adminId: string | null = null;
+  let matched = Boolean(hash && salt) && (await hashPassword(password, salt)) === hash;
+
+  if (!matched && business.multiAdmin) {
+    const { data: admins } = await db.from("menu_admins").select("*").eq("business_id", business.id);
+    for (const row of admins ?? []) {
+      const r = row as Row;
+      const s = str(r["access_salt"]);
+      const h = str(r["access_hash"]);
+      if (!s || !h) continue;
+      if ((await hashPassword(password, s)) !== h) continue;
+      if (bool(r["suspended"], false)) throw new Error("Tu acceso está suspendido");
+      matched = true;
+      adminId = str(r["id"]);
+      actor = str(r["name"]) || "Administrador";
+      temp = bool(r["access_temp"], true);
+      break;
+    }
+  }
+
+  if (!matched) {
+    if (!hash || !salt) throw new Error("Este negocio todavía no tiene contraseña asignada");
     throw new Error("Negocio o contraseña incorrectos");
-  if (business.accessSuspended) throw new Error("Tu acceso está suspendido");
+  }
+  if (!adminId && business.accessSuspended) throw new Error("Tu acceso está suspendido");
   const status = businessStatus(business);
   if (status !== "activo")
     throw new Error(status === "vencido" ? "Tu acceso venció" : "Tu catálogo está apagado");
-  return { token: await makeOwnerToken(business.id), business };
+
+  if (adminId)
+    await db.from("menu_admins").update({ last_login_at: new Date().toISOString() }).eq("id", adminId);
+
+  await logAudit({
+    businessId: business.id,
+    actorKind: adminId ? "equipo" : "dueno",
+    actorName: actor,
+    action: "acceso",
+    target: "Sesión",
+    field: "Entró al panel",
+  });
+
+  return { token: await makeOwnerToken(business.id, actor), business, mustChange: temp, adminId };
 }
+
+/* ------------------------------- Bitácora ------------------------------- */
+
+export async function logAudit(entry: {
+  businessId: string;
+  actorKind: "dueno" | "admin" | "equipo";
+  actorName: string;
+  action: string;
+  target: string;
+  field?: string;
+  before?: string | number | boolean;
+  after?: string | number | boolean;
+}) {
+  const db = await admin();
+  await db.from("menu_audit").insert({
+    business_id: entry.businessId,
+    actor_kind: entry.actorKind,
+    actor_name: entry.actorName.slice(0, 80),
+    action: entry.action,
+    target: entry.target.slice(0, 120),
+    field: entry.field ?? "",
+    before_value: entry.before === undefined ? "" : String(entry.before),
+    after_value: entry.after === undefined ? "" : String(entry.after),
+  });
+}
+
+export async function listAudit(businessId: string, limit = 200) {
+  const db = await admin();
+  const { data, error } = await db
+    .from("menu_audit")
+    .select("*")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => {
+    const row = r as Row;
+    return {
+      id: str(row["id"]),
+      businessId: str(row["business_id"]),
+      actorKind: str(row["actor_kind"], "dueno") as "dueno" | "admin" | "equipo",
+      actorName: str(row["actor_name"]),
+      action: str(row["action"]),
+      target: str(row["target"]),
+      field: str(row["field"]),
+      before: str(row["before_value"]),
+      after: str(row["after_value"]),
+      createdAt: str(row["created_at"]),
+    };
+  });
+}
+
