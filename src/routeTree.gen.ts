@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
 import { Route as AccesoRouteImport } from './routes/acceso'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as IndexRouteImport } from './routes/index'
@@ -20,6 +21,11 @@ import { Route as ApiPublicNotifyPendingRouteImport } from './routes/api/public/
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MiCatalogoRoute = MiCatalogoRouteImport.update({
+  id: '/mi-catalogo',
+  path: '/mi-catalogo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccesoRoute = AccesoRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/mi-catalogo': typeof MiCatalogoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/mi-catalogo': typeof MiCatalogoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/mi-catalogo': typeof MiCatalogoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/mi-catalogo'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/mi-catalogo'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/mi-catalogo'
     | '/sitemap.xml'
     | '/m/$slug'
     | '/api/public/notify-pending'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
   AccesoRoute: typeof AccesoRoute
+  MiCatalogoRoute: typeof MiCatalogoRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   MSlugRoute: typeof MSlugRoute
   ApiPublicNotifyPendingRoute: typeof ApiPublicNotifyPendingRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mi-catalogo': {
+      id: '/mi-catalogo'
+      path: '/mi-catalogo'
+      fullPath: '/mi-catalogo'
+      preLoaderRoute: typeof MiCatalogoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/acceso': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
   AccesoRoute: AccesoRoute,
+  MiCatalogoRoute: MiCatalogoRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   MSlugRoute: MSlugRoute,
   ApiPublicNotifyPendingRoute: ApiPublicNotifyPendingRoute,
