@@ -145,7 +145,7 @@ export function BusinessTools({
       if (fTo && day > fTo) return false;
       if (
         q &&
-        !`${name} ${e.target} ${e.field} ${e.beforeValue} ${e.afterValue}`.toLowerCase().includes(q)
+        !`${name} ${e.target} ${e.field} ${e.before} ${e.after}`.toLowerCase().includes(q)
       )
         return false;
       return true;
