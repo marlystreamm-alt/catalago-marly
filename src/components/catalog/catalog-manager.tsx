@@ -35,11 +35,11 @@ export function CatalogManager() {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Catálogos</DialogTitle>
             <DialogDescription>
-              Crea catálogos adicionales con sus propios servicios, precios y WhatsApp.
+              Crea catálogos adicionales y decide cuáles ve el público.
             </DialogDescription>
           </DialogHeader>
 
