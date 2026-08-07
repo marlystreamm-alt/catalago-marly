@@ -99,6 +99,35 @@ export function CatalogManager() {
               ))}
             </div>
           ) : null}
+
+          <div className="grid gap-2 border-t border-border pt-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              Mostrar u ocultar al público
+            </p>
+            {allCatalogIds.map((id) => (
+              <div
+                key={id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-card-foreground">
+                    {state.catalogs[id].name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {state.catalogs[id].hidden ? "Oculto al público" : "Visible al público"}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={state.catalogs[id].hidden ? "default" : "outline"}
+                  className="shrink-0 rounded-xl"
+                  onClick={() => toggleCatalogHidden(id)}
+                >
+                  {state.catalogs[id].hidden ? "Mostrar" : "Ocultar"}
+                </Button>
+              </div>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </>
