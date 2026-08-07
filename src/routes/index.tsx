@@ -433,8 +433,14 @@ function CatalogPage() {
                 {catalog.subtitle}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
               <ClientMenuButton />
+              {isAdmin ? (
+                <>
+                  <NotificationsDialog />
+                  <MenusDialog />
+                </>
+              ) : null}
               <AdminBar />
             </div>
           </div>
