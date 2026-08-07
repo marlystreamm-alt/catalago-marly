@@ -1,6 +1,6 @@
 # Historial por negocio más claro y panel de administrador ordenado
 
-Dos partes: (1) mejorar el historial de cambios de cada negocio vendido, (2) ordenar el panel de administrador y unificar lo repetido. Nada del catálogo público cambia.
+Dos partes: (1) mejorar el historial de cambios de cada negocio vendido, (2) ordenar el panel de administrador y unificar lo repetido con autorización aceptada por mi ,del catálogo público se ocultan los botones no autorizados.
 
 ## 1. Historial de cambios por negocio
 
