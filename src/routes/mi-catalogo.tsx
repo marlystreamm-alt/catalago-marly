@@ -25,7 +25,15 @@ import {
   ownerSaveItem,
 } from "@/lib/menus/owner.functions";
 import { clearOwnerToken, getOwnerToken } from "@/lib/menus/owner-session";
-import type { Features, MenuBusiness, MenuCategory, MenuItem } from "@/lib/menus/types";
+import {
+  EDIT_FEATURES,
+  FEATURE_LABELS,
+  type EditFeature,
+  type Features,
+  type MenuBusiness,
+  type MenuCategory,
+  type MenuItem,
+} from "@/lib/menus/types";
 
 export const Route = createFileRoute("/mi-catalogo")({
   ssr: false,
@@ -47,6 +55,29 @@ export const Route = createFileRoute("/mi-catalogo")({
 });
 
 const err = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
+
+/** Qué significa cada permiso, en palabras del dueño. */
+const FEATURE_HELP: Record<EditFeature, string> = {
+  edit_prices: "Cambiar el precio de tus productos.",
+  edit_item_text: "Cambiar el nombre y la descripción de tus productos.",
+  edit_photos: "Poner o cambiar la foto de cada producto.",
+  add_items: "Agregar productos nuevos a tu menú.",
+  delete_items: "Eliminar productos de tu menú.",
+  edit_categories: "Crear, renombrar y borrar categorías.",
+  toggle_items: "Marcar productos como disponibles o agotados.",
+  edit_business: "Cambiar el nombre, WhatsApp, dirección y logo del negocio.",
+};
+
+const NO_PERMISO = "No tienes autorización para esto. Pídeselo a MA² para que lo active.";
+
+/** Aviso claro cuando una sección está bloqueada. */
+function Bloqueado({ texto }: { texto: string }) {
+  return (
+    <p className="rounded-xl bg-muted p-2 text-xs text-muted-foreground">
+      🔒 {texto} {NO_PERMISO}
+    </p>
+  );
+}
 
 function OwnerPanel() {
   const navigate = useNavigate();
@@ -255,9 +286,29 @@ function OwnerPanel() {
           </section>
         ) : null}
 
-        {can("edit_business") ? (
-          <section className="card-soft space-y-3 rounded-3xl border border-border bg-card p-4">
-            <h2 className="text-sm font-semibold">Datos del negocio</h2>
+        <section className="card-soft space-y-2 rounded-3xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">Lo que puedes hacer en tu menú</h2>
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {EDIT_FEATURES.map((k) => (
+              <li key={k} className="flex items-start gap-2 text-xs">
+                <span aria-hidden>{can(k) ? "✅" : "🔒"}</span>
+                <span className={can(k) ? "" : "text-muted-foreground"}>
+                  <strong className="font-medium">{FEATURE_LABELS[k]}</strong>
+                  <br />
+                  {FEATURE_HELP[k]}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Lo que aparece con 🔒 está bloqueado por MA²; se ve pero no se puede modificar.
+          </p>
+        </section>
+
+        <section className="card-soft space-y-3 rounded-3xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">Datos del negocio</h2>
+          {can("edit_business") ? null : <Bloqueado texto="Cambiar los datos del negocio." />}
+          <fieldset disabled={!can("edit_business")} className="space-y-3 disabled:opacity-70">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="b-name">Nombre</Label>
@@ -296,23 +347,30 @@ function OwnerPanel() {
             <Button size="sm" className="rounded-xl" onClick={() => void saveBusiness(business)}>
               Guardar datos
             </Button>
-          </section>
-        ) : null}
+          </fieldset>
+        </section>
 
-        {can("edit_categories") ? (
-          <section className="space-y-2">
+        <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Categorías</h2>
-              <Button size="sm" variant="outline" className="rounded-xl" onClick={addCategory}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-xl"
+                disabled={!can("edit_categories")}
+                onClick={addCategory}
+              >
                 <Plus className="mr-1 size-4" />
                 Agregar
               </Button>
             </div>
+            {can("edit_categories") ? null : <Bloqueado texto="Manejar tus categorías." />}
             {categories.map((c) => (
               <div key={c.id} className="flex items-center gap-2">
                 <Input
                   value={c.name}
                   aria-label="Nombre de la categoría"
+                  disabled={!can("edit_categories")}
                   onChange={(e) =>
                     setCategories((prev) =>
                       prev.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
@@ -325,25 +383,30 @@ function OwnerPanel() {
                   size="icon"
                   className="size-8 shrink-0"
                   aria-label={`Eliminar ${c.name}`}
+                  disabled={!can("edit_categories")}
                   onClick={() => void removeCategory(c.id)}
                 >
                   <Trash2 className="size-4 text-destructive" />
                 </Button>
               </div>
             ))}
-          </section>
-        ) : null}
+        </section>
 
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Productos</h2>
-            {can("add_items") ? (
-              <Button size="sm" variant="outline" className="rounded-xl" onClick={addItem}>
-                <Plus className="mr-1 size-4" />
-                Agregar
-              </Button>
-            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl"
+              disabled={!can("add_items")}
+              onClick={addItem}
+            >
+              <Plus className="mr-1 size-4" />
+              Agregar
+            </Button>
           </div>
+          {can("add_items") ? null : <Bloqueado texto="Agregar productos nuevos." />}
           {items.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
               Todavía no tienes productos.
@@ -366,12 +429,13 @@ function OwnerPanel() {
                   }
                   onBlur={() => void saveItem(it)}
                 />
-                {can("delete_items") ? (
+                {true ? (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="size-8 shrink-0"
                     aria-label={`Eliminar ${it.name}`}
+                    disabled={!can("delete_items")}
                     onClick={() => void removeItem(it.id)}
                   >
                     <Trash2 className="size-4 text-destructive" />
@@ -379,12 +443,13 @@ function OwnerPanel() {
                 ) : null}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {can("edit_prices") ? (
+                {true ? (
                   <>
                     <div className="space-y-1">
                       <Label className="text-xs">Precio (MXN)</Label>
                       <Input
                         inputMode="decimal"
+                        disabled={!can("edit_prices")}
                         value={String(it.price)}
                         onChange={(e) =>
                           setItems((prev) =>
@@ -403,6 +468,7 @@ function OwnerPanel() {
                       <Input
                         value={it.priceText}
                         placeholder="Ej. desde $80"
+                        disabled={!can("edit_prices")}
                         onChange={(e) =>
                           setItems((prev) =>
                             prev.map((x) =>
@@ -415,10 +481,11 @@ function OwnerPanel() {
                     </div>
                   </>
                 ) : null}
-                {can("edit_categories") ? (
+                {true ? (
                   <div className="space-y-1">
                     <Label className="text-xs">Categoría</Label>
                     <Select
+                      disabled={!can("edit_categories")}
                       value={it.categoryId ?? "none"}
                       onValueChange={(v) =>
                         void saveItem({ ...it, categoryId: v === "none" ? null : v })
@@ -438,11 +505,12 @@ function OwnerPanel() {
                     </Select>
                   </div>
                 ) : null}
-                {can("edit_photos") ? (
+                {true ? (
                   <div className="space-y-1">
                     <Label className="text-xs">Imagen (URL)</Label>
                     <Input
                       value={it.imageUrl}
+                      disabled={!can("edit_photos")}
                       onChange={(e) =>
                         setItems((prev) =>
                           prev.map((x) => (x.id === it.id ? { ...x, imageUrl: e.target.value } : x)),
@@ -453,11 +521,12 @@ function OwnerPanel() {
                   </div>
                 ) : null}
               </div>
-              {can("edit_item_text") ? (
+              {true ? (
                 <div className="space-y-1">
                   <Label className="text-xs">Descripción</Label>
                   <Textarea
                     rows={2}
+                    disabled={!can("edit_item_text")}
                     value={it.description}
                     onChange={(e) =>
                       setItems((prev) =>
@@ -470,9 +539,10 @@ function OwnerPanel() {
                   />
                 </div>
               ) : null}
-              {can("toggle_items") ? (
+              {true ? (
                 <div className="flex items-center gap-2">
                   <Switch
+                    disabled={!can("toggle_items")}
                     checked={it.available}
                     onCheckedChange={(v) => void saveItem({ ...it, available: v })}
                     aria-label="Disponible"
