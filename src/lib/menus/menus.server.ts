@@ -246,7 +246,7 @@ export async function makeOwnerToken(businessId: string, actorName = "Dueño") {
 
 export async function readOwnerToken(
   token: string,
-): Promise<{ id: string; actor: string; kind: "dueno" | "equipo" }> {
+): Promise<{ id: string; actor: string; kind: "dueno" | "equipo"; adminId: string }> {
   const raw = token ?? "";
   const cut = raw.lastIndexOf(".");
   if (cut < 1) throw new Error("Sesión no válida, vuelve a entrar");
@@ -259,15 +259,22 @@ export async function readOwnerToken(
   const exp = parts.length === 3 ? parts[2] : payload.split(".")[1];
   if (!id || Number(exp) < Date.now()) throw new Error("Tu sesión expiró, vuelve a entrar");
   const kind = actor.startsWith("equipo:") ? "equipo" : "dueno";
-  const name = actor.replace(/^(equipo|dueno):/, "");
-  return { id, actor: name || "Dueño", kind };
+  const rest = actor.replace(/^(equipo|dueno):/, "");
+  const [adminId = "", ...nameParts] = kind === "equipo" ? rest.split(":") : ["", rest];
+  const name = kind === "equipo" ? nameParts.join(":") : rest;
+  return { id, actor: name || "Dueño", kind, adminId };
 }
 
 /** Carga el negocio del dueño validando token, estado y vencimiento. */
 export async function requireOwnerCtx(
   token: string,
-): Promise<{ business: MenuBusiness; actor: string; kind: "dueno" | "equipo" }> {
-  const { id, actor, kind } = await readOwnerToken(token);
+): Promise<{
+  business: MenuBusiness;
+  actor: string;
+  kind: "dueno" | "equipo";
+  adminId: string;
+}> {
+  const { id, actor, kind, adminId } = await readOwnerToken(token);
   const db = await admin();
   const { data } = await db.from("menu_businesses").select("*").eq("id", id).maybeSingle();
   if (!data) throw new Error("Negocio no encontrado");
@@ -276,7 +283,12 @@ export async function requireOwnerCtx(
   const status = businessStatus(business);
   if (status === "apagado") throw new Error("Tu catálogo está apagado");
   if (status === "vencido") throw new Error("Tu acceso venció");
-  return { business, actor, kind };
+  if (kind === "equipo") {
+    if (!business.multiAdmin) throw new Error("Tu acceso está suspendido");
+    const { data: row } = await db.from("menu_admins").select("suspended").eq("id", adminId).maybeSingle();
+    if (!row || bool((row as Row)["suspended"], false)) throw new Error("Tu acceso está suspendido");
+  }
+  return { business, actor, kind, adminId };
 }
 
 export async function requireOwner(token: string): Promise<MenuBusiness> {
@@ -344,7 +356,10 @@ export async function ownerLogin(slug: string, password: string) {
   });
 
   return {
-    token: await makeOwnerToken(business.id, `${adminId ? "equipo" : "dueno"}:${actor}`),
+    token: await makeOwnerToken(
+      business.id,
+      adminId ? `equipo:${adminId}:${actor}` : `dueno:${actor}`,
+    ),
     business,
     mustChange: temp,
     adminId,
