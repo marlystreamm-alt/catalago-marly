@@ -5,6 +5,7 @@ import type {
   MenuAdmin,
   MenuAuditEntry,
   MenuBackup,
+  MenuBackupVersion,
   MenuBusiness,
   MenuCategory,
   MenuData,
@@ -299,42 +300,47 @@ export const menusAudit = createServerFn({ method: "POST" })
     return listAudit(data.businessId, data.limit);
   });
 
-/** Respaldo JSON del catálogo de un negocio. */
+/** Respaldo JSON del catálogo de un negocio (queda guardado como versión). */
 export const menusExport = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ code, businessId: z.string().min(1) }).parse(d))
   .handler(async ({ data }): Promise<MenuBackup> => {
     await gate(data.code);
-    const { loadMenu } = await import("./menus.server");
-    const { business, categories, items } = await loadMenu(data.businessId);
-    const catName = new Map(categories.map((c) => [c.id, c.name]));
-    return {
-      kind: "ma2-menu-backup",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      business: {
-        name: business.name,
-        ownerName: business.ownerName,
-        whatsapp: business.whatsapp,
-        address: business.address,
-        logoUrl: business.logoUrl,
-        notes: business.notes,
-      },
-      categories: categories.map((c) => ({ name: c.name, sortIndex: c.sortIndex })),
-      items: items.map((i) => ({
-        category: i.categoryId ? (catName.get(i.categoryId) ?? null) : null,
-        name: i.name,
-        description: i.description,
-        price: i.price,
-        priceText: i.priceText,
-        imageUrl: i.imageUrl,
-        available: i.available,
-        sortIndex: i.sortIndex,
-      })),
-    };
+    const { buildBackup, saveBackupVersion, logAudit } = await import("./menus.server");
+    const backup = await buildBackup(data.businessId);
+    const saved = await saveBackupVersion({
+      businessId: data.businessId,
+      origin: "export",
+      label: "Exportación manual desde el panel",
+      actorKind: "admin",
+      actorName: "Administrador",
+      payload: backup,
+    });
+    await logAudit({
+      businessId: data.businessId,
+      actorKind: "admin",
+      actorName: "Administrador",
+      action: "respaldo",
+      target: "Catálogo",
+      field: `Exportó respaldo v${saved.version} · origen: panel de administrador`,
+      after: `resultado: ${backup.items.length} productos, ${backup.categories.length} categorías`,
+    });
+    return backup;
   });
 
 const backupSchema = z.object({
   kind: z.literal("ma2-menu-backup").optional(),
+  version: z.number().int().default(1),
+  exportedAt: z.string().default(() => new Date().toISOString()),
+  business: z
+    .object({
+      name: z.string().default(""),
+      ownerName: z.string().default(""),
+      whatsapp: z.string().default(""),
+      address: z.string().default(""),
+      logoUrl: z.string().default(""),
+      notes: z.string().default(""),
+    })
+    .default({ name: "", ownerName: "", whatsapp: "", address: "", logoUrl: "", notes: "" }),
   categories: z.array(z.object({ name: z.string(), sortIndex: z.number().int().default(0) })).default([]),
   items: z
     .array(
@@ -360,71 +366,58 @@ export const menusImport = createServerFn({ method: "POST" })
         code,
         businessId: z.string().min(1),
         replace: z.boolean().default(true),
+        origin: z.string().default("archivo JSON"),
         backup: backupSchema,
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ categories: number; items: number }> => {
+  .handler(async ({ data }): Promise<{ categories: number; items: number; resumen: string; snapshotVersion: number }> => {
     await gate(data.code);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { logAudit } = await import("./menus.server");
-    const bid = data.businessId;
-
-    if (data.replace) {
-      await supabaseAdmin.from("menu_items").delete().eq("business_id", bid);
-      await supabaseAdmin.from("menu_categories").delete().eq("business_id", bid);
-    }
-
-    const catId = new Map<string, string>();
-    if (!data.replace) {
-      const { data: existing } = await supabaseAdmin
-        .from("menu_categories")
-        .select("id,name")
-        .eq("business_id", bid);
-      for (const r of existing ?? []) {
-        const row = r as { id: string; name: string };
-        catId.set(row.name, row.id);
-      }
-    }
-    for (const c of data.backup.categories) {
-      if (catId.has(c.name)) continue;
-      const { data: row, error } = await supabaseAdmin
-        .from("menu_categories")
-        .insert({ business_id: bid, name: c.name, sort_index: c.sortIndex })
-        .select("id")
-        .single();
-      if (error) throw new Error(error.message);
-      catId.set(c.name, (row as { id: string }).id);
-    }
-
-    if (data.backup.items.length) {
-      const { error } = await supabaseAdmin.from("menu_items").insert(
-        data.backup.items.map((i) => ({
-          business_id: bid,
-          category_id: i.category ? (catId.get(i.category) ?? null) : null,
-          name: i.name,
-          description: i.description,
-          price: i.price,
-          price_text: i.priceText,
-          image_url: i.imageUrl,
-          available: i.available,
-          sort_index: i.sortIndex,
-        })),
-      );
-      if (error) throw new Error(error.message);
-    }
-
-    await logAudit({
-      businessId: bid,
+    const { applyBackup } = await import("./menus.server");
+    return applyBackup({
+      businessId: data.businessId,
+      backup: data.backup as MenuBackup,
+      replace: data.replace,
+      origin: data.origin,
       actorKind: "admin",
       actorName: "Administrador",
-      action: "respaldo",
-      target: "Catálogo",
-      field: data.replace ? "Restauró un respaldo (reemplazó todo)" : "Importó un respaldo (agregó)",
-      after: `${data.backup.items.length} productos`,
     });
+  });
 
-    return { categories: data.backup.categories.length, items: data.backup.items.length };
+/** Versiones de respaldo guardadas de un negocio. */
+export const menusBackups = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ code, businessId: z.string().min(1) }).parse(d))
+  .handler(async ({ data }): Promise<MenuBackupVersion[]> => {
+    await gate(data.code);
+    const { listBackups } = await import("./menus.server");
+    return listBackups(data.businessId);
+  });
+
+/** Restaura el catálogo a una versión guardada (sin tocar otros negocios). */
+export const menusRestoreBackup = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        code,
+        businessId: z.string().min(1),
+        backupId: z.string().min(1),
+        replace: z.boolean().default(true),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }): Promise<{ categories: number; items: number; resumen: string; snapshotVersion: number }> => {
+    await gate(data.code);
+    const { applyBackup, getBackupPayload, listBackups } = await import("./menus.server");
+    const payload = await getBackupPayload(data.backupId, data.businessId);
+    const ficha = (await listBackups(data.businessId, 200)).find((b) => b.id === data.backupId);
+    return applyBackup({
+      businessId: data.businessId,
+      backup: payload,
+      replace: data.replace,
+      origin: `versión guardada v${ficha?.version ?? "?"}`,
+      actorKind: "admin",
+      actorName: "Administrador",
+    });
   });
 
 /** Prende o apaga que el negocio tenga varios administradores. */
