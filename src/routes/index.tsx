@@ -37,11 +37,7 @@ import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-skeletons";
-import {
-  AuditDialog,
-  CatalogVisibilityDialog,
-  HistoryDialog,
-} from "@/components/catalog/history-dialog";
+import { HistoryDialog } from "@/components/catalog/history-dialog";
 import { PendingOrdersBar } from "@/components/catalog/pending-orders";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
