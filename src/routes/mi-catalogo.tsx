@@ -40,7 +40,10 @@ export const Route = createFileRoute("/mi-catalogo")({
   head: () => ({
     meta: [
       { title: "Mi catálogo — Panel del dueño | MA² Connect" },
-      { name: "description", content: "Edita tu catálogo: productos, precios, fotos y categorías." },
+      {
+        name: "description",
+        content: "Edita tu catálogo: productos, precios, fotos y categorías.",
+      },
       { property: "og:title", content: "Mi catálogo — Panel del dueño" },
       {
         property: "og:description",
@@ -351,45 +354,45 @@ function OwnerPanel() {
         </section>
 
         <section className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Categorías</h2>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-xl"
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Categorías</h2>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-xl"
+              disabled={!can("edit_categories")}
+              onClick={addCategory}
+            >
+              <Plus className="mr-1 size-4" />
+              Agregar
+            </Button>
+          </div>
+          {can("edit_categories") ? null : <Bloqueado texto="Manejar tus categorías." />}
+          {categories.map((c) => (
+            <div key={c.id} className="flex items-center gap-2">
+              <Input
+                value={c.name}
+                aria-label="Nombre de la categoría"
                 disabled={!can("edit_categories")}
-                onClick={addCategory}
+                onChange={(e) =>
+                  setCategories((prev) =>
+                    prev.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
+                  )
+                }
+                onBlur={() => void saveCategory(c)}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0"
+                aria-label={`Eliminar ${c.name}`}
+                disabled={!can("edit_categories")}
+                onClick={() => void removeCategory(c.id)}
               >
-                <Plus className="mr-1 size-4" />
-                Agregar
+                <Trash2 className="size-4 text-destructive" />
               </Button>
             </div>
-            {can("edit_categories") ? null : <Bloqueado texto="Manejar tus categorías." />}
-            {categories.map((c) => (
-              <div key={c.id} className="flex items-center gap-2">
-                <Input
-                  value={c.name}
-                  aria-label="Nombre de la categoría"
-                  disabled={!can("edit_categories")}
-                  onChange={(e) =>
-                    setCategories((prev) =>
-                      prev.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
-                    )
-                  }
-                  onBlur={() => void saveCategory(c)}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 shrink-0"
-                  aria-label={`Eliminar ${c.name}`}
-                  disabled={!can("edit_categories")}
-                  onClick={() => void removeCategory(c.id)}
-                >
-                  <Trash2 className="size-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
+          ))}
         </section>
 
         <section className="space-y-2">
@@ -429,115 +432,113 @@ function OwnerPanel() {
                   }
                   onBlur={() => void saveItem(it)}
                 />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 shrink-0"
-                    aria-label={`Eliminar ${it.name}`}
-                    disabled={!can("delete_items")}
-                    onClick={() => void removeItem(it.id)}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  aria-label={`Eliminar ${it.name}`}
+                  disabled={!can("delete_items")}
+                  onClick={() => void removeItem(it.id)}
+                >
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                  <>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Precio (MXN)</Label>
-                      <Input
-                        inputMode="decimal"
-                        disabled={!can("edit_prices")}
-                        value={String(it.price)}
-                        onChange={(e) =>
-                          setItems((prev) =>
-                            prev.map((x) =>
-                              x.id === it.id
-                                ? { ...x, price: Math.max(0, Number(e.target.value) || 0) }
-                                : x,
-                            ),
-                          )
-                        }
-                        onBlur={() => void saveItem(it)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Precio en texto</Label>
-                      <Input
-                        value={it.priceText}
-                        placeholder="Ej. desde $80"
-                        disabled={!can("edit_prices")}
-                        onChange={(e) =>
-                          setItems((prev) =>
-                            prev.map((x) =>
-                              x.id === it.id ? { ...x, priceText: e.target.value } : x,
-                            ),
-                          )
-                        }
-                        onBlur={() => void saveItem(it)}
-                      />
-                    </div>
-                  </>
+                <>
                   <div className="space-y-1">
-                    <Label className="text-xs">Categoría</Label>
-                    <Select
-                      disabled={!can("edit_categories")}
-                      value={it.categoryId ?? "none"}
-                      onValueChange={(v) =>
-                        void saveItem({ ...it, categoryId: v === "none" ? null : v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin categoría</SelectItem>
-                        {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Imagen (URL)</Label>
+                    <Label className="text-xs">Precio (MXN)</Label>
                     <Input
-                      value={it.imageUrl}
-                      disabled={!can("edit_photos")}
+                      inputMode="decimal"
+                      disabled={!can("edit_prices")}
+                      value={String(it.price)}
                       onChange={(e) =>
                         setItems((prev) =>
-                          prev.map((x) => (x.id === it.id ? { ...x, imageUrl: e.target.value } : x)),
+                          prev.map((x) =>
+                            x.id === it.id
+                              ? { ...x, price: Math.max(0, Number(e.target.value) || 0) }
+                              : x,
+                          ),
                         )
                       }
                       onBlur={() => void saveItem(it)}
                     />
                   </div>
-              </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Precio en texto</Label>
+                    <Input
+                      value={it.priceText}
+                      placeholder="Ej. desde $80"
+                      disabled={!can("edit_prices")}
+                      onChange={(e) =>
+                        setItems((prev) =>
+                          prev.map((x) =>
+                            x.id === it.id ? { ...x, priceText: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      onBlur={() => void saveItem(it)}
+                    />
+                  </div>
+                </>
                 <div className="space-y-1">
-                  <Label className="text-xs">Descripción</Label>
-                  <Textarea
-                    rows={2}
-                    disabled={!can("edit_item_text")}
-                    value={it.description}
+                  <Label className="text-xs">Categoría</Label>
+                  <Select
+                    disabled={!can("edit_categories")}
+                    value={it.categoryId ?? "none"}
+                    onValueChange={(v) =>
+                      void saveItem({ ...it, categoryId: v === "none" ? null : v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sin categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin categoría</SelectItem>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Imagen (URL)</Label>
+                  <Input
+                    value={it.imageUrl}
+                    disabled={!can("edit_photos")}
                     onChange={(e) =>
                       setItems((prev) =>
-                        prev.map((x) =>
-                          x.id === it.id ? { ...x, description: e.target.value } : x,
-                        ),
+                        prev.map((x) => (x.id === it.id ? { ...x, imageUrl: e.target.value } : x)),
                       )
                     }
                     onBlur={() => void saveItem(it)}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    disabled={!can("toggle_items")}
-                    checked={it.available}
-                    onCheckedChange={(v) => void saveItem({ ...it, available: v })}
-                    aria-label="Disponible"
-                  />
-                  <span className="text-sm text-muted-foreground">Disponible</span>
-                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Descripción</Label>
+                <Textarea
+                  rows={2}
+                  disabled={!can("edit_item_text")}
+                  value={it.description}
+                  onChange={(e) =>
+                    setItems((prev) =>
+                      prev.map((x) => (x.id === it.id ? { ...x, description: e.target.value } : x)),
+                    )
+                  }
+                  onBlur={() => void saveItem(it)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  disabled={!can("toggle_items")}
+                  checked={it.available}
+                  onCheckedChange={(v) => void saveItem({ ...it, available: v })}
+                  aria-label="Disponible"
+                />
+                <span className="text-sm text-muted-foreground">Disponible</span>
+              </div>
             </div>
           ))}
         </section>

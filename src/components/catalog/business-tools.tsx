@@ -1,6 +1,16 @@
 /** Bitácora filtrable, respaldos versionados y administradores adicionales de un negocio vendido. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Download, History, Loader2, Plus, RotateCcw, Trash2, Upload, Users } from "lucide-react";
+import {
+  Copy,
+  Download,
+  History,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,12 +34,7 @@ import {
   menusSetAdmin,
   menusSetMultiAdmin,
 } from "@/lib/menus/menus.functions";
-import type {
-  MenuAdmin,
-  MenuAuditEntry,
-  MenuBackupVersion,
-  MenuBusiness,
-} from "@/lib/menus/types";
+import type { MenuAdmin, MenuAuditEntry, MenuBackupVersion, MenuBusiness } from "@/lib/menus/types";
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
 
@@ -179,7 +184,9 @@ export function BusinessTools({
     )
       return;
     try {
-      const res = await menusRestoreBackup({ data: { code, businessId, backupId: b.id, replace: true } });
+      const res = await menusRestoreBackup({
+        data: { code, businessId, backupId: b.id, replace: true },
+      });
       toast.success(`Restaurado a v${b.version} · cambios → ${res.resumen}`);
       await refresh();
     } catch (e) {
@@ -337,7 +344,12 @@ export function BusinessTools({
           como versión y anotada en el historial con su origen y resultado.
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => void exportJson()}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => void exportJson()}
+          >
             <Download className="mr-1 size-4" />
             Exportar JSON
           </Button>

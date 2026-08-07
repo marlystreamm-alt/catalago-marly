@@ -171,7 +171,12 @@ export const menusGenerateAccess = createServerFn({ method: "POST" })
 export const menusSetAccess = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z
-      .object({ code, id: z.string().min(1), suspended: z.boolean().optional(), revoke: z.boolean().optional() })
+      .object({
+        code,
+        id: z.string().min(1),
+        suspended: z.boolean().optional(),
+        revoke: z.boolean().optional(),
+      })
       .parse(d),
   )
   .handler(async ({ data }): Promise<MenuBusiness> => {
@@ -292,7 +297,13 @@ export const menusDeleteItem = createServerFn({ method: "POST" })
 /** Historial de cambios de un negocio (quién, cuándo y qué cambió). */
 export const menusAudit = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
-    z.object({ code, businessId: z.string().min(1), limit: z.number().int().min(1).max(500).default(200) }).parse(d),
+    z
+      .object({
+        code,
+        businessId: z.string().min(1),
+        limit: z.number().int().min(1).max(500).default(200),
+      })
+      .parse(d),
   )
   .handler(async ({ data }): Promise<MenuAuditEntry[]> => {
     await gate(data.code);
@@ -341,7 +352,9 @@ const backupSchema = z.object({
       notes: z.string().default(""),
     })
     .default({ name: "", ownerName: "", whatsapp: "", address: "", logoUrl: "", notes: "" }),
-  categories: z.array(z.object({ name: z.string(), sortIndex: z.number().int().default(0) })).default([]),
+  categories: z
+    .array(z.object({ name: z.string(), sortIndex: z.number().int().default(0) }))
+    .default([]),
   items: z
     .array(
       z.object({
@@ -371,18 +384,27 @@ export const menusImport = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ categories: number; items: number; resumen: string; snapshotVersion: number }> => {
-    await gate(data.code);
-    const { applyBackup } = await import("./menus.server");
-    return applyBackup({
-      businessId: data.businessId,
-      backup: data.backup as MenuBackup,
-      replace: data.replace,
-      origin: data.origin,
-      actorKind: "admin",
-      actorName: "Administrador",
-    });
-  });
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      categories: number;
+      items: number;
+      resumen: string;
+      snapshotVersion: number;
+    }> => {
+      await gate(data.code);
+      const { applyBackup } = await import("./menus.server");
+      return applyBackup({
+        businessId: data.businessId,
+        backup: data.backup as MenuBackup,
+        replace: data.replace,
+        origin: data.origin,
+        actorKind: "admin",
+        actorName: "Administrador",
+      });
+    },
+  );
 
 /** Versiones de respaldo guardadas de un negocio. */
 export const menusBackups = createServerFn({ method: "POST" })
@@ -405,20 +427,29 @@ export const menusRestoreBackup = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }): Promise<{ categories: number; items: number; resumen: string; snapshotVersion: number }> => {
-    await gate(data.code);
-    const { applyBackup, getBackupPayload, listBackups } = await import("./menus.server");
-    const payload = await getBackupPayload(data.backupId, data.businessId);
-    const ficha = (await listBackups(data.businessId, 200)).find((b) => b.id === data.backupId);
-    return applyBackup({
-      businessId: data.businessId,
-      backup: payload,
-      replace: data.replace,
-      origin: `versión guardada v${ficha?.version ?? "?"}`,
-      actorKind: "admin",
-      actorName: "Administrador",
-    });
-  });
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      categories: number;
+      items: number;
+      resumen: string;
+      snapshotVersion: number;
+    }> => {
+      await gate(data.code);
+      const { applyBackup, getBackupPayload, listBackups } = await import("./menus.server");
+      const payload = await getBackupPayload(data.backupId, data.businessId);
+      const ficha = (await listBackups(data.businessId, 200)).find((b) => b.id === data.backupId);
+      return applyBackup({
+        businessId: data.businessId,
+        backup: payload,
+        replace: data.replace,
+        origin: `versión guardada v${ficha?.version ?? "?"}`,
+        actorKind: "admin",
+        actorName: "Administrador",
+      });
+    },
+  );
 
 /** Prende o apaga que el negocio tenga varios administradores. */
 export const menusSetMultiAdmin = createServerFn({ method: "POST" })

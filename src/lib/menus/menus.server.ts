@@ -11,7 +11,6 @@ import {
   type MenuItem,
 } from "./types";
 
-
 type Row = Record<string, unknown>;
 
 async function admin() {
@@ -136,11 +135,7 @@ export async function loadMenu(businessId: string) {
 /** Catálogo público de un negocio por su enlace (slug), respetando sus interruptores. */
 export async function loadPublicMenu(slug: string) {
   const db = await admin();
-  const { data: biz } = await db
-    .from("menu_businesses")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const { data: biz } = await db.from("menu_businesses").select("*").eq("slug", slug).maybeSingle();
   if (!biz) return null;
   const business = rowToBusiness(biz as Row);
   if (businessStatus(business) !== "activo") return null;
@@ -269,9 +264,7 @@ export async function readOwnerToken(
 }
 
 /** Carga el negocio del dueño validando token, estado y vencimiento. */
-export async function requireOwnerCtx(
-  token: string,
-): Promise<{
+export async function requireOwnerCtx(token: string): Promise<{
   business: MenuBusiness;
   actor: string;
   kind: "dueno" | "equipo";
@@ -288,8 +281,13 @@ export async function requireOwnerCtx(
   if (status === "vencido") throw new Error("Tu acceso venció");
   if (kind === "equipo") {
     if (!business.multiAdmin) throw new Error("Tu acceso está suspendido");
-    const { data: row } = await db.from("menu_admins").select("suspended").eq("id", adminId).maybeSingle();
-    if (!row || bool((row as Row)["suspended"], false)) throw new Error("Tu acceso está suspendido");
+    const { data: row } = await db
+      .from("menu_admins")
+      .select("suspended")
+      .eq("id", adminId)
+      .maybeSingle();
+    if (!row || bool((row as Row)["suspended"], false))
+      throw new Error("Tu acceso está suspendido");
   }
   return { business, actor, kind, adminId };
 }
@@ -321,7 +319,10 @@ export async function ownerLogin(slug: string, password: string) {
   let matched = Boolean(hash && salt) && (await hashPassword(password, salt)) === hash;
 
   if (!matched && business.multiAdmin) {
-    const { data: admins } = await db.from("menu_admins").select("*").eq("business_id", business.id);
+    const { data: admins } = await db
+      .from("menu_admins")
+      .select("*")
+      .eq("business_id", business.id);
     for (const row of admins ?? []) {
       const r = row as Row;
       const s = str(r["access_salt"]);
@@ -347,7 +348,10 @@ export async function ownerLogin(slug: string, password: string) {
     throw new Error(status === "vencido" ? "Tu acceso venció" : "Tu catálogo está apagado");
 
   if (adminId)
-    await db.from("menu_admins").update({ last_login_at: new Date().toISOString() }).eq("id", adminId);
+    await db
+      .from("menu_admins")
+      .update({ last_login_at: new Date().toISOString() })
+      .eq("id", adminId);
 
   await logAudit({
     businessId: business.id,
@@ -419,7 +423,6 @@ export async function listAudit(businessId: string, limit = 200) {
     };
   });
 }
-
 
 /* --------------------------- Respaldos versionados --------------------------- */
 
@@ -509,7 +512,9 @@ export async function listBackups(businessId: string, limit = 50): Promise<MenuB
   const db = await admin();
   const { data, error } = await db
     .from("menu_backups")
-    .select("id,business_id,version,origin,label,actor_kind,actor_name,categories_count,items_count,created_at")
+    .select(
+      "id,business_id,version,origin,label,actor_kind,actor_name,categories_count,items_count,created_at",
+    )
     .eq("business_id", businessId)
     .order("version", { ascending: false })
     .limit(limit);
