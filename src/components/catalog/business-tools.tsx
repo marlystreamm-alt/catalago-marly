@@ -4,7 +4,6 @@ import { Copy, Download, History, Loader2, Plus, Trash2, Upload, Users } from "l
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -314,6 +313,3 @@ export function BusinessTools({
     </>
   );
 }
-
-/** Etiqueta para reutilizar el tipo de Label sin warnings de lint. */
-export const BusinessToolsLabel = Label;

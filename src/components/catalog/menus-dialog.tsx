@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getSavedCode, saveCode } from "@/lib/notify/client";
+import { BusinessTools } from "@/components/catalog/business-tools";
 import {
   menusCounts,
   menusDeleteBusiness,
@@ -681,6 +682,14 @@ export function MenusDialog() {
                   : "Todavía no tiene contraseña."}
               </p>
             </section>
+
+            <BusinessTools
+              code={code}
+              business={business}
+              onBusinessChange={(saved) =>
+                setBusinesses((prev) => prev.map((b) => (b.id === saved.id ? saved : b)))
+              }
+            />
 
 
             <section className="space-y-2">

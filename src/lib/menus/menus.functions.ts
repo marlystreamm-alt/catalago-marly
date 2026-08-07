@@ -262,6 +262,16 @@ export const menusSaveItem = createServerFn({ method: "POST" })
       : supabaseAdmin.from("menu_items").insert(payload).select("*").single();
     const { data: row, error } = await q;
     if (error) throw new Error(error.message);
+    const { logAudit } = await import("./menus.server");
+    await logAudit({
+      businessId: i.businessId,
+      actorKind: "admin",
+      actorName: "Administrador",
+      action: i.id ? "edicion" : "creacion",
+      target: i.name.trim(),
+      field: i.id ? "Guardó el producto" : "Creó el producto",
+      after: `$${i.price}${i.available ? "" : " · no disponible"}`,
+    });
     return rowToItem(row as Record<string, unknown>);
   });
 
