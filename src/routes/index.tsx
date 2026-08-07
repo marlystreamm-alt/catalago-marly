@@ -857,8 +857,6 @@ function CatalogPage() {
       <CatalogSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <CategoriesDialog open={categoriesOpen} onOpenChange={setCategoriesOpen} />
       <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
-      <CatalogVisibilityDialog open={visibilityOpen} onOpenChange={setVisibilityOpen} />
-      <AuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
       <ServiceDetailDialog
         service={detailService}
         open={!!detailService}
