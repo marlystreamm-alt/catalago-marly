@@ -103,7 +103,7 @@ export function BusinessTools({
   const [order, setOrder] = useState<"desc" | "asc">("desc");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
-  const [showAllBackups, setShowAllBackups] = useState(false);
+  
   const fileRef = useRef<HTMLInputElement>(null);
   const businessId = business.id;
 
