@@ -73,6 +73,59 @@ export type MenuBusiness = {
   accessTemp: boolean;
   accessSuspended: boolean;
   accessUpdatedAt: string | null;
+  /** Permite que el negocio tenga varios administradores con contraseñas distintas. */
+  multiAdmin: boolean;
+};
+
+/** Administrador adicional de un negocio (mismos permisos que el dueño). */
+export type MenuAdmin = {
+  id: string;
+  businessId: string;
+  name: string;
+  suspended: boolean;
+  temp: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+};
+
+/** Movimiento de la bitácora de un negocio. */
+export type MenuAuditEntry = {
+  id: string;
+  businessId: string;
+  actorKind: "dueno" | "admin" | "equipo";
+  actorName: string;
+  action: string;
+  target: string;
+  field: string;
+  before: string;
+  after: string;
+  createdAt: string;
+};
+
+/** Respaldo JSON del catálogo de un negocio. */
+export type MenuBackup = {
+  kind: "ma2-menu-backup";
+  version: 1;
+  exportedAt: string;
+  business: {
+    name: string;
+    ownerName: string;
+    whatsapp: string;
+    address: string;
+    logoUrl: string;
+    notes: string;
+  };
+  categories: { name: string; sortIndex: number }[];
+  items: {
+    category: string | null;
+    name: string;
+    description: string;
+    price: number;
+    priceText: string;
+    imageUrl: string;
+    available: boolean;
+    sortIndex: number;
+  }[];
 };
 
 export type MenuCategory = {
