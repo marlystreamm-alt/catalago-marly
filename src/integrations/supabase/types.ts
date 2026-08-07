@@ -14,6 +14,100 @@ export type Database = {
   }
   public: {
     Tables: {
+      menu_admins: {
+        Row: {
+          access_hash: string
+          access_salt: string
+          access_temp: boolean
+          business_id: string
+          created_at: string
+          id: string
+          last_login_at: string | null
+          name: string
+          suspended: boolean
+          updated_at: string
+        }
+        Insert: {
+          access_hash?: string
+          access_salt?: string
+          access_temp?: boolean
+          business_id: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          name?: string
+          suspended?: boolean
+          updated_at?: string
+        }
+        Update: {
+          access_hash?: string
+          access_salt?: string
+          access_temp?: boolean
+          business_id?: string
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          name?: string
+          suspended?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_admins_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_audit: {
+        Row: {
+          action: string
+          actor_kind: string
+          actor_name: string
+          after_value: string
+          before_value: string
+          business_id: string
+          created_at: string
+          field: string
+          id: string
+          target: string
+        }
+        Insert: {
+          action?: string
+          actor_kind?: string
+          actor_name?: string
+          after_value?: string
+          before_value?: string
+          business_id: string
+          created_at?: string
+          field?: string
+          id?: string
+          target?: string
+        }
+        Update: {
+          action?: string
+          actor_kind?: string
+          actor_name?: string
+          after_value?: string
+          before_value?: string
+          business_id?: string
+          created_at?: string
+          field?: string
+          id?: string
+          target?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_audit_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "menu_businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_businesses: {
         Row: {
           access_hash: string
@@ -28,6 +122,7 @@ export type Database = {
           features: Json
           id: string
           logo_url: string
+          multi_admin: boolean
           name: string
           notes: string
           owner_name: string
@@ -49,6 +144,7 @@ export type Database = {
           features?: Json
           id?: string
           logo_url?: string
+          multi_admin?: boolean
           name?: string
           notes?: string
           owner_name?: string
@@ -70,6 +166,7 @@ export type Database = {
           features?: Json
           id?: string
           logo_url?: string
+          multi_admin?: boolean
           name?: string
           notes?: string
           owner_name?: string
