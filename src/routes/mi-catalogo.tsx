@@ -429,7 +429,6 @@ function OwnerPanel() {
                   }
                   onBlur={() => void saveItem(it)}
                 />
-                {true ? (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -440,10 +439,8 @@ function OwnerPanel() {
                   >
                     <Trash2 className="size-4 text-destructive" />
                   </Button>
-                ) : null}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {true ? (
                   <>
                     <div className="space-y-1">
                       <Label className="text-xs">Precio (MXN)</Label>
@@ -480,8 +477,6 @@ function OwnerPanel() {
                       />
                     </div>
                   </>
-                ) : null}
-                {true ? (
                   <div className="space-y-1">
                     <Label className="text-xs">Categoría</Label>
                     <Select
@@ -504,8 +499,6 @@ function OwnerPanel() {
                       </SelectContent>
                     </Select>
                   </div>
-                ) : null}
-                {true ? (
                   <div className="space-y-1">
                     <Label className="text-xs">Imagen (URL)</Label>
                     <Input
@@ -519,9 +512,7 @@ function OwnerPanel() {
                       onBlur={() => void saveItem(it)}
                     />
                   </div>
-                ) : null}
               </div>
-              {true ? (
                 <div className="space-y-1">
                   <Label className="text-xs">Descripción</Label>
                   <Textarea
@@ -538,8 +529,6 @@ function OwnerPanel() {
                     onBlur={() => void saveItem(it)}
                   />
                 </div>
-              ) : null}
-              {true ? (
                 <div className="flex items-center gap-2">
                   <Switch
                     disabled={!can("toggle_items")}
@@ -549,7 +538,6 @@ function OwnerPanel() {
                   />
                   <span className="text-sm text-muted-foreground">Disponible</span>
                 </div>
-              ) : null}
             </div>
           ))}
         </section>
