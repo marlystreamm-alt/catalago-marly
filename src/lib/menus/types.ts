@@ -1,4 +1,60 @@
-/** Tipos del apartado Menús (solo administrador). */
+/** Tipos del apartado de catálogos vendidos (negocios de clientes). */
+
+export const VIEW_FEATURES = [
+  "show_prices",
+  "show_photos",
+  "show_descriptions",
+  "show_whatsapp",
+  "show_address",
+] as const;
+
+export const EDIT_FEATURES = [
+  "edit_prices",
+  "edit_item_text",
+  "edit_photos",
+  "add_items",
+  "delete_items",
+  "edit_categories",
+  "toggle_items",
+  "edit_business",
+] as const;
+
+export type ViewFeature = (typeof VIEW_FEATURES)[number];
+export type EditFeature = (typeof EDIT_FEATURES)[number];
+export type FeatureKey = ViewFeature | EditFeature;
+export type Features = Record<FeatureKey, boolean>;
+
+export const FEATURE_LABELS: Record<FeatureKey, string> = {
+  show_prices: "Mostrar precios",
+  show_photos: "Mostrar fotos",
+  show_descriptions: "Mostrar descripciones",
+  show_whatsapp: "Botón Pedir por WhatsApp",
+  show_address: "Mostrar dirección",
+  edit_prices: "Editar precios",
+  edit_item_text: "Editar nombre y descripción",
+  edit_photos: "Cambiar fotos",
+  add_items: "Agregar productos",
+  delete_items: "Eliminar productos",
+  edit_categories: "Manejar categorías",
+  toggle_items: "Activar/desactivar productos",
+  edit_business: "Cambiar datos del negocio",
+};
+
+export const DEFAULT_FEATURES: Features = {
+  show_prices: true,
+  show_photos: true,
+  show_descriptions: true,
+  show_whatsapp: true,
+  show_address: true,
+  edit_prices: true,
+  edit_item_text: true,
+  edit_photos: true,
+  add_items: true,
+  delete_items: false,
+  edit_categories: true,
+  toggle_items: true,
+  edit_business: false,
+};
 
 export type MenuBusiness = {
   id: string;
@@ -10,6 +66,13 @@ export type MenuBusiness = {
   notes: string;
   active: boolean;
   sortIndex: number;
+  logoUrl: string;
+  expiresOn: string | null;
+  features: Features;
+  hasAccess: boolean;
+  accessTemp: boolean;
+  accessSuspended: boolean;
+  accessUpdatedAt: string | null;
 };
 
 export type MenuCategory = {
@@ -38,6 +101,9 @@ export type MenuData = {
   items: MenuItem[];
 };
 
+/** Datos que ve el dueño en su panel: su negocio, su menú y sus permisos. */
+export type OwnerData = MenuData & { features: Features; mustChangePassword: boolean };
+
 export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
   slug: "",
   name: "",
@@ -47,4 +113,21 @@ export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
   notes: "",
   active: true,
   sortIndex: 0,
+  logoUrl: "",
+  expiresOn: null,
+  features: { ...DEFAULT_FEATURES },
+  hasAccess: false,
+  accessTemp: true,
+  accessSuspended: false,
+  accessUpdatedAt: null,
 });
+
+/** Estado comercial del negocio para el panel del administrador. */
+export function businessStatus(b: {
+  active: boolean;
+  expiresOn: string | null;
+}): "activo" | "apagado" | "vencido" {
+  if (!b.active) return "apagado";
+  if (b.expiresOn && b.expiresOn < new Date().toISOString().slice(0, 10)) return "vencido";
+  return "activo";
+}

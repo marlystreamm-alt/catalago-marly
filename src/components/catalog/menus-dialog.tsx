@@ -25,16 +25,29 @@ import {
 } from "@/components/ui/select";
 import { getSavedCode, saveCode } from "@/lib/notify/client";
 import {
+  menusCounts,
   menusDeleteBusiness,
   menusDeleteCategory,
   menusDeleteItem,
+  menusGenerateAccess,
   menusList,
   menusLoad,
   menusSaveBusiness,
   menusSaveCategory,
   menusSaveItem,
+  menusSetAccess,
+  menusSetFeatures,
 } from "@/lib/menus/menus.functions";
-import type { MenuBusiness, MenuCategory, MenuItem } from "@/lib/menus/types";
+import {
+  businessStatus,
+  EDIT_FEATURES,
+  FEATURE_LABELS,
+  VIEW_FEATURES,
+  type FeatureKey,
+  type MenuBusiness,
+  type MenuCategory,
+  type MenuItem,
+} from "@/lib/menus/types";
 
 const money = (n: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -48,17 +61,20 @@ export function MenusDialog() {
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [businesses, setBusinesses] = useState<MenuBusiness[]>([]);
+  const [counts, setCounts] = useState<Record<string, { cats: number; items: number }>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [newPassword, setNewPassword] = useState<{ id: string; value: string } | null>(null);
 
-  const refreshList = useCallback(
-    async (value: string) => {
-      const list = await menusList({ data: { code: value } });
-      setBusinesses(list);
-    },
-    [],
-  );
+  const refreshList = useCallback(async (value: string) => {
+    const [list, c] = await Promise.all([
+      menusList({ data: { code: value } }),
+      menusCounts({ data: { code: value } }),
+    ]);
+    setBusinesses(list);
+    setCounts(c);
+  }, []);
 
   const openMenu = useCallback(
     async (businessId: string) => {
@@ -138,6 +154,43 @@ export function MenusDialog() {
       toast.error(errText(e));
     }
   };
+
+  const toggleFeature = async (business: MenuBusiness, key: FeatureKey, value: boolean) => {
+    const features = { ...business.features, [key]: value };
+    setBusinesses((prev) => prev.map((b) => (b.id === business.id ? { ...b, features } : b)));
+    try {
+      const saved = await menusSetFeatures({ data: { code, id: business.id, features } });
+      setBusinesses((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
+    } catch (e) {
+      toast.error(errText(e));
+      await refreshList(code);
+    }
+  };
+
+  const generateAccess = async (business: MenuBusiness) => {
+    try {
+      const { password } = await menusGenerateAccess({ data: { code, id: business.id } });
+      setNewPassword({ id: business.id, value: password });
+      await refreshList(code);
+      toast.success("Contraseña temporal generada");
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  };
+
+  const patchAccess = async (
+    business: MenuBusiness,
+    change: { suspended?: boolean; revoke?: boolean },
+  ) => {
+    try {
+      const saved = await menusSetAccess({ data: { code, id: business.id, ...change } });
+      setBusinesses((prev) => prev.map((b) => (b.id === saved.id ? saved : b)));
+      if (change.revoke) setNewPassword(null);
+    } catch (e) {
+      toast.error(errText(e));
+    }
+  };
+
 
   const removeBusiness = async (id: string) => {
     if (!window.confirm("¿Eliminar este negocio y todo su menú?")) return;
@@ -241,12 +294,12 @@ export function MenusDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="rounded-xl">
           <UtensilsCrossed className="mr-1.5 size-4" />
-          Menús
+          Mis clientes
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
         <DialogHeader>
-          <DialogTitle>Menús de negocios</DialogTitle>
+          <DialogTitle>Mis clientes · catálogos vendidos</DialogTitle>
           <DialogDescription>
             Apartado privado del administrador. Los clientes del catálogo no lo ven.
           </DialogDescription>
@@ -285,34 +338,78 @@ export function MenusDialog() {
               </p>
             ) : (
               <ul className="space-y-2">
-                {businesses.map((b) => (
-                  <li
-                    key={b.id}
-                    className="card-soft flex items-center gap-2 rounded-2xl border border-border bg-card p-3"
-                  >
-                    <Store className="size-4 shrink-0 text-primary" />
-                    <button
-                      type="button"
-                      onClick={() => void openMenu(b.id)}
-                      className="min-w-0 flex-1 text-left"
+                {businesses.map((b) => {
+                  const status = businessStatus(b);
+                  const c = counts[b.id] ?? { cats: 0, items: 0 };
+                  return (
+                    <li
+                      key={b.id}
+                      className="card-soft space-y-2 rounded-2xl border border-border bg-card p-3"
                     >
-                      <span className="block truncate text-sm font-semibold">{b.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {b.ownerName || "Sin dueño"} · {b.whatsapp || "sin WhatsApp"}
-                      </span>
-                    </button>
-                    {!b.active ? <Badge variant="secondary">Inactivo</Badge> : null}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0"
-                      aria-label={`Eliminar ${b.name}`}
-                      onClick={() => void removeBusiness(b.id)}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </li>
-                ))}
+                      <div className="flex items-center gap-2">
+                        <Store className="size-4 shrink-0 text-primary" />
+                        <button
+                          type="button"
+                          onClick={() => void openMenu(b.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="block truncate text-sm font-semibold">{b.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {b.ownerName || "Sin dueño"} · {b.whatsapp || "sin WhatsApp"}
+                          </span>
+                        </button>
+                        <Badge
+                          variant={status === "activo" ? "default" : "secondary"}
+                          className="shrink-0 capitalize"
+                        >
+                          {status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0"
+                          aria-label={`Eliminar ${b.name}`}
+                          onClick={() => void removeBusiness(b.id)}
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>
+                          {c.items} productos · {c.cats} categorías
+                        </span>
+                        <span>·</span>
+                        <span>{b.hasAccess ? "Clave entregada" : "Sin clave"}</span>
+                        {b.expiresOn ? <span>· vence {b.expiresOn}</span> : null}
+                      </div>
+                      {b.slug ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={`/${b.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="min-w-0 break-all text-xs text-primary underline"
+                          >
+                            {`${origin}/${b.slug}`}
+                          </a>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(`${origin}/${b.slug}`);
+                              toast.success("Enlace copiado");
+                            }}
+                          >
+                            <Copy className="mr-1 size-3.5" />
+                            Copiar
+                          </Button>
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -389,6 +486,37 @@ export function MenusDialog() {
                     onBlur={() => void patchBusiness(business)}
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="biz-expires">Vence el</Label>
+                  <Input
+                    id="biz-expires"
+                    type="date"
+                    value={business.expiresOn ?? ""}
+                    onChange={(e) =>
+                      setBusinesses((prev) =>
+                        prev.map((b) =>
+                          b.id === business.id ? { ...b, expiresOn: e.target.value || null } : b,
+                        ),
+                      )
+                    }
+                    onBlur={() => void patchBusiness(business)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="biz-logo">Logo (URL)</Label>
+                  <Input
+                    id="biz-logo"
+                    value={business.logoUrl}
+                    onChange={(e) =>
+                      setBusinesses((prev) =>
+                        prev.map((b) =>
+                          b.id === business.id ? { ...b, logoUrl: e.target.value } : b,
+                        ),
+                      )
+                    }
+                    onBlur={() => void patchBusiness(business)}
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="biz-slug">Enlace público</Label>
@@ -406,12 +534,12 @@ export function MenusDialog() {
                 {business.slug ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <a
-                      href={`/m/${business.slug}`}
+                      href={`/${business.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="min-w-0 break-all text-xs text-primary underline"
                     >
-                      {`${origin}/m/${business.slug}`}
+                      {`${origin}/${business.slug}`}
                     </a>
                     <Button
                       type="button"
@@ -419,7 +547,7 @@ export function MenusDialog() {
                       variant="outline"
                       className="rounded-xl"
                       onClick={() => {
-                        void navigator.clipboard.writeText(`${origin}/m/${business.slug}`);
+                        void navigator.clipboard.writeText(`${origin}/${business.slug}`);
                         toast.success("Enlace copiado");
                       }}
                     >
@@ -453,9 +581,107 @@ export function MenusDialog() {
                   checked={business.active}
                   onCheckedChange={(v) => void patchBusiness({ ...business, active: v })}
                 />
-                <Label htmlFor="biz-active">Negocio activo</Label>
+                <Label htmlFor="biz-active">Catálogo activo</Label>
+                <Badge variant="secondary" className="ml-auto capitalize">
+                  {businessStatus(business)}
+                </Badge>
               </div>
             </section>
+
+            <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
+              <h3 className="text-sm font-semibold">Lo que ve el público</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {VIEW_FEATURES.map((k) => (
+                  <label key={k} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={business.features[k]}
+                      onCheckedChange={(v) => void toggleFeature(business, k, v)}
+                      aria-label={FEATURE_LABELS[k]}
+                    />
+                    <span className="min-w-0 flex-1">{FEATURE_LABELS[k]}</span>
+                  </label>
+                ))}
+              </div>
+              <h3 className="pt-1 text-sm font-semibold">Lo que el dueño puede editar</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {EDIT_FEATURES.map((k) => (
+                  <label key={k} className="flex items-center gap-2 text-sm">
+                    <Switch
+                      checked={business.features[k]}
+                      onCheckedChange={(v) => void toggleFeature(business, k, v)}
+                      aria-label={FEATURE_LABELS[k]}
+                    />
+                    <span className="min-w-0 flex-1">{FEATURE_LABELS[k]}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
+              <h3 className="text-sm font-semibold">Acceso del dueño</h3>
+              <p className="text-xs text-muted-foreground">
+                Entra en {origin}/acceso con su enlace ({business.slug || "sin enlace"}) y la
+                contraseña temporal que le generes. Él la cambia al entrar.
+              </p>
+              {newPassword?.id === business.id ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary p-2">
+                  <code className="min-w-0 break-all text-sm font-semibold">
+                    {newPassword.value}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(newPassword.value);
+                      toast.success("Contraseña copiada");
+                    }}
+                  >
+                    <Copy className="mr-1 size-3.5" />
+                    Copiar
+                  </Button>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => void generateAccess(business)}
+                >
+                  {business.hasAccess ? "Generar nueva contraseña" : "Generar contraseña"}
+                </Button>
+                {business.hasAccess ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() =>
+                        void patchAccess(business, { suspended: !business.accessSuspended })
+                      }
+                    >
+                      {business.accessSuspended ? "Reactivar acceso" : "Suspender acceso"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => void patchAccess(business, { revoke: true })}
+                    >
+                      Quitar acceso
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {business.hasAccess
+                  ? `${business.accessSuspended ? "Suspendido" : "Activo"}${
+                      business.accessTemp ? " · contraseña temporal sin cambiar" : ""
+                    }`
+                  : "Todavía no tiene contraseña."}
+              </p>
+            </section>
+
 
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-2">
