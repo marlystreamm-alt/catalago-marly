@@ -155,7 +155,12 @@ export type MenuData = {
 };
 
 /** Datos que ve el dueño en su panel: su negocio, su menú y sus permisos. */
-export type OwnerData = MenuData & { features: Features; mustChangePassword: boolean };
+export type OwnerData = MenuData & {
+  features: Features;
+  mustChangePassword: boolean;
+  /** Nombre de quien entró (dueño o administrador adicional). */
+  actorName: string;
+};
 
 export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
   slug: "",
@@ -173,6 +178,7 @@ export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
   accessTemp: true,
   accessSuspended: false,
   accessUpdatedAt: null,
+  multiAdmin: false,
 });
 
 /** Estado comercial del negocio para el panel del administrador. */
