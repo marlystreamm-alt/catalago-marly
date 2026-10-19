@@ -27,6 +27,8 @@ export function stockDashboardSummary(rows: DashboardStock[], today: string) {
   })).sort((a,b) => b.available - a.available || a.platform.localeCompare(b.platform, 'es'));
   return { today, weekEnd, month, available: available.length, sold: sold.length, expiring: expiring.length,
     expired: units.filter(expired).length,
+    renewToday: units.filter(r => r.status !== "available" && r.expires_on === today).length,
+    renewUpcoming: units.filter(r => r.status !== "available" && r.expires_on && r.expires_on > today && r.expires_on <= weekEnd).length,
     replacements: units.filter(r => ['client_replacement','provider_replacement'].includes(r.status)).length,
     revenue: Math.round(revenue * 100) / 100, margin: Math.round(margin * 100) / 100,
     sales: sales.length, salesWithoutPrice: sales.length - priced.length,

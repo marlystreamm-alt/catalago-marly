@@ -18,8 +18,6 @@ import {
   Settings2,
   Trash2,
   Warehouse,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -31,7 +29,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { getSavedCode, saveCode } from "@/lib/notify/client";
 import { notifyLogin } from "@/lib/notify/notify.functions";
 import { copyText } from "@/lib/browser/clipboard";
-import { useOnline } from "@/hooks/use-online";
 import { cyberdocsListOrders } from "@/lib/cyberdocs/cyberdocs.functions";
 import type { CyberDocsOrder } from "@/lib/cyberdocs/types";
 import {
@@ -56,7 +53,6 @@ type FeatureMap = Record<string, boolean>;
 type HistoryRow = { id: string; action: string; detail: string; createdAt: string };
 type StockTab = "available" | "sold" | "expiring" | "expired";
 
-type OrdersSummary = { pending: number };
 
 const blank = (): StockItem => ({
   id: "",
@@ -126,20 +122,16 @@ export function StockManagerDialog({
   whatsappTemplate?: string;
 }) {
   const admin = !ownerToken;
-  const online = useOnline();
   const can = (key: string) => admin || Boolean(ownerFeatures?.[key]);
   const code = getSavedCode();
 
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<StockItem[]>([]);
-  const [section, setSection] = useState<"panel" | "stock">("panel");
   const [stockTab, setStockTab] = useState<StockTab>("available");
   const [stockKindTab, setStockKindTab] = useState<"complete" | "profile">("complete");
   const [q, setQ] = useState("");
-  const [ordersSummary, setOrdersSummary] = useState<OrdersSummary>({ pending: 0 });
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
-  const [lowStockThreshold, setLowStockThreshold] = useState(2);
 
   const [formOpen, setFormOpen] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
@@ -212,9 +204,6 @@ export function StockManagerDialog({
       if (admin) {
         const orders = await cyberdocsListOrders({ data: { code } });
         setCyberdocOrders(orders);
-        setOrdersSummary({
-          pending: orders.filter((o) => !["completed", "rejected", "cancelled"].includes(o.status)).length,
-        });
       }
     } catch (e) {
       toast.error(err(e));
@@ -225,8 +214,6 @@ export function StockManagerDialog({
 
   useEffect(() => {
     if (!open) return;
-    const savedThreshold = Number(localStorage.getItem("ma2-low-stock-threshold") || "2");
-    setLowStockThreshold(Number.isFinite(savedThreshold) && savedThreshold > 0 ? savedThreshold : 2);
     if (admin) {
       const saved = localStorage.getItem("ma2-stock-whatsapp-template");
       if (saved) setMessage(saved);
@@ -245,20 +232,7 @@ export function StockManagerDialog({
     () => items.filter((x) => x.status !== "available" && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7),
     [items],
   );
-  const renewToday = renewalItems.filter((x) => daysUntil(x.expiresOn) === 0).length;
-  const renewUpcoming = renewalItems.filter((x) => {
-    const d = daysUntil(x.expiresOn);
-    return d !== null && d >= 1 && d <= 7;
-  }).length;
   const expiredCount = items.filter((x) => x.status === "expired" || (x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0)).length;
-  const incidenceCount = items.filter((x) => x.status === "client_replacement" || x.status === "provider_replacement").length;
-  const availableByPlatform = useMemo(() => {
-    const map = new Map<string, number>();
-    items.filter((x) => x.status === "available").forEach((x) => map.set(x.platform, (map.get(x.platform) || 0) + 1));
-    return map;
-  }, [items]);
-  const lowStock = [...availableByPlatform.entries()].filter(([, count]) => count <= lowStockThreshold);
-  const pendingSync = Number(localStorage.getItem("ma2-sync-pending-count") || "0") || 0;
 
   const tabItems = useMemo(() => {
     let base = items.filter((x) => (x.stockKind || "complete") === stockKindTab);
@@ -538,41 +512,14 @@ export function StockManagerDialog({
       <DialogContent className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Gestor</DialogTitle>
-          <DialogDescription>Panel del día y administración de tu stock sin mostrar información innecesaria.</DialogDescription>
+          <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant={section === "panel" ? "default" : "outline"} onClick={() => setSection("panel")}>Panel</Button>
-          <Button size="sm" variant={section === "stock" ? "default" : "outline"} onClick={() => setSection("stock")}>Mi stock actual</Button>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold">Mi stock actual</h3>
           <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw className="mr-1 size-4" />Actualizar</Button>
         </div>
 
-        {section === "panel" ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              ["Pedidos pendientes", ordersSummary.pending, "Por entregar o atender"],
-              ["Renovaciones de hoy", renewToday, "Vencen hoy"],
-              ["Renovaciones próximas", renewUpcoming, "Próximos 7 días"],
-              ["Cuentas vencidas", expiredCount, "Revisar o dar de baja"],
-              ["Stock bajo", lowStock.length, lowStock.length ? lowStock.map(([p, c]) => `${p}: ${c}`).join(" · ") : "Sin alertas"],
-              ["Incidencias abiertas", incidenceCount, "Reposiciones cliente/proveedor"],
-              ["Sincronización", online ? "✓" : pendingSync, online ? "Sincronizado" : `${pendingSync} cambio(s) pendiente(s)`],
-            ].map(([title, value, subtitle]) => (
-              <div key={String(title)} className="rounded-2xl border bg-card p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-                <p className="mt-1 text-2xl font-bold">{String(value)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{String(subtitle)}</p>
-              </div>
-            ))}
-            <div className="rounded-2xl border bg-card p-4">
-              <div className="flex items-center gap-2">{online ? <Wifi className="size-4 text-emerald-600" /> : <WifiOff className="size-4 text-orange-600" />}<p className="font-semibold">{online ? "En línea" : "Modo sin conexión"}</p></div>
-              <p className="mt-1 text-xs text-muted-foreground">Las credenciales protegidas requieren conexión para validarse.</p>
-            </div>
-            {admin ? <div className="rounded-2xl border bg-card p-4 sm:col-span-2 lg:col-span-4">
-              <div className="flex flex-wrap items-center gap-2"><Label>Alerta de stock bajo cuando queden</Label><Input className="w-20" type="number" min={1} value={lowStockThreshold} onChange={(e) => { const value = Math.max(1, Number(e.target.value) || 1); setLowStockThreshold(value); localStorage.setItem("ma2-low-stock-threshold", String(value)); }} /><span className="text-sm text-muted-foreground">cuenta(s) por plataforma</span></div>
-            </div> : null}
-          </div>
-        ) : (
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
               <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Selecciona una subpestaña. La información sensible queda dentro de ⚙️.</p></div>
@@ -605,7 +552,6 @@ export function StockManagerDialog({
               {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay registros en esta subpestaña.</p> : null}
             </div>
           </div>
-        )}
 
         <Dialog open={formOpen} onOpenChange={(value) => { setFormOpen(value); if (!value) { setForm(blank()); setBulkMode(false); } }}>
           <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">

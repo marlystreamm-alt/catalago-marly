@@ -66,6 +66,7 @@ import { CatalogManager } from "./catalog-manager";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 
 type AdminDrawerProps = {
+  onShowCatalog?: () => void;
   onAddService: () => void;
   onCatalogSettings: () => void;
   onCategories: () => void;
@@ -423,7 +424,7 @@ function PanelGroup({ title, description, children, className = "" }: {
   );
 }
 
-function AdminDrawer({ onExportCsv, onExportPdf, exportDisabled }: AdminDrawerProps) {
+function AdminDrawer({ onExportCsv, onExportPdf, exportDisabled, onShowCatalog }: AdminDrawerProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -453,10 +454,11 @@ function AdminDrawer({ onExportCsv, onExportPdf, exportDisabled }: AdminDrawerPr
             <MenusDialog />
             <SalesDialog />
             <SheetClose asChild>
-              <Button type="button" variant="outline" onClick={() =>
+              <Button type="button" variant="outline" onClick={() => {
+                onShowCatalog?.();
                 setTimeout(() => document.getElementById("ma2-catalog-workspace")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" }), 120)
-              }>
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+              }}>
                 <Store className="size-4" /> Editar servicios del catálogo
               </Button>
             </SheetClose>

@@ -131,6 +131,7 @@ function CatalogPage() {
     resetPrefs,
   } = useCatalogStore();
 
+  const [homeView, setHomeView] = useState(true);
   const online = useOnline();
   const [query, setQuery] = useState("");
   const {
@@ -484,15 +485,16 @@ function CatalogPage() {
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
                 <h1 className="text-xl font-bold leading-tight text-balance text-card-foreground sm:text-2xl">
-                  {catalog.name}
+                  {isAdmin && homeView ? "Inicio · Mi tienda MA²" : catalog.name}
                 </h1>
                 <p className="text-[13px] leading-snug text-muted-foreground sm:text-sm">
-                  {catalog.subtitle}
+                  {isAdmin && homeView ? "Resumen de tu negocio" : catalog.subtitle}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 [&_button]:rounded-xl">
               <SessionAccess
+                onShowCatalog={() => setHomeView(false)}
                 onAddService={openNew}
                 onCatalogSettings={() => setSettingsOpen(true)}
                 onCategories={() => setCategoriesOpen(true)}
@@ -529,17 +531,21 @@ function CatalogPage() {
           {isAdmin ? (
             <nav
               className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
-              style={{ gridTemplateColumns: `repeat(${visibleCatalogIds.length}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${visibleCatalogIds.length + 1}, minmax(0, 1fr))` }}
               aria-label="Catálogos de administración"
             >
+              <button type="button" onClick={() => setHomeView(true)} aria-current={homeView ? "page" : undefined}
+                className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${homeView ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                Inicio
+              </button>
               {visibleCatalogIds.map((id) => (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setCatalogId(id)}
-                  aria-current={id === catalogId}
+                  onClick={() => { setHomeView(false); setCatalogId(id); }}
+                  aria-current={!homeView && id === catalogId ? "page" : undefined}
                   className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
-                    id === catalogId
+                    !homeView && id === catalogId
                       ? "bg-card text-primary shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
@@ -552,7 +558,9 @@ function CatalogPage() {
           ) : null}
         </header>
 
-        {isAdmin ? <AdminDashboard /> : null}
+        {isAdmin && homeView ? <AdminDashboard /> : null}
+
+        <div hidden={isAdmin && homeView}>
 
         {!online ? (
           <div
@@ -854,6 +862,7 @@ function CatalogPage() {
             onClear={() => setSelectedIds([])}
           />
         ) : null}
+        </div>
       </div>
 
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />

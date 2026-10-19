@@ -14,3 +14,8 @@ test('monthly amounts exclude old and future sales and disclose missing financia
  const s=stockDashboardSummary([row('a',{status:'assigned',delivered_on:'2026-10-01',cost:35,sale_price:80}),row('b',{status:'expired',delivered_on:'2026-10-02',sale_price:50}),row('c',{status:'assigned',delivered_on:'2026-10-03'}),row('d',{status:'assigned',delivered_on:'2026-09-30',cost:1,sale_price:100}),row('e',{status:'assigned',delivered_on:'2026-10-20',cost:1,sale_price:100})],'2026-10-19');
  assert.equal(s.sales,3);assert.equal(s.revenue,130);assert.equal(s.margin,45);assert.equal(s.marginSales,1);assert.equal(s.salesWithoutMargin,2);assert.equal(s.salesWithoutPrice,1);
 });
+
+test('renewals distinguish today from the next seven days and exclude unsold units',()=>{
+ const s=stockDashboardSummary([row('a',{status:'assigned',expires_on:'2026-10-19'}),row('b',{status:'expiring',expires_on:'2026-10-26'}),row('c',{expires_on:'2026-10-19'}),row('d',{status:'assigned',expires_on:'2026-10-18'})],'2026-10-19');
+ assert.equal(s.renewToday,1);assert.equal(s.renewUpcoming,1);
+});
