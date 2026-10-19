@@ -1,42 +1,28 @@
-/**
- * Registro del service worker con guardas: nunca se registra en desarrollo,
- * dentro de un iframe, en las vistas previas de Lovable, ni con ?sw=off.
- */
-const SW_URL = "/sw.js";
-
-async function unregisterAppSw() {
-  if (!("serviceWorker" in navigator)) return;
-  const regs = await navigator.serviceWorker.getRegistrations();
-  await Promise.all(
-    regs
-      .filter((r) => (r.active?.scriptURL ?? r.installing?.scriptURL ?? "").endsWith(SW_URL))
-      .map((r) => r.unregister()),
-  );
-}
-
-function isBlockedContext() {
-  if (!import.meta.env.PROD) return true;
-  if (window.self !== window.top) return true;
-  const h = window.location.hostname;
-  if (h.startsWith("id-preview--") || h.startsWith("preview--")) return true;
-  if (h === "lovableproject.com" || h.endsWith(".lovableproject.com")) return true;
-  if (h === "lovableproject-dev.com" || h.endsWith(".lovableproject-dev.com")) return true;
-  if (h === "beta.lovable.dev" || h.endsWith(".beta.lovable.dev")) return true;
-  if (new URLSearchParams(window.location.search).has("sw")) {
-    return new URLSearchParams(window.location.search).get("sw") === "off";
-  }
-  return false;
-}
-
+/** Registra y conserva el service worker usado por MA² para notificaciones push. */
 export function registerPwa() {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-  if (isBlockedContext()) {
-    void unregisterAppSw();
-    return;
-  }
-  window.addEventListener("load", () => {
-    void navigator.serviceWorker.register(SW_URL, { scope: "/" }).catch(() => {
-      /* sin conexión o sin soporte: la app sigue funcionando normalmente */
-    });
-  });
+  if (typeof window === "undefined") return;
+  if (!("serviceWorker" in navigator)) return;
+
+  void (async () => {
+    try {
+      // Mantener un único worker de push estable. No lo eliminamos al recargar,
+      // porque hacerlo invalida la suscripción del iPhone y obliga a registrar
+      // el dispositivo una y otra vez.
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      const pushRegistration = registrations.find((registration) =>
+        registration.active?.scriptURL.endsWith("/push-sw.js") ||
+        registration.waiting?.scriptURL.endsWith("/push-sw.js") ||
+        registration.installing?.scriptURL.endsWith("/push-sw.js"),
+      );
+
+      if (!pushRegistration) {
+        await navigator.serviceWorker.register("/push-sw.js", { scope: "/" });
+      } else {
+        // Busca actualizaciones sin eliminar el registro existente.
+        void pushRegistration.update().catch(() => undefined);
+      }
+    } catch {
+      // El fallo del worker no debe impedir que el catálogo cargue.
+    }
+  })();
 }

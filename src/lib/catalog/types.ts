@@ -39,8 +39,27 @@ export interface Service {
   vigencia?: string;
   /** Requisitos o campos requeridos (texto libre, usado en trámites). */
   requirements?: string;
+  /** WhatsApp específico de esta tarjeta. Solo se usa en directorios cuando la ficha lo activa. */
+  whatsapp?: string;
+  /** Activa el botón de WhatsApp personal únicamente para esta ficha de directorio. */
+  personalWhatsappEnabled?: boolean;
+  /** Mensaje personalizado para esta tarjeta. */
+  whatsappMessage?: string;
   /** Orden manual dentro del catálogo (menor primero). */
   sortIndex?: number;
+  /** Enlace del menú personalizado aprobado para una tarjeta de Agenda de negocio. */
+  linkedMenuUrl?: string;
+  /** Datos comerciales opcionales para directorios. */
+  serviceDays?: string;
+  businessHours?: string;
+  address?: string;
+  mapsUrl?: string;
+  homeDelivery?: boolean;
+  paymentMethods?: ("cash" | "transfer" | "card")[];
+  /** Campos adicionales configurables por tarjeta. */
+  customFields?: { id: string; label: string; value: string; visible?: boolean }[];
+  /** Sección/pestaña pública superior dentro del catálogo (ej. Perfiles, Completas). */
+  sectionId?: string;
 }
 
 export type LogAction =
@@ -67,13 +86,39 @@ export interface LogEntry {
 }
 
 
+
+export type SpaceType = "catalog" | "menu" | "directory" | "provider" | "marketplace";
+export const SPACE_TYPE_LABELS: Record<SpaceType, string> = {
+  catalog: "Catálogo",
+  menu: "Menú",
+  directory: "Directorio telefónico",
+  provider: "Directorio de proveedores",
+  marketplace: "Mercadito",
+};
+
+export interface CatalogSection {
+  id: string;
+  name: string;
+  hidden?: boolean;
+}
+
 export interface Catalog {
   id: CatalogId;
   name: string;
   subtitle: string;
+  spaceType: SpaceType;
+  imageUrl: string;
   whatsappNumber: string;
   whatsappTemplate: string;
+  /** Permite usar WhatsApp y mensaje distintos en cada tarjeta. */
+  individualWhatsappEnabled: boolean;
+  /** El administrador decide si este espacio permite datos comerciales en sus tarjetas. */
+  commercialFieldsEnabled?: boolean;
   hidden: boolean;
+  /** Nombres heredados; se conservan para migrar instalaciones anteriores. */
+  sectionLabels?: { perfiles: string; completas: string; "ia-creatividad"?: string; tramites: string };
+  /** Secciones superiores editables, visibles también en modo público. */
+  sectionTabs?: CatalogSection[];
   categories: Category[];
   services: Service[];
   log: LogEntry[];

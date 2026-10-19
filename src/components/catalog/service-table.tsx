@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Download, MessageCircle, Star, Undo2, Upload, Wand2, X } from "lucide-react";
+import { Check, MessageCircle, Star, Undo2, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -45,8 +45,7 @@ export function ServiceTable({
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
 }) {
-  const { catalog, isAdmin, saveService, toggleFavorite, exportBackup, importBackup } =
-    useCatalogStore();
+  const { catalog, isAdmin, prefs, saveService, toggleFavorite } = useCatalogStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
@@ -174,16 +173,6 @@ export function ServiceTable({
     toast.success(`Se revirtió el cambio de ${last.label} (${restored} servicio(s))`);
   };
 
-  const onImportFile = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      importBackup(text);
-    } catch {
-      toast.error("No se pudo leer el archivo de respaldo");
-    }
-  };
-
   if (!services.length) {
     return (
       <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
@@ -203,25 +192,6 @@ export function ServiceTable({
           <Button size="sm" variant="outline" disabled={undoCount === 0} onClick={undo}>
             <Undo2 className="size-4" />
             Deshacer precio
-          </Button>
-          <Button size="sm" variant="outline" onClick={exportBackup}>
-            <Download className="size-4" />
-            Exportar respaldo
-          </Button>
-          <Button size="sm" variant="outline" asChild>
-            <label className="cursor-pointer">
-              <Upload className="size-4" />
-              Importar respaldo
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="sr-only"
-                onChange={(e) => {
-                  void onImportFile(e.target.files?.[0]);
-                  e.target.value = "";
-                }}
-              />
-            </label>
           </Button>
           <span className="text-xs text-muted-foreground">
             {selectedIds.length
@@ -323,7 +293,7 @@ export function ServiceTable({
                     )}
                   </td>
                   <td className="p-2 text-right">
-                    <Button asChild size="icon" variant="ghost">
+                    {prefs.showWhatsapp ? <Button asChild size="icon" variant="ghost">
                       <a
                         href={buildWhatsappLink(s, catalog)}
                         target="_blank"
@@ -344,7 +314,7 @@ export function ServiceTable({
                       >
                         <MessageCircle className="size-4 text-primary" />
                       </a>
-                    </Button>
+                    </Button> : null}
                   </td>
                 </tr>
               );

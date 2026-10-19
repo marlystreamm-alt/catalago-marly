@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS notification_log_created_idx ON public.notification_l
 
 GRANT ALL ON public.notification_log TO service_role;
 ALTER TABLE public.notification_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "No direct access to notification log" ON public.notification_log FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);

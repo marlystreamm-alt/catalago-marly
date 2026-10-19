@@ -18,11 +18,28 @@ const settingsSchema = codeSchema.extend({
     channelEmail: z.boolean(),
     channelWhatsapp: z.boolean(),
     channelAlexa: z.boolean(),
+    channelAlexaApp: z.boolean(),
     email: z.string(),
     whatsappNumber: z.string(),
-    alexaProvider: z.enum(["notifyme", "voicemonkey"]),
+    whatsappProvider: z.enum(["twilio", "whapi", "greenapi"]),
+    alexaProvider: z.enum(["voicemonkey", "virtualbuttons", "webhook", "custom"]),
     alexaToken: z.string(),
     alexaDevice: z.string(),
+    alexaAppDevice: z.string(),
+    alexaWebhookUrl: z.string(),
+    alexaWebhookSecret: z.string(),
+    alexaMethod: z.enum(["POST", "GET"]),
+    alexaBodyTemplate: z.string(),
+    alexaEvents: z.object({
+      order_new: z.boolean(),
+      order_reminder: z.boolean(),
+      directory_request: z.boolean(),
+      menu_extra_request: z.boolean(),
+      payment_proof: z.boolean(),
+      client_suspended: z.boolean(),
+    }),
+    alexaOrderNewMessage: z.string().max(500),
+    alexaOrderReminderMessage: z.string().max(500),
     repeatEnabled: z.boolean(),
     repeatMinutes: z.number().int().min(5).max(240),
     quietStart: z.string(),
@@ -37,17 +54,18 @@ const settingsSchema = codeSchema.extend({
 
 /** ¿Ya hay un código de administrador creado? (público, no revela nada sensible) */
 export const notifyStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const { loadSettings } = await import("./notify.server");
+  const { loadSettings, ensureVapidConfig } = await import("./notify.server");
   const settings = await loadSettings();
+  const vapid = await ensureVapidConfig();
   return {
     hasCode: settings.hasCode,
-    vapidPublicKey: process.env["VAPID_PUBLIC_KEY"] ?? "",
+    vapidPublicKey: vapid.publicKey,
   };
 });
 
 /** Inicia sesión en el panel de avisos y devuelve la configuración actual. */
 export const notifyLogin = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .validator((d: unknown) => codeSchema.parse(d))
   .handler(async ({ data }): Promise<NotifySettings> => {
     const { requireAdminCode, loadSettings } = await import("./notify.server");
     await requireAdminCode(data.code);
@@ -56,7 +74,7 @@ export const notifyLogin = createServerFn({ method: "POST" })
 
 /** Guarda la configuración de avisos. */
 export const notifySaveSettings = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => settingsSchema.parse(d))
+  .validator((d: unknown) => settingsSchema.parse(d))
   .handler(async ({ data }): Promise<NotifySettings> => {
     const { requireAdminCode, admin, loadSettings } = await import("./notify.server");
     await requireAdminCode(data.code);
@@ -70,11 +88,21 @@ export const notifySaveSettings = createServerFn({ method: "POST" })
         channel_email: s.channelEmail,
         channel_whatsapp: s.channelWhatsapp,
         channel_alexa: s.channelAlexa,
+        channel_alexa_app: s.channelAlexaApp,
         email: s.email,
         whatsapp_number: s.whatsappNumber,
+        whatsapp_provider: s.whatsappProvider,
         alexa_provider: s.alexaProvider,
         alexa_token: s.alexaToken,
         alexa_device: s.alexaDevice,
+        alexa_app_device: s.alexaAppDevice,
+        alexa_webhook_url: s.alexaWebhookUrl,
+        alexa_webhook_secret: s.alexaWebhookSecret,
+        alexa_method: s.alexaMethod,
+        alexa_body_template: s.alexaBodyTemplate,
+        alexa_events: s.alexaEvents,
+        alexa_order_new_message: s.alexaOrderNewMessage,
+        alexa_order_reminder_message: s.alexaOrderReminderMessage,
         repeat_enabled: s.repeatEnabled,
         repeat_minutes: s.repeatMinutes,
         quiet_start: s.quietStart,
@@ -93,22 +121,23 @@ export const notifySaveSettings = createServerFn({ method: "POST" })
 
 /** Cambia el código de acceso del panel de avisos. */
 export const notifyChangeCode = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.extend({ newCode: z.string().min(4) }).parse(d))
+  .validator((d: unknown) => codeSchema.extend({ newCode: z.string().min(6).max(64) }).parse(d))
   .handler(async ({ data }) => {
-    const { requireAdminCode, admin, hashCode, randomSalt } = await import("./notify.server");
-    await requireAdminCode(data.code);
+    const { requireAdminPassword, admin, hashCode, randomSalt } = await import("./notify.server");
+    await requireAdminPassword(data.code);
     const salt = randomSalt();
     const db = await admin();
-    await db
+    const { error } = await db
       .from("notification_settings")
       .update({ admin_code_hash: await hashCode(data.newCode.trim(), salt), admin_code_salt: salt })
       .eq("id", 1);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 /** Lista los pedidos recibidos. */
 export const notifyListOrders = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     codeSchema.extend({ onlyNew: z.boolean().default(false) }).parse(d),
   )
   .handler(async ({ data }): Promise<CloudOrder[]> => {
@@ -124,7 +153,7 @@ export const notifyListOrders = createServerFn({ method: "POST" })
 
 /** Marca un pedido como atendido (o lo regresa a pendiente). */
 export const notifySetOrderStatus = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     codeSchema.extend({ id: z.string().uuid(), status: z.enum(["nuevo", "atendido"]) }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -144,7 +173,7 @@ export const notifySetOrderStatus = createServerFn({ method: "POST" })
 
 /** Registra el dispositivo actual para recibir notificaciones push. */
 export const notifySavePush = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     codeSchema.extend({
       endpoint: z.string().url(),
       p256dh: z.string().min(1),
@@ -175,7 +204,7 @@ export const notifySavePush = createServerFn({ method: "POST" })
 
 /** Lista los dispositivos registrados para avisos push. */
 export const notifyListDevices = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .validator((d: unknown) => codeSchema.parse(d))
   .handler(async ({ data }): Promise<NotifyDevice[]> => {
     const { requireAdminCode, admin } = await import("./notify.server");
     await requireAdminCode(data.code);
@@ -199,7 +228,7 @@ export const notifyListDevices = createServerFn({ method: "POST" })
 
 /** Activa o desactiva un dispositivo. */
 export const notifySetDeviceActive = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     codeSchema.extend({ id: z.string().uuid(), active: z.boolean() }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -216,7 +245,7 @@ export const notifySetDeviceActive = createServerFn({ method: "POST" })
 
 /** Elimina un dispositivo registrado. */
 export const notifyDeleteDevice = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.extend({ id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => codeSchema.extend({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { requireAdminCode, admin } = await import("./notify.server");
     await requireAdminCode(data.code);
@@ -228,7 +257,7 @@ export const notifyDeleteDevice = createServerFn({ method: "POST" })
 
 /** Historial de avisos enviados. */
 export const notifyListLog = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .validator((d: unknown) => codeSchema.parse(d))
   .handler(async ({ data }): Promise<NotifyLogEntry[]> => {
     const { requireAdminCode, admin } = await import("./notify.server");
     await requireAdminCode(data.code);
@@ -236,6 +265,10 @@ export const notifyListLog = createServerFn({ method: "POST" })
     const { data: rows, error } = await db
       .from("notification_log")
       .select("*")
+      .neq("channel", "protected_delivery")
+      .neq("channel", "ma2_config")
+      .neq("channel", "ma2_sale")
+      .neq("channel", "ma2_demo")
       .order("created_at", { ascending: false })
       .limit(150);
     if (error) throw new Error(error.message);
@@ -256,7 +289,7 @@ export const notifyListLog = createServerFn({ method: "POST" })
 
 /** Envía un aviso de prueba por los canales activos. */
 export const notifyTest = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => codeSchema.parse(d))
+  .validator((d: unknown) => codeSchema.parse(d))
   .handler(async ({ data }) => {
     const { requireAdminCode, loadSettings, notifyOrder, withinSchedule } = await import(
       "./notify.server"
@@ -291,14 +324,18 @@ export const notifyTest = createServerFn({ method: "POST" })
 
 export const NOTIFY_DEFAULTS = DEFAULT_SETTINGS;
 
-/** Valida el código de acceso de Alexa enviando un anuncio de prueba y lo guarda si funciona. */
+/** Valida la integración de Alexa enviando una prueba y la guarda si funciona. */
 export const notifyVerifyAlexa = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     codeSchema
       .extend({
-        provider: z.enum(["notifyme", "voicemonkey"]),
-        token: z.string().trim().min(4, "El código es demasiado corto").max(500),
+        provider: z.enum(["voicemonkey", "virtualbuttons", "webhook", "custom"]),
+        token: z.string().trim().max(1000).default(""),
         device: z.string().trim().max(120).default(""),
+        webhookUrl: z.string().trim().max(1200).default(""),
+        webhookSecret: z.string().max(1200).default(""),
+        method: z.enum(["POST", "GET"]).default("POST"),
+        bodyTemplate: z.string().max(6000).default('{"message":"{message}","event":"{event}","source":"MA2"}'),
         save: z.boolean().default(true),
       })
       .parse(d),
@@ -307,10 +344,17 @@ export const notifyVerifyAlexa = createServerFn({ method: "POST" })
     const { requireAdminCode, sendAlexaText, admin, logEvent } = await import("./notify.server");
     await requireAdminCode(data.code);
     const result = await sendAlexaText(
-      "Prueba de MA². Si escuchas esto, los avisos de pedidos ya están conectados con Alexa.",
-      data.provider,
-      data.token,
-      data.device,
+      "Prueba de MA². Si escuchas esto, los avisos ya están conectados con Alexa.",
+      {
+        provider: data.provider,
+        token: data.token,
+        device: data.device,
+        webhookUrl: data.webhookUrl,
+        webhookSecret: data.webhookSecret,
+        method: data.method,
+        bodyTemplate: data.bodyTemplate,
+        event: "prueba",
+      },
     );
     await logEvent({
       orderId: null,
@@ -328,6 +372,10 @@ export const notifyVerifyAlexa = createServerFn({ method: "POST" })
           alexa_provider: data.provider,
           alexa_token: data.token.trim(),
           alexa_device: data.device.trim(),
+          alexa_webhook_url: data.webhookUrl.trim(),
+          alexa_webhook_secret: data.webhookSecret,
+          alexa_method: data.method,
+          alexa_body_template: data.bodyTemplate,
           updated_at: new Date().toISOString(),
         })
         .eq("id", 1);

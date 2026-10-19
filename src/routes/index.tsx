@@ -1,3 +1,4 @@
+import { copyText } from "@/lib/browser/clipboard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -6,13 +7,11 @@ import {
   ArrowLeft,
   ArrowUp,
   ArrowUpDown,
-  ChevronDown,
-  Wrench,
   FileDown,
-  FileText,
   History,
   Link2,
   Plus,
+  Pencil,
   Search,
   Settings2,
   Star,
@@ -32,19 +31,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AdminBar } from "@/components/catalog/admin-bar";
 import { CategoriesDialog } from "@/components/catalog/categories-dialog";
 import { ServiceCard } from "@/components/catalog/service-card";
 import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-skeletons";
 import { HistoryDialog } from "@/components/catalog/history-dialog";
-import { PendingOrdersBar } from "@/components/catalog/pending-orders";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
 import { buildCatalogLink } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
-import { ServiceTable } from "@/components/catalog/service-table";
-import { AdminList } from "@/components/catalog/admin-list";
 
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
@@ -52,10 +47,11 @@ import { CatalogProvider, useCatalogStore } from "@/lib/catalog/store";
 import { ALL_CATEGORIES } from "@/lib/catalog/prefs";
 import { useOnline } from "@/hooks/use-online";
 import { CatalogManager } from "@/components/catalog/catalog-manager";
-import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
-import { MenusDialog } from "@/components/catalog/menus-dialog";
+import { CartDialog } from "@/components/catalog/cart-dialog";
+import { DirectoryMenuRequestsDialog } from "@/components/catalog/directory-menu-requests-dialog";
+import { DirectoryListingRequestDialog } from "@/components/catalog/directory-listing-request-dialog";
 
-import { ClientAccessDialog, ClientMenuButton } from "@/components/catalog/client-access-dialog";
+import { SessionAccess } from "@/components/catalog/session-access";
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
 
@@ -77,6 +73,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "MA² · Catálogos de servicios y trámites" },
+      { name: "ma2-build", content: "v20.62-tanstack-cve-2026-102989" },
       {
         name: "description",
         content:
@@ -142,11 +139,66 @@ function CatalogPage() {
     sortMode,
     showDetail,
     showShare,
-    viewMode,
-    toolsOpen,
+    showWhatsapp,
   } = prefs;
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const effectiveShowDetail = showDetail && (!isClient || can("usarDetalles"));
+  const effectiveShowShare = isAdmin || isClient ? true : showShare;
+  const effectiveShowWhatsapp = showWhatsapp && (!isClient || can("usarWhatsapp"));
+  const effectiveFavorites = !isClient || can("usarFavoritos");
+
+  const legacyGrouping = ["clientes", "cyberdoc", "revendedores"].includes(catalog.id);
+  // Las secciones superiores son navegación pública real para cualquier espacio tipo Catálogo.
+  // Ya no dependen del id histórico (clientes/cyberdoc/revendedores), porque los espacios pueden renombrarse o crearse.
+  const publicSectionGrouping = catalog.spaceType === "catalog";
+  const sectionTabs = useMemo(
+    () => catalog.sectionTabs?.length
+      ? catalog.sectionTabs.filter((t) => !t.hidden)
+      : [
+          { id: "perfiles", name: catalog.sectionLabels?.perfiles || "Perfiles" },
+          { id: "completas", name: catalog.sectionLabels?.completas || "Completas" },
+          { id: "tramites", name: catalog.sectionLabels?.tramites || "Trámites" },
+        ],
+    [catalog.sectionTabs, catalog.sectionLabels],
+  );
+  const [publicSection, setPublicSection] = useState("");
+
+  const serviceSection = (service: Service) => {
+    if (service.sectionId && sectionTabs.some((t) => t.id === service.sectionId)) return service.sectionId;
+    const category = catalog.categories.find((c) => c.id === service.categoryId);
+    const sub = category?.subsections.find((x) => x.id === service.subsectionId)?.name.toLowerCase() ?? "";
+    const plan = (service.plan ?? "").toLowerCase();
+    if (sectionTabs.some((t) => t.id === "perfiles") && (sub.includes("perfil") || plan.includes("perfil"))) return "perfiles";
+    if (sectionTabs.some((t) => t.id === "completas") && (sub.includes("complet") || plan.includes("complet"))) return "completas";
+    if (legacyGrouping && sectionTabs.some((t) => t.id === "tramites")) return "tramites";
+    return sectionTabs[0]?.id ?? "";
+  };
+
+  useEffect(() => {
+    if (!publicSectionGrouping) {
+      if (publicSection) setPublicSection("");
+      return;
+    }
+    if (!sectionTabs.some((t) => t.id === publicSection)) setPublicSection(sectionTabs[0]?.id ?? "");
+  }, [catalog.id, publicSectionGrouping, sectionTabs, publicSection]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", prefs.themeMode === "oscuro");
+    root.style.setProperty("--ma2-user-accent", prefs.accentColor);
+    root.style.setProperty("--primary", prefs.accentColor);
+    root.style.setProperty("--ring", prefs.accentColor);
+    root.style.setProperty("--sidebar-primary", prefs.accentColor);
+    return () => {
+      // No limpiamos el tema al desmontar: evita parpadeos al cambiar de ruta.
+    };
+  }, [prefs.themeMode, prefs.accentColor]);
+
+  const selectedIds = prefs.markedIds;
+  const setSelectedIds = (updater: string[] | ((prev: string[]) => string[])) => {
+    const next = typeof updater === "function" ? updater(prefs.markedIds) : updater;
+    setPrefs({ markedIds: next });
+  };
   // Precio que tenía cada servicio al seleccionarlo, para avisar si cambió.
   const [snapshots, setSnapshots] = useState<Record<string, number>>({});
   const toggleSelect = (id: string) => {
@@ -163,9 +215,8 @@ function CatalogPage() {
     setSelectedIds([]);
     setSnapshots({});
   };
-  // Al cambiar de catálogo la selección múltiple se limpia.
+  // Al cambiar de catálogo solo se limpian las instantáneas de precio; las marcas se conservan.
   useEffect(() => {
-    setSelectedIds([]);
     setSnapshots({});
   }, [catalogId]);
   const setCategoryFilter = (categoryFilter: string) => setPrefs({ categoryFilter });
@@ -240,17 +291,10 @@ function CatalogPage() {
   );
 
   const shareLink = () => {
-    const url = buildCatalogLink(catalogId, {
-      q: query,
-      categoria: categoryFilter !== ALL ? categoryFilter : undefined,
-      activos: onlyActive,
-      fav: onlyFavorites,
-      orden: sortMode,
-    });
-    navigator.clipboard
-      .writeText(url)
-      .then(() => toast.success("Enlace con filtros copiado"))
-      .catch(() => toast.error("No se pudo copiar el enlace"));
+    const url = buildCatalogLink(catalogId);
+    copyText(url)
+      .then(() => toast.success(`Enlace público de ${catalog.name} copiado`))
+      .catch(() => toast.error("No se pudo copiar el enlace público"));
   };
 
   const stats = useMemo(() => {
@@ -269,9 +313,10 @@ function CatalogPage() {
     const q = query.trim().toLowerCase();
     return catalog.services.filter((s) => {
       if (!isAdmin && !can("verOcultos") && !s.active) return false;
-      if (onlyFavorites && !s.favorite) return false;
+      if (effectiveFavorites && onlyFavorites && !s.favorite) return false;
       if (onlyActive && !s.active) return false;
       if (categoryFilter !== ALL && s.categoryId !== categoryFilter) return false;
+      if (publicSectionGrouping && publicSection && serviceSection(s) !== publicSection) return false;
       if (!q) return true;
       return (
         s.name.toLowerCase().includes(q) ||
@@ -282,14 +327,14 @@ function CatalogPage() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, query, categoryFilter, onlyActive, onlyFavorites, isAdmin, isClient]);
+  }, [catalog, query, categoryFilter, onlyActive, onlyFavorites, isAdmin, isClient, publicSectionGrouping, publicSection, sectionTabs]);
 
   const sorted = useMemo(() => {
     const list = [...visible];
     if (sortMode === "precio") list.sort((a, b) => a.price - b.price);
     if (sortMode === "nombre") list.sort((a, b) => a.name.localeCompare(b.name, "es-MX"));
-    // Los favoritos siempre suben al inicio para encontrarlos más rápido.
-    return list.sort((a, b) => Number(b.favorite) - Number(a.favorite));
+    // En el orden por categoría se conserva el orden manual definido desde administración.
+    return list;
   }, [visible, sortMode]);
 
   const grouped = useMemo(() => {
@@ -419,52 +464,91 @@ function CatalogPage() {
   };
 
   return (
-    <main className="app-gradient min-h-screen pb-24">
+    <main
+      className={`min-h-screen pb-24 ${
+        prefs.backgroundStyle === "solido"
+          ? "app-solid"
+          : prefs.backgroundStyle === "suave"
+            ? "app-soft"
+            : "app-gradient"
+      }`}
+    >
       <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6 lg:max-w-6xl lg:px-8">
-        <header className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
+        <header id="ma2-catalog-workspace" className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
-              <h1 className="text-xl font-bold leading-tight text-balance text-card-foreground sm:text-2xl">
-                {catalog.name}
-              </h1>
-              <p className="text-[13px] leading-snug text-muted-foreground sm:text-sm">
-                {catalog.subtitle}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
-              <ClientMenuButton />
-              {isAdmin ? (
-                <>
-                  <NotificationsDialog />
-                  <MenusDialog />
-                </>
+            <div className="flex min-w-0 items-center gap-3">
+              {catalog.imageUrl ? (
+                <img src={catalog.imageUrl} alt="" className="size-14 shrink-0 rounded-2xl border border-border object-cover sm:size-16" />
               ) : null}
-              <AdminBar />
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
+                <h1 className="text-xl font-bold leading-tight text-balance text-card-foreground sm:text-2xl">
+                  {catalog.name}
+                </h1>
+                <p className="text-[13px] leading-snug text-muted-foreground sm:text-sm">
+                  {catalog.subtitle}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 [&_button]:rounded-xl">
+              <SessionAccess
+                onAddService={openNew}
+                onCatalogSettings={() => setSettingsOpen(true)}
+                onCategories={() => setCategoriesOpen(true)}
+                onHistory={() => setHistoryOpen(true)}
+                exportDisabled={!sorted.length}
+                onExportCsv={() => {
+                  downloadCsv(
+                    `ma2-busqueda-${catalogId}-${stamp()}`,
+                    SEARCH_HEADERS,
+                    searchRows,
+                    exportMeta,
+                  );
+                  toast.success("Búsqueda exportada en CSV");
+                }}
+                onExportPdf={() => {
+                  const ok = printPdf(
+                    `${catalog.name} · Búsqueda`,
+                    `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
+                    SEARCH_HEADERS,
+                    searchRows,
+                    exportMeta,
+                  );
+                  if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
+                }}
+              />
+              {effectiveShowShare ? (
+                <Button type="button" size="sm" variant="outline" className="h-10 rounded-xl" onClick={shareLink}>
+                  <Link2 className="size-4" /> Compartir
+                </Button>
+              ) : null}
             </div>
           </div>
 
-          <nav
-            className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
-            style={{ gridTemplateColumns: `repeat(${visibleCatalogIds.length}, minmax(0, 1fr))` }}
-          >
-            {visibleCatalogIds.map((id) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setCatalogId(id)}
-                aria-current={id === catalogId}
-                className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
-                  id === catalogId
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {state.catalogs[id].name}
-                {isAdmin && state.catalogs[id].hidden ? " (oculto)" : ""}
-              </button>
-            ))}
-          </nav>
+          {isAdmin ? (
+            <nav
+              className="mt-4 grid gap-1.5 rounded-2xl bg-muted p-1"
+              style={{ gridTemplateColumns: `repeat(${visibleCatalogIds.length}, minmax(0, 1fr))` }}
+              aria-label="Catálogos de administración"
+            >
+              {visibleCatalogIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setCatalogId(id)}
+                  aria-current={id === catalogId}
+                  className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
+                    id === catalogId
+                      ? "bg-card text-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {state.catalogs[id].name}
+                  {state.catalogs[id].hidden ? " (oculto)" : ""}
+                </button>
+              ))}
+            </nav>
+          ) : null}
         </header>
 
         {!online ? (
@@ -480,7 +564,21 @@ function CatalogPage() {
           </div>
         ) : null}
 
-        <PendingOrdersBar />
+        {!isAdmin ? (
+          <section
+            className="card-soft mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-3"
+            aria-label="Resumen público"
+          >
+            <div className="rounded-xl bg-muted/40 px-3 py-2 text-center">
+              <span className="block text-xs font-medium text-muted-foreground">Servicios activos</span>
+              <span className="text-xl font-bold text-primary">{stats.activos}</span>
+            </div>
+            <div className="rounded-xl bg-muted/40 px-3 py-2 text-center">
+              <span className="block text-xs font-medium text-muted-foreground">Favoritos</span>
+              <span className="text-xl font-bold text-primary">{stats.favoritos}</span>
+            </div>
+          </section>
+        ) : null}
 
         {isClient ? (
           <div className="card-soft mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
@@ -495,6 +593,10 @@ function CatalogPage() {
         ) : null}
 
         <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            {(catalog.spaceType === "directory" || catalog.spaceType === "provider") && !isAdmin ? <DirectoryListingRequestDialog catalog={catalog} /> : null}
+            {catalog.spaceType !== "directory" ? <CartDialog /> : null}
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -512,247 +614,167 @@ function CatalogPage() {
           ) : null}
         </section>
 
-        {isAdmin || canEdit ? (
-          <section className="card-soft mt-3 overflow-hidden rounded-3xl border border-border bg-card">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left active:bg-muted/60"
-              aria-expanded={toolsOpen}
-              onClick={() => setPrefs({ toolsOpen: !toolsOpen })}
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10">
-                  <Wrench className="size-4 text-primary" />
-                </span>
-                Herramientas
-              </span>
-              <ChevronDown
-                className={`size-4 shrink-0 text-muted-foreground transition-transform ${toolsOpen ? "rotate-180" : ""}`}
-              />
-            </button>
+        {canEdit ? (
+          <div className="mt-3 grid gap-3">
+            <section className="card-soft rounded-3xl border border-border bg-card p-3 sm:p-4">
+              {isAdmin ? (
+                <div className="mb-3 grid grid-cols-5 gap-1.5" aria-label="Estadísticas">
+                  <StatCard label="Total" value={stats.total} />
+                  <StatCard label="Activos" value={stats.activos} />
+                  <StatCard label="Categorías" value={stats.categorias} />
+                  <StatCard label="Ocultos" value={stats.ocultos} />
+                  <StatCard label="Favoritos" value={stats.favoritos} />
+                </div>
+              ) : null}
 
-            {toolsOpen ? (
-              <div className="grid gap-4 border-t border-border px-3 pb-4 pt-3 sm:px-4">
-                {isAdmin ? (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Estadísticas">
-                    <StatCard label="Total" value={stats.total} />
-                    <StatCard label="Activos" value={stats.activos} />
-                    <StatCard label="Categorías" value={stats.categorias} />
-                    <StatCard label="Ocultos" value={stats.ocultos} />
-                    <StatCard label="Favoritos" value={stats.favoritos} />
-                  </div>
-                ) : null}
-
-                <div className="grid gap-2.5">
+              <div className="grid gap-2.5">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Filtros y vista
                   </p>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="h-11 w-full" aria-label="Filtrar por categoría">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL}>Todas las categorías</SelectItem>
-                        {catalog.categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                      <SelectTrigger className="h-11 w-full" aria-label="Ordenar servicios">
-                        <ArrowUpDown className="size-4 shrink-0 text-muted-foreground" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="categoria">Por categoría</SelectItem>
-                        <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
-                        <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={viewMode}
-                      onValueChange={(v) =>
-                        setPrefs({ viewMode: v as "tarjetas" | "tabla" | "lista" })
-                      }
+                  {activeFilters.length ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        setQuery("");
+                        resetPrefs();
+                      }}
                     >
-                      <SelectTrigger className="h-11 w-full" aria-label="Vista del catálogo">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="lista">Editar (lista)</SelectItem>
-                        <SelectItem value="tarjetas">Vista pública (tarjetas)</SelectItem>
-                        {isAdmin ? <SelectItem value="tabla">Vista tabla</SelectItem> : null}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      Limpiar filtros
+                    </Button>
+                  ) : null}
+                </div>
 
-                  <div className="grid gap-1.5 sm:grid-cols-2">
-                    <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="h-10 w-full" aria-label="Filtrar por categoría">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Todas las categorías</SelectItem>
+                      {catalog.categories.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+                    <SelectTrigger className="h-10 w-full" aria-label="Ordenar servicios">
+                      <ArrowUpDown className="size-4 shrink-0 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="categoria">Por categoría</SelectItem>
+                      <SelectItem value="precio">Por precio (menor a mayor)</SelectItem>
+                      <SelectItem value="nombre">Por nombre (A-Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {effectiveFavorites ? (
+                    <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
                       <Label htmlFor="only-fav" className="flex items-center gap-1.5 text-sm">
                         <Star className="size-3.5" />
                         Favoritos
                       </Label>
-                      <Switch
-                        id="only-fav"
-                        checked={onlyFavorites}
-                        onCheckedChange={setOnlyFavorites}
-                      />
+                      <Switch id="only-fav" checked={onlyFavorites} onCheckedChange={setOnlyFavorites} />
                     </div>
-                    {isAdmin ? (
-                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                        <Label htmlFor="only-active" className="text-sm">
-                          Solo activos
-                        </Label>
-                        <Switch
-                          id="only-active"
-                          checked={onlyActive}
-                          onCheckedChange={setOnlyActive}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {activeFilters.length ? (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {activeFilters.map((f) => (
-                        <Badge key={f.key} variant="secondary" className="gap-1">
-                          {f.label}
-                          <button
-                            type="button"
-                            aria-label={`Quitar filtro ${f.label}`}
-                            onClick={f.clear}
-                            className="rounded-full p-0.5 hover:bg-background"
-                          >
-                            <X className="size-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setQuery("");
-                          resetPrefs();
-                        }}
-                      >
-                        Limpiar filtros
-                      </Button>
+                  ) : <div />}
+                  {isAdmin ? (
+                    <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <Label htmlFor="only-active" className="text-sm">
+                        Solo activos
+                      </Label>
+                      <Switch id="only-active" checked={onlyActive} onCheckedChange={setOnlyActive} />
                     </div>
                   ) : null}
                 </div>
 
-                {isAdmin ? (
-                  <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Botones en las tarjetas
-                    </p>
-                    <div className="grid gap-1.5 sm:grid-cols-2">
-                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                        <Label htmlFor="show-detail" className="text-sm">
-                          Ver detalles
-                        </Label>
-                        <Switch
-                          id="show-detail"
-                          checked={showDetail}
-                          onCheckedChange={(v) => setPrefs({ showDetail: v })}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                        <Label htmlFor="show-share" className="text-sm">
-                          Compartir
-                        </Label>
-                        <Switch
-                          id="show-share"
-                          checked={showShare}
-                          onCheckedChange={(v) => setPrefs({ showShare: v })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {isAdmin ? (
-                  <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Editar
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-                      <Button size="sm" onClick={openNew}>
-                        <Plus className="size-4" />
-                        Agregar servicio
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-                        <Settings2 className="size-4" />
-                        Ajustes del catálogo
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}>
-                        <Tags className="size-4" />
-                        Categorías
-                      </Button>
-                      <CatalogManager />
-                      <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
-                        <History className="size-4" />
-                        Historial
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {isAdmin ? (
-                  <div className="grid gap-2 border-t border-border pt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Compartir y exportar
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 [&_button]:w-full [&_button]:justify-start sm:grid-cols-3">
-                      <Button size="sm" variant="outline" onClick={shareLink}>
-                        <Link2 className="size-4" />
-                        Compartir enlace con filtros
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!sorted.length}
-                        onClick={() => {
-                          downloadCsv(
-                            `ma2-busqueda-${catalogId}-${stamp()}`,
-                            SEARCH_HEADERS,
-                            searchRows,
-                            exportMeta,
-                          );
-                          toast.success("Búsqueda exportada en CSV");
-                        }}
-                      >
-                        <FileDown className="size-4" />
-                        Exportar búsqueda CSV
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!sorted.length}
-                        onClick={() => {
-                          const ok = printPdf(
-                            `${catalog.name} · Búsqueda`,
-                            `${sorted.length} servicio(s) · ${filtersSummary} · ${formatStamp()}`,
-                            SEARCH_HEADERS,
-                            searchRows,
-                            exportMeta,
-                          );
-
-                          if (!ok) toast.error("Permite ventanas emergentes para generar el PDF");
-                        }}
-                      >
-                        <FileText className="size-4" />
-                        Exportar búsqueda PDF
-                      </Button>
-                      <ClientAccessDialog />
-                    </div>
+                {activeFilters.length ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {activeFilters.map((f) => (
+                      <Badge key={f.key} variant="secondary" className="gap-1">
+                        {f.label}
+                        <button
+                          type="button"
+                          aria-label={`Quitar filtro ${f.label}`}
+                          onClick={f.clear}
+                          className="rounded-full p-0.5 hover:bg-background"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
                 ) : null}
               </div>
+            </section>
+
+            {isAdmin ? (
+              <section className="card-soft rounded-3xl border border-border bg-card p-3 sm:p-4">
+                <div className="mb-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Administrar catálogo</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Acciones agrupadas para mantener esta pantalla limpia.</p>
+                </div>
+                <div className="grid gap-2">
+                  <details className="rounded-2xl border border-border bg-muted/20 p-2">
+                    <summary className="cursor-pointer list-none rounded-xl px-2 py-2 text-sm font-semibold">Editar catálogo</summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2 px-1 pb-1 sm:grid-cols-3">
+                      <Button size="sm" onClick={openNew}><Plus className="size-4" />Agregar</Button>
+                      <Button size="sm" variant="outline" onClick={() => setCategoriesOpen(true)}><Tags className="size-4" />Categorías</Button>
+                      <CatalogManager />
+                      <DirectoryMenuRequestsDialog />
+                    </div>
+                  </details>
+
+                  <details className="rounded-2xl border border-border bg-muted/20 p-2">
+                    <summary className="cursor-pointer list-none rounded-xl px-2 py-2 text-sm font-semibold">Configuración del catálogo</summary>
+                    <div className="mt-2 grid gap-3 px-1 pb-1">
+                      <Button size="sm" variant="outline" className="justify-start" onClick={() => setSettingsOpen(true)}><Settings2 className="size-4" />Nombre, apariencia y WhatsApp</Button>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <label className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm"><span>Ver detalles</span><Switch checked={showDetail} onCheckedChange={(v) => setPrefs({ showDetail: v })} /></label>
+                        <label className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm"><span>Compartir</span><Switch checked={showShare} onCheckedChange={(v) => setPrefs({ showShare: v })} /></label>
+                        <label className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm"><span>Pedir por WhatsApp</span><Switch checked={showWhatsapp} onCheckedChange={(v) => setPrefs({ showWhatsapp: v })} /></label>
+                      </div>
+                    </div>
+                  </details>
+
+                </div>
+              </section>
             ) : null}
+          </div>
+        ) : null}
+
+        {publicSectionGrouping && sectionTabs.length ? (
+          <section className="mt-5 rounded-2xl bg-muted/70 p-2" aria-label="Secciones del catálogo">
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(sectionTabs.length, 1), 4)}, minmax(0, 1fr))` }}>
+              {sectionTabs.map((section) => {
+                const count = catalog.services.filter((service) => {
+                  if (!isAdmin && !can("verOcultos") && !service.active) return false;
+                  return serviceSection(service) === section.id;
+                }).length;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setPublicSection(section.id)}
+                    aria-current={publicSection === section.id}
+                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
+                      publicSection === section.id
+                        ? "bg-card text-primary shadow-sm"
+                        : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
+                    }`}
+                  >
+                    {section.name} ({count})
+                  </button>
+                );
+              })}
+            </div>
           </section>
         ) : null}
 
@@ -761,21 +783,13 @@ function CatalogPage() {
             <ServiceListSkeleton count={5} />
           ) : refreshing ? (
             <ServiceListSkeleton count={3} label="Actualizando resultados…" />
-          ) : canEdit && viewMode === "lista" ? (
-            <AdminList />
-          ) : isAdmin && viewMode === "tabla" ? (
-            <ServiceTable
-              services={sorted}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-            />
           ) : sortMode !== "categoria" ? (
             sorted.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-border bg-card/70 p-8 text-center text-sm text-muted-foreground">
                 No hay servicios que coincidan con tu búsqueda.
               </p>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              <div className={!isAdmin && !isClient ? "grid grid-cols-2 gap-2 sm:gap-3" : "grid gap-3 lg:grid-cols-2 xl:grid-cols-3"}>
                 {sorted.map((service) => (
                   <ServiceCard
                     key={service.id}
@@ -784,8 +798,8 @@ function CatalogPage() {
                     onOpenDetail={setDetailId}
                     selected={selectedIds.includes(service.id)}
                     onToggleSelect={toggleSelect}
-                    showDetail={showDetail}
-                    showShare={showShare}
+                    showDetail={effectiveShowDetail}
+                    showShare={effectiveShowShare}
                   />
                 ))}
               </div>
@@ -810,7 +824,7 @@ function CatalogPage() {
                         {group.title}
                       </h3>
                     ) : null}
-                    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                    <div className={!isAdmin && !isClient ? "grid grid-cols-2 gap-2 sm:gap-3" : "grid gap-3 lg:grid-cols-2 xl:grid-cols-3"}>
                       {group.items.map((service) => (
                         <ServiceCard
                           key={service.id}
@@ -819,8 +833,8 @@ function CatalogPage() {
                           onOpenDetail={setDetailId}
                           selected={selectedIds.includes(service.id)}
                           onToggleSelect={toggleSelect}
-                          showDetail={showDetail}
-                          showShare={showShare}
+                          showDetail={effectiveShowDetail}
+                          showShare={effectiveShowShare}
                         />
                       ))}
                     </div>
@@ -831,10 +845,12 @@ function CatalogPage() {
           )}
         </div>
 
-        <BulkOrderBar
-          services={catalog.services.filter((s) => selectedIds.includes(s.id))}
-          onClear={() => setSelectedIds([])}
-        />
+        {effectiveShowWhatsapp ? (
+          <BulkOrderBar
+            services={catalog.services.filter((s) => selectedIds.includes(s.id))}
+            onClear={() => setSelectedIds([])}
+          />
+        ) : null}
       </div>
 
       <ServiceFormDialog open={formOpen} onOpenChange={setFormOpen} service={editing} />
@@ -882,7 +898,7 @@ function BackNav() {
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       >
         <ArrowUp className="size-4" />
-        Volver al catálogo
+        Arriba
       </Button>
     </div>
   );

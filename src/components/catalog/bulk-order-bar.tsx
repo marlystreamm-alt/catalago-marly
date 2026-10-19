@@ -1,3 +1,4 @@
+import { copyText } from "@/lib/browser/clipboard";
 import { useMemo, useState } from "react";
 import { AlertTriangle, MessageCircle, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,7 @@ export function BulkOrderBar({
       recipient: recipientFromLink(link),
     });
     try {
-      await navigator.clipboard.writeText(message);
+      await copyText(message);
     } catch {
       /* el pedido ya quedó en la cola aunque no se pueda copiar */
     }

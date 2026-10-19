@@ -36,8 +36,6 @@ export const Route = createFileRoute("/api/public/orders")({
           "@/lib/notify/notify.server"
         );
         const settings = await loadSettings();
-        if (!settings.enabled) return Response.json({ skipped: true });
-
         const db = await admin();
         const { data, error } = await db
           .from("orders")
@@ -59,7 +57,7 @@ export const Route = createFileRoute("/api/public/orders")({
         }
 
         const cloudOrder = rowToOrder(data as Record<string, unknown>);
-        if (withinSchedule(settings)) {
+        if (settings.enabled && withinSchedule(settings)) {
           try {
             await notifyOrder(cloudOrder, settings, false);
           } catch (e) {

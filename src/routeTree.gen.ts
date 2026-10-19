@@ -9,28 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
-import { Route as AccesoRouteImport } from './routes/acceso'
-import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SlugRouteImport } from './routes/$slug'
+import { Route as AccesoRouteImport } from './routes/acceso'
+import { Route as ContratarRouteImport } from './routes/contratar'
+import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as DemoIdRouteImport } from './routes/demo.$id'
+import { Route as EIdRouteImport } from './routes/e.$id'
 import { Route as MSlugRouteImport } from './routes/m.$slug'
-import { Route as ApiPublicOrdersRouteImport } from './routes/api/public/orders'
 import { Route as ApiPublicNotifyPendingRouteImport } from './routes/api/public/notify-pending'
+import { Route as ApiPublicOrdersRouteImport } from './routes/api/public/orders'
+import { Route as ApiIntegrationsCyberdocsFallbackRouteImport } from './routes/api/integrations/cyberdocs/fallback'
+import { Route as ApiIntegrationsCyberdocsTelegramRouteImport } from './routes/api/integrations/cyberdocs/telegram'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MiCatalogoRoute = MiCatalogoRouteImport.update({
-  id: '/mi-catalogo',
-  path: '/mi-catalogo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccesoRoute = AccesoRouteImport.update({
-  id: '/acceso',
-  path: '/acceso',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SlugRoute = SlugRouteImport.update({
@@ -38,9 +34,39 @@ const SlugRoute = SlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AccesoRoute = AccesoRouteImport.update({
+  id: '/acceso',
+  path: '/acceso',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContratarRoute = ContratarRouteImport.update({
+  id: '/contratar',
+  path: '/contratar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MiCatalogoRoute = MiCatalogoRouteImport.update({
+  id: '/mi-catalogo',
+  path: '/mi-catalogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoIdRoute = DemoIdRouteImport.update({
+  id: '/demo/$id',
+  path: '/demo/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EIdRoute = EIdRouteImport.update({
+  id: '/e/$id',
+  path: '/e/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MSlugRoute = MSlugRouteImport.update({
@@ -48,47 +74,77 @@ const MSlugRoute = MSlugRouteImport.update({
   path: '/m/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicOrdersRoute = ApiPublicOrdersRouteImport.update({
-  id: '/api/public/orders',
-  path: '/api/public/orders',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicNotifyPendingRoute = ApiPublicNotifyPendingRouteImport.update({
   id: '/api/public/notify-pending',
   path: '/api/public/notify-pending',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOrdersRoute = ApiPublicOrdersRouteImport.update({
+  id: '/api/public/orders',
+  path: '/api/public/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntegrationsCyberdocsFallbackRoute =
+  ApiIntegrationsCyberdocsFallbackRouteImport.update({
+    id: '/api/integrations/cyberdocs/fallback',
+    path: '/api/integrations/cyberdocs/fallback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiIntegrationsCyberdocsTelegramRoute =
+  ApiIntegrationsCyberdocsTelegramRouteImport.update({
+    id: '/api/integrations/cyberdocs/telegram',
+    path: '/api/integrations/cyberdocs/telegram',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/contratar': typeof ContratarRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/demo/$id': typeof DemoIdRoute
+  '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
+  '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
+  '/api/integrations/cyberdocs/telegram': typeof ApiIntegrationsCyberdocsTelegramRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/contratar': typeof ContratarRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/demo/$id': typeof DemoIdRoute
+  '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
+  '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
+  '/api/integrations/cyberdocs/telegram': typeof ApiIntegrationsCyberdocsTelegramRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
+  '/contratar': typeof ContratarRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/demo/$id': typeof DemoIdRoute
+  '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
+  '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
+  '/api/integrations/cyberdocs/telegram': typeof ApiIntegrationsCyberdocsTelegramRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,65 +152,75 @@ export interface FileRouteTypes {
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/contratar'
     | '/mi-catalogo'
+    | '/robots.txt'
     | '/sitemap.xml'
+    | '/demo/$id'
+    | '/e/$id'
     | '/m/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
+    | '/api/integrations/cyberdocs/fallback'
+    | '/api/integrations/cyberdocs/telegram'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/contratar'
     | '/mi-catalogo'
+    | '/robots.txt'
     | '/sitemap.xml'
+    | '/demo/$id'
+    | '/e/$id'
     | '/m/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
+    | '/api/integrations/cyberdocs/fallback'
+    | '/api/integrations/cyberdocs/telegram'
   id:
     | '__root__'
     | '/'
     | '/$slug'
     | '/acceso'
+    | '/contratar'
     | '/mi-catalogo'
+    | '/robots.txt'
     | '/sitemap.xml'
+    | '/demo/$id'
+    | '/e/$id'
     | '/m/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
+    | '/api/integrations/cyberdocs/fallback'
+    | '/api/integrations/cyberdocs/telegram'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
   AccesoRoute: typeof AccesoRoute
+  ContratarRoute: typeof ContratarRoute
   MiCatalogoRoute: typeof MiCatalogoRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  DemoIdRoute: typeof DemoIdRoute
+  EIdRoute: typeof EIdRoute
   MSlugRoute: typeof MSlugRoute
   ApiPublicNotifyPendingRoute: typeof ApiPublicNotifyPendingRoute
   ApiPublicOrdersRoute: typeof ApiPublicOrdersRoute
+  ApiIntegrationsCyberdocsFallbackRoute: typeof ApiIntegrationsCyberdocsFallbackRoute
+  ApiIntegrationsCyberdocsTelegramRoute: typeof ApiIntegrationsCyberdocsTelegramRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mi-catalogo': {
-      id: '/mi-catalogo'
-      path: '/mi-catalogo'
-      fullPath: '/mi-catalogo'
-      preLoaderRoute: typeof MiCatalogoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/acceso': {
-      id: '/acceso'
-      path: '/acceso'
-      fullPath: '/acceso'
-      preLoaderRoute: typeof AccesoRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$slug': {
@@ -164,11 +230,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/acceso': {
+      id: '/acceso'
+      path: '/acceso'
+      fullPath: '/acceso'
+      preLoaderRoute: typeof AccesoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contratar': {
+      id: '/contratar'
+      path: '/contratar'
+      fullPath: '/contratar'
+      preLoaderRoute: typeof ContratarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mi-catalogo': {
+      id: '/mi-catalogo'
+      path: '/mi-catalogo'
+      fullPath: '/mi-catalogo'
+      preLoaderRoute: typeof MiCatalogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/$id': {
+      id: '/demo/$id'
+      path: '/demo/$id'
+      fullPath: '/demo/$id'
+      preLoaderRoute: typeof DemoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e/$id': {
+      id: '/e/$id'
+      path: '/e/$id'
+      fullPath: '/e/$id'
+      preLoaderRoute: typeof EIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/m/$slug': {
@@ -178,6 +286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/notify-pending': {
+      id: '/api/public/notify-pending'
+      path: '/api/public/notify-pending'
+      fullPath: '/api/public/notify-pending'
+      preLoaderRoute: typeof ApiPublicNotifyPendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/orders': {
       id: '/api/public/orders'
       path: '/api/public/orders'
@@ -185,11 +300,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/notify-pending': {
-      id: '/api/public/notify-pending'
-      path: '/api/public/notify-pending'
-      fullPath: '/api/public/notify-pending'
-      preLoaderRoute: typeof ApiPublicNotifyPendingRouteImport
+    '/api/integrations/cyberdocs/fallback': {
+      id: '/api/integrations/cyberdocs/fallback'
+      path: '/api/integrations/cyberdocs/fallback'
+      fullPath: '/api/integrations/cyberdocs/fallback'
+      preLoaderRoute: typeof ApiIntegrationsCyberdocsFallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/cyberdocs/telegram': {
+      id: '/api/integrations/cyberdocs/telegram'
+      path: '/api/integrations/cyberdocs/telegram'
+      fullPath: '/api/integrations/cyberdocs/telegram'
+      preLoaderRoute: typeof ApiIntegrationsCyberdocsTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -199,11 +321,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
   AccesoRoute: AccesoRoute,
+  ContratarRoute: ContratarRoute,
   MiCatalogoRoute: MiCatalogoRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  DemoIdRoute: DemoIdRoute,
+  EIdRoute: EIdRoute,
   MSlugRoute: MSlugRoute,
   ApiPublicNotifyPendingRoute: ApiPublicNotifyPendingRoute,
   ApiPublicOrdersRoute: ApiPublicOrdersRoute,
+  ApiIntegrationsCyberdocsFallbackRoute: ApiIntegrationsCyberdocsFallbackRoute,
+  ApiIntegrationsCyberdocsTelegramRoute: ApiIntegrationsCyberdocsTelegramRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

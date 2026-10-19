@@ -1,3 +1,4 @@
+import { copyText } from "@/lib/browser/clipboard";
 /** Bitácora filtrable, respaldos versionados y administradores adicionales de un negocio vendido. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -80,14 +81,18 @@ const kindLabel: Record<string, string> = {
   otros: "Otros",
 };
 
+export type BusinessToolsSection = "todo" | "administradores" | "respaldos" | "historial";
+
 export function BusinessTools({
   code,
   business,
   onBusinessChange,
+  section = "todo",
 }: {
   code: string;
   business: MenuBusiness;
   onBusinessChange: (b: MenuBusiness) => void;
+  section?: BusinessToolsSection;
 }) {
   const [audit, setAudit] = useState<MenuAuditEntry[]>([]);
   const [admins, setAdmins] = useState<MenuAdmin[]>([]);
@@ -260,6 +265,7 @@ export function BusinessTools({
 
   return (
     <>
+      {section === "todo" || section === "administradores" ? (
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <Users className="size-4 text-primary" />
@@ -300,7 +306,7 @@ export function BusinessTools({
                   variant="outline"
                   className="rounded-xl"
                   onClick={() => {
-                    void navigator.clipboard.writeText(shown.password);
+                    void copyText(shown.password);
                     toast.success("Contraseña copiada");
                   }}
                 >
@@ -359,7 +365,9 @@ export function BusinessTools({
           </>
         ) : null}
       </section>
+      ) : null}
 
+      {section === "todo" || section === "respaldos" ? (
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
         <h3 className="text-sm font-semibold">Respaldos de este catálogo</h3>
         <p className="text-xs text-muted-foreground">
@@ -428,7 +436,9 @@ export function BusinessTools({
           </ul>
         )}
       </section>
+      ) : null}
 
+      {section === "todo" || section === "historial" ? (
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
         <div className="flex items-center gap-2">
           <h3 className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold">
@@ -575,6 +585,7 @@ export function BusinessTools({
           </>
         )}
       </section>
+      ) : null}
     </>
   );
 }

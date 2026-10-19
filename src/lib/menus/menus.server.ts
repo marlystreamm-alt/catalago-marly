@@ -9,6 +9,7 @@ import {
   type MenuBusiness,
   type MenuCategory,
   type MenuItem,
+  type MenuSpace,
 } from "./types";
 
 type Row = Record<string, unknown>;
@@ -48,9 +49,18 @@ export function rowToBusiness(row: Row): MenuBusiness {
     expiresOn: row["expires_on"] ? str(row["expires_on"]) : null,
     features: parseFeatures(row["features"]),
     hasAccess: Boolean(str(row["access_hash"])),
+    accessUsername: str(row["access_username"]),
     accessTemp: bool(row["access_temp"], true),
     accessSuspended: bool(row["access_suspended"], false),
     accessUpdatedAt: row["access_updated_at"] ? str(row["access_updated_at"]) : null,
+    allowedSpaces: num(row["allowed_spaces"], 1),
+    planName: str(row["plan_name"], "Plan base"),
+    renewalPrice: num(row["renewal_price"], 0),
+    billingDay: row["billing_day"] === null || row["billing_day"] === undefined ? null : num(row["billing_day"]),
+    graceDays: num(row["grace_days"], 1),
+    contractStartedOn: str(row["contract_started_on"]),
+    whatsappTemplate: str(row["whatsapp_template"], "Hola {cliente}, aquí tienes tu entrega: {link}"),
+    suspensionMessage: str(row["suspension_message"], "Servicio no disponible. Contacta al administrador."),
     multiAdmin: bool(row["multi_admin"], false),
   };
 }
@@ -59,8 +69,30 @@ export function rowToCategory(row: Row): MenuCategory {
   return {
     id: str(row["id"]),
     businessId: str(row["business_id"]),
+    spaceId: row["space_id"] ? str(row["space_id"]) : null,
+    parentId: row["parent_id"] ? str(row["parent_id"]) : null,
     name: str(row["name"]),
+    imageUrl: str(row["image_url"]),
+    hidden: bool(row["hidden"], false),
     sortIndex: num(row["sort_index"]),
+  };
+}
+
+export function rowToSpace(row: Row): MenuSpace {
+  const kind = str(row["kind"], "catalog");
+  return {
+    id: str(row["id"]),
+    businessId: str(row["business_id"]),
+    kind: kind === "menu" || kind === "directory" || kind === "marketplace" ? kind : "catalog",
+    name: str(row["name"]),
+    subtitle: str(row["subtitle"]),
+    imageUrl: str(row["image_url"]),
+    slug: str(row["slug"]),
+    hidden: bool(row["hidden"], false),
+    sortIndex: num(row["sort_index"]),
+    noticeEnabled: bool(row["notice_enabled"], false),
+    noticeTitle: str(row["notice_title"]),
+    noticeMessage: str(row["notice_message"]),
   };
 }
 
@@ -69,13 +101,17 @@ export function rowToItem(row: Row): MenuItem {
   return {
     id: str(row["id"]),
     businessId: str(row["business_id"]),
+    spaceId: row["space_id"] ? str(row["space_id"]) : null,
     categoryId: cat || null,
     name: str(row["name"]),
     description: str(row["description"]),
     price: num(row["price"]),
     priceText: str(row["price_text"]),
     imageUrl: str(row["image_url"]),
+    whatsapp: str(row["whatsapp"]),
+    whatsappMessage: str(row["whatsapp_message"]),
     available: bool(row["available"]),
+    condition: str(row["item_condition"], "new") === "used" ? "used" : "new",
     sortIndex: num(row["sort_index"]),
   };
 }
@@ -111,8 +147,9 @@ export async function countsByBusiness(): Promise<Record<string, { cats: number;
 export async function loadMenu(businessId: string) {
   const db = await admin();
 
-  const [biz, cats, items] = await Promise.all([
+  const [biz, spaces, cats, items] = await Promise.all([
     db.from("menu_businesses").select("*").eq("id", businessId).maybeSingle(),
+    db.from("menu_spaces").select("*").eq("business_id", businessId).order("sort_index", { ascending: true }),
     db
       .from("menu_categories")
       .select("*")
@@ -127,55 +164,73 @@ export async function loadMenu(businessId: string) {
   if (!biz.data) throw new Error("Negocio no encontrado");
   return {
     business: rowToBusiness(biz.data as Row),
+    spaces: (spaces.data ?? []).map((r) => rowToSpace(r as Row)),
     categories: (cats.data ?? []).map((r) => rowToCategory(r as Row)),
     items: (items.data ?? []).map((r) => rowToItem(r as Row)),
   };
 }
 
-/** Catálogo público de un negocio por su enlace (slug), respetando sus interruptores. */
+/** Espacio público por slug. También devuelve datos mínimos si el servicio está suspendido. */
 export async function loadPublicMenu(slug: string) {
   const db = await admin();
-  const { data: biz } = await db.from("menu_businesses").select("*").eq("slug", slug).maybeSingle();
-  if (!biz) return null;
-  const business = rowToBusiness(biz as Row);
-  if (businessStatus(business) !== "activo") return null;
+  const { data: spaceRow } = await db.from("menu_spaces").select("*").eq("slug", slug).maybeSingle();
+  const matchedSpaceSlug = Boolean(spaceRow);
+  let businessRow: Row | null = null;
+  let selectedSpace: MenuSpace | null = null;
+  if (spaceRow) {
+    selectedSpace = rowToSpace(spaceRow as Row);
+    const { data } = await db.from("menu_businesses").select("*").eq("id", selectedSpace.businessId).maybeSingle();
+    businessRow = (data as Row | null) ?? null;
+  } else {
+    const { data } = await db.from("menu_businesses").select("*").eq("slug", slug).maybeSingle();
+    businessRow = (data as Row | null) ?? null;
+    if (businessRow) {
+      const businessId = str(businessRow["id"]);
+      const { data: firstSpace } = await db.from("menu_spaces").select("*").eq("business_id", businessId).order("sort_index", { ascending: true }).limit(1).maybeSingle();
+      if (firstSpace) selectedSpace = rowToSpace(firstSpace as Row);
+    }
+  }
+  if (!businessRow) return null;
+  const business = rowToBusiness(businessRow);
+  const status = businessStatus(business);
+  const { data: visibleSpaceRows } = await db
+    .from("menu_spaces")
+    .select("*")
+    .eq("business_id", business.id)
+    .eq("hidden", false)
+    .order("sort_index", { ascending: true });
+  const visibleSpaces = (visibleSpaceRows ?? []).map((r) => rowToSpace(r as Row));
+  if (!matchedSpaceSlug && (!selectedSpace || selectedSpace.hidden)) selectedSpace = visibleSpaces[0] ?? null;
+  if (status === "apagado" || status === "vencido" || !selectedSpace || selectedSpace.hidden || !visibleSpaces.length) {
+    return {
+      unavailable: true as const,
+      status,
+      business: { name: business.name, ownerName: business.ownerName, whatsapp: business.whatsapp, suspensionMessage: business.suspensionMessage },
+      space: selectedSpace,
+    };
+  }
 
   const f = business.features;
   const [cats, items] = await Promise.all([
-    db
-      .from("menu_categories")
-      .select("*")
-      .eq("business_id", business.id)
-      .order("sort_index", { ascending: true }),
-    db
-      .from("menu_items")
-      .select("*")
-      .eq("business_id", business.id)
-      .eq("available", true)
-      .order("sort_index", { ascending: true }),
+    db.from("menu_categories").select("*").eq("business_id", business.id).order("sort_index", { ascending: true }),
+    db.from("menu_items").select("*").eq("business_id", business.id).eq("available", true).order("sort_index", { ascending: true }),
   ]);
+  const visibleSpaceIds = new Set(visibleSpaces.map((space) => space.id));
   return {
+    unavailable: false as const,
     business: {
-      ...business,
-      notes: "",
-      address: f.show_address ? business.address : "",
-      whatsapp: f.show_whatsapp ? business.whatsapp : "",
-      accessTemp: false,
-      accessSuspended: false,
-      accessUpdatedAt: null,
-      hasAccess: false,
+      ...business, notes: "", address: f.show_address ? business.address : "", whatsapp: f.show_whatsapp ? business.whatsapp : "",
+      accessTemp: false, accessSuspended: false, accessUpdatedAt: null, hasAccess: false,
     },
-    categories: (cats.data ?? []).map((r) => rowToCategory(r as Row)),
+    spaces: visibleSpaces,
+    space: selectedSpace,
+    categories: (cats.data ?? [])
+      .map((r) => rowToCategory(r as Row))
+      .filter((c) => !c.hidden && Boolean(c.spaceId && visibleSpaceIds.has(c.spaceId))),
     items: (items.data ?? []).map((r) => {
       const it = rowToItem(r as Row);
-      return {
-        ...it,
-        price: f.show_prices ? it.price : 0,
-        priceText: f.show_prices ? it.priceText : "",
-        description: f.show_descriptions ? it.description : "",
-        imageUrl: f.show_photos ? it.imageUrl : "",
-      };
-    }),
+      return { ...it, price: f.show_prices ? it.price : 0, priceText: f.show_prices ? it.priceText : "", description: f.show_descriptions ? it.description : "", imageUrl: f.show_photos ? it.imageUrl : "" };
+    }).filter((it) => Boolean(it.spaceId && visibleSpaceIds.has(it.spaceId))),
   };
 }
 
@@ -206,19 +261,17 @@ export function randomSalt() {
     .join("");
 }
 
-/** Contraseña temporal legible para mandársela al dueño. */
+/** Contraseña temporal aleatoria para flujos heredados de administradores adicionales. */
 export function tempPassword() {
-  const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  const chars = Array.from(bytes).map((b) => abc[b % abc.length]);
-  return `MA2-${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
 function secret() {
-  return (
-    process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["SUPABASE_URL"] ?? "ma2-fallback-secret"
-  );
+  const value = process.env["MA2_SESSION_SECRET"] ?? process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!value) throw new Error("Falta MA2_SESSION_SECRET o SUPABASE_SERVICE_ROLE_KEY en el servidor");
+  return value;
 }
 
 async function sign(payload: string) {
@@ -239,7 +292,10 @@ async function sign(payload: string) {
 export async function makeOwnerToken(businessId: string, actorName = "Dueño") {
   const clean = actorName.replace(/[~.]/g, " ").trim() || "Dueño";
   const payload = `${businessId}~${encodeURIComponent(clean)}~${Date.now() + 1000 * 60 * 60 * 24 * 30}`;
-  return `${payload}.${await sign(payload)}`;
+  const token = `${payload}.${await sign(payload)}`;
+  const { createServerSession } = await import("@/lib/sessions.server");
+  await createServerSession(clean, { token, hours: 24 * 30 });
+  return token;
 }
 
 export async function readOwnerToken(
@@ -251,6 +307,8 @@ export async function readOwnerToken(
   const payload = raw.slice(0, cut);
   const sig = raw.slice(cut + 1);
   if ((await sign(payload)) !== sig) throw new Error("Sesión no válida, vuelve a entrar");
+  const { requireServerSession } = await import("@/lib/sessions.server");
+  await requireServerSession(raw);
   const parts = payload.split("~");
   const id = parts[0] ?? "";
   const actor = parts.length === 3 ? decodeURIComponent(parts[1] ?? "") : "Dueño";
@@ -261,6 +319,11 @@ export async function readOwnerToken(
   const [adminId = "", ...nameParts] = kind === "equipo" ? rest.split(":") : ["", rest];
   const name = kind === "equipo" ? nameParts.join(":") : rest;
   return { id, actor: name || "Dueño", kind, adminId };
+}
+
+export async function ownerLogout(token: string) {
+  const { revokeServerSession } = await import("@/lib/sessions.server");
+  await revokeServerSession(token);
 }
 
 /** Carga el negocio del dueño validando token, estado y vencimiento. */
@@ -301,14 +364,20 @@ export function requireFeature(business: MenuBusiness, key: FeatureKey) {
 }
 
 /** Valida contraseña del dueño (o de un administrador adicional) y devuelve su token. */
-export async function ownerLogin(slug: string, password: string) {
+export async function ownerLogin(username: string, password: string) {
   const db = await admin();
-  const { data } = await db
+  const clean = username.trim().toLowerCase();
+  let { data } = await db
     .from("menu_businesses")
     .select("*")
-    .eq("slug", slug.trim().toLowerCase())
+    .eq("access_username", clean)
     .maybeSingle();
-  if (!data) throw new Error("Negocio o contraseña incorrectos");
+  // Compatibilidad con clientes antiguos: también acepta el slug mientras se les asigna usuario.
+  if (!data) {
+    const legacy = await db.from("menu_businesses").select("*").eq("slug", clean).maybeSingle();
+    data = legacy.data;
+  }
+  if (!data) throw new Error("Usuario o contraseña incorrectos");
   const business = rowToBusiness(data as Row);
   const salt = str((data as Row)["access_salt"]);
   const hash = str((data as Row)["access_hash"]);
@@ -340,11 +409,11 @@ export async function ownerLogin(slug: string, password: string) {
 
   if (!matched) {
     if (!hash || !salt) throw new Error("Este negocio todavía no tiene contraseña asignada");
-    throw new Error("Negocio o contraseña incorrectos");
+    throw new Error("Usuario o contraseña incorrectos");
   }
   if (!adminId && business.accessSuspended) throw new Error("Tu acceso está suspendido");
   const status = businessStatus(business);
-  if (status !== "activo")
+  if (status === "apagado" || status === "vencido")
     throw new Error(status === "vencido" ? "Tu acceso venció" : "Tu catálogo está apagado");
 
   if (adminId)

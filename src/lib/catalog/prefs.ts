@@ -1,7 +1,9 @@
 import { CATALOG_IDS, type CatalogId, type SortMode } from "./types";
 
 /** Vista del catálogo: tarjetas completas o tabla compacta plataforma/precio. */
-export type ViewMode = "tarjetas" | "tabla" | "lista";
+export type ViewMode = "tarjetas" | "tabla";
+export type ThemeMode = "claro" | "oscuro";
+export type BackgroundStyle = "degradado" | "solido" | "suave";
 
 /** Preferencias de filtrado y orden guardadas por catálogo en este dispositivo. */
 export interface CatalogPrefs {
@@ -13,10 +15,20 @@ export interface CatalogPrefs {
   showDetail: boolean;
   /** Muestra el botón "Compartir" en las tarjetas. */
   showShare: boolean;
+  /** Muestra los botones de pedido por WhatsApp en el catálogo. */
+  showWhatsapp: boolean;
   /** Tarjetas o tabla de plataformas y precios. */
   viewMode: ViewMode;
+  /** Modo de edición en lista, separado del formato de vista. */
+  editMode: boolean;
   /** Panel "Herramientas" abierto o plegado. */
   toolsOpen: boolean;
+  /** Apariencia recuperada del módulo independiente de Mis Clientes. */
+  themeMode: ThemeMode;
+  accentColor: string;
+  backgroundStyle: BackgroundStyle;
+  /** Servicios marcados para pedido múltiple; se conservan por catálogo. */
+  markedIds: string[];
 }
 
 export type PrefsMap = Record<CatalogId, CatalogPrefs>;
@@ -32,8 +44,14 @@ export const DEFAULT_PREFS: CatalogPrefs = {
   categoryFilter: ALL_CATEGORIES,
   showDetail: true,
   showShare: true,
+  showWhatsapp: true,
   viewMode: "tarjetas",
+  editMode: false,
   toolsOpen: false,
+  themeMode: "claro",
+  accentColor: "#8b5cf6",
+  backgroundStyle: "degradado",
+  markedIds: [],
 };
 
 const SORTS: SortMode[] = ["categoria", "precio", "nombre"];
@@ -60,9 +78,23 @@ function normalize(raw: unknown): PrefsMap {
       categoryFilter: typeof p.categoryFilter === "string" ? p.categoryFilter : ALL_CATEGORIES,
       showDetail: p.showDetail !== false,
       showShare: p.showShare !== false,
-      viewMode:
-        p.viewMode === "tabla" ? "tabla" : p.viewMode === "lista" ? "lista" : "tarjetas",
+      showWhatsapp: p.showWhatsapp !== false,
+      // Migra la preferencia antigua "lista" al nuevo modo Editar separado.
+      viewMode: p.viewMode === "tabla" ? "tabla" : "tarjetas",
+      editMode: p.editMode === true || (p.viewMode as string | undefined) === "lista",
       toolsOpen: p.toolsOpen === true,
+      themeMode: p.themeMode === "oscuro" ? "oscuro" : "claro",
+      accentColor:
+        typeof p.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(p.accentColor)
+          ? p.accentColor
+          : "#8b5cf6",
+      backgroundStyle:
+        p.backgroundStyle === "solido" || p.backgroundStyle === "suave"
+          ? p.backgroundStyle
+          : "degradado",
+      markedIds: Array.isArray(p.markedIds)
+        ? p.markedIds.filter((id): id is string => typeof id === "string")
+        : [],
     };
 
   }

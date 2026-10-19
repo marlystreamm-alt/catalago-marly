@@ -19,20 +19,70 @@ export function CategoriesDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { catalog, saveCategory, deleteCategory, saveSubsection, deleteSubsection } =
+  const { catalog, saveCategory, deleteCategory, saveSubsection, deleteSubsection, updateCatalogMeta } =
     useCatalogStore();
   const [newCategory, setNewCategory] = useState("");
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [newSub, setNewSub] = useState<Record<string, string>>({});
+  const [newSection, setNewSection] = useState("");
+  const [sectionEditing, setSectionEditing] = useState<Record<string, string>>({});
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Categorías y subsecciones</DialogTitle>
-          <DialogDescription>Organiza los servicios de {catalog.name}.</DialogDescription>
+          <DialogTitle>{catalog.spaceType === "catalog" ? "Secciones y categorías" : "Categorías"}</DialogTitle>
+          <DialogDescription>Organiza las tarjetas de {catalog.name} sin salir de la vista por tarjetas.</DialogDescription>
         </DialogHeader>
 
+
+        {catalog.spaceType === "catalog" ? (
+          <section className="grid gap-2 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+            <div>
+              <p className="text-sm font-semibold">Secciones del catálogo</p>
+              <p className="text-xs text-muted-foreground">Estas son las pestañas superiores que verá el público.</p>
+            </div>
+            <div className="grid gap-2">
+              {(catalog.sectionTabs ?? []).map((section) => {
+                const editingName = sectionEditing[section.id];
+                return (
+                  <div key={section.id} className="flex items-center gap-2 rounded-xl border bg-card p-2">
+                    {editingName !== undefined ? (
+                      <>
+                        <Input value={editingName} onChange={(e) => setSectionEditing({ ...sectionEditing, [section.id]: e.target.value })} />
+                        <Button size="sm" onClick={() => {
+                          const name = editingName.trim();
+                          if (!name) return;
+                          updateCatalogMeta(catalog.id, { sectionTabs: (catalog.sectionTabs ?? []).map((x) => x.id === section.id ? { ...x, name } : x) });
+                          const next = { ...sectionEditing }; delete next[section.id]; setSectionEditing(next);
+                        }}>Guardar</Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm font-medium">{section.name}</span>
+                        <Button size="icon" variant="ghost" onClick={() => setSectionEditing({ ...sectionEditing, [section.id]: section.name })}><Pencil className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" disabled={(catalog.sectionTabs?.length ?? 0) <= 1} onClick={() => {
+                          const next = (catalog.sectionTabs ?? []).filter((x) => x.id !== section.id);
+                          updateCatalogMeta(catalog.id, { sectionTabs: next });
+                        }}><Trash2 className="size-4 text-destructive" /></Button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="flex gap-2">
+                <Input value={newSection} placeholder="Nueva sección" onChange={(e) => setNewSection(e.target.value)} />
+                <Button onClick={() => {
+                  const name = newSection.trim();
+                  if (!name) return;
+                  const id = `seccion-${Date.now()}`;
+                  updateCatalogMeta(catalog.id, { sectionTabs: [...(catalog.sectionTabs ?? []), { id, name, hidden: false }] });
+                  setNewSection("");
+                }}><Plus className="size-4" />Agregar sección</Button>
+              </div>
+            </div>
+          </section>
+        ) : null}
         <div className="flex gap-2">
           <Input
             value={newCategory}

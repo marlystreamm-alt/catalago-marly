@@ -15,6 +15,10 @@ export const PERMISSIONS = [
   { key: "verDescripciones", label: "Ver descripciones", group: "ver" },
   { key: "verImagenes", label: "Ver imágenes", group: "ver" },
   { key: "verOcultos", label: "Ver servicios ocultos", group: "ver" },
+  { key: "usarDetalles", label: "Botón Ver detalles", group: "funciones" },
+  { key: "usarCompartir", label: "Botón Compartir", group: "funciones" },
+  { key: "usarWhatsapp", label: "Botón Pedir por WhatsApp", group: "funciones" },
+  { key: "usarFavoritos", label: "Favoritos", group: "funciones" },
   { key: "editPrecio", label: "Editar precio", group: "editar" },
   { key: "editNombre", label: "Editar nombre", group: "editar" },
   { key: "editDescripcion", label: "Editar descripción", group: "editar" },
@@ -24,6 +28,7 @@ export const PERMISSIONS = [
   { key: "agregarServicio", label: "Agregar servicios", group: "editar" },
   { key: "eliminarServicio", label: "Eliminar servicios", group: "editar" },
   { key: "ajustesCatalogo", label: "Cambiar nombre, subtítulo y WhatsApp", group: "editar" },
+  { key: "editWhatsappTarjeta", label: "WhatsApp individual por tarjeta", group: "editar" },
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number]["key"];
@@ -41,6 +46,9 @@ export const DEFAULT_PERMISSIONS: Permissions = {
   verPrecios: true,
   verDescripciones: true,
   verImagenes: true,
+  usarDetalles: true,
+  usarWhatsapp: true,
+  usarFavoritos: true,
 };
 
 export interface ClientAccess {
@@ -48,8 +56,12 @@ export interface ClientAccess {
   business: string;
   owner: string;
   whatsapp: string;
+  /** Usuario elegido manualmente por la administradora. */
+  username: string;
   notes: string;
   catalogId: string;
+  /** Catálogos que este acceso puede ver. catalogId se conserva como principal por compatibilidad. */
+  catalogIds: string[];
   startsOn: string;
   expiresOn: string;
   suspended: boolean;
@@ -99,16 +111,6 @@ function safeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-/** Clave legible tipo MA2-4F7K-92QX. */
-export function generateAccessCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const block = (n: number) =>
-    Array.from(crypto.getRandomValues(new Uint8Array(n)))
-      .map((b) => alphabet[b % alphabet.length])
-      .join("");
-  return `MA2-${block(4)}-${block(4)}`;
-}
-
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export function addMonths(dateISO: string, months: number) {
@@ -132,12 +134,14 @@ function normalize(raw: unknown): ClientAccess[] {
       business: String(c.business ?? ""),
       owner: String(c.owner ?? ""),
       whatsapp: String(c.whatsapp ?? ""),
+      username: String(c.username ?? ""),
       notes: String(c.notes ?? ""),
       catalogId: String(c.catalogId ?? "clientes"),
+      catalogIds: Array.isArray(c.catalogIds) && c.catalogIds.length ? c.catalogIds.map(String) : [String(c.catalogId ?? "clientes")],
       startsOn: String(c.startsOn ?? todayISO()),
       expiresOn: String(c.expiresOn ?? addMonths(todayISO(), 1)),
       suspended: c.suspended === true,
-      permissions: { ...EMPTY_PERMISSIONS, ...(c.permissions as Permissions | undefined) },
+      permissions: { ...DEFAULT_PERMISSIONS, ...(c.permissions as Permissions | undefined) },
       salt: String(c.salt ?? ""),
       hash: String(c.hash ?? ""),
       createdAt: String(c.createdAt ?? new Date().toISOString()),
@@ -165,23 +169,22 @@ export function saveClients(clients: ClientAccess[]) {
   }
 }
 
-/** Busca el cliente cuya clave coincide y sigue vigente. */
-export async function findClientByCode(
-  code: string,
+/** Busca un cliente por usuario + contraseña y valida estado/vigencia. */
+export async function findClientByCredentials(
+  username: string,
+  password: string,
   clients: ClientAccess[],
 ): Promise<{ ok: true; client: ClientAccess } | { ok: false; error: string }> {
-  const clean = code.trim().toUpperCase();
-  if (!clean) return { ok: false, error: "Escribe tu clave de acceso" };
-  for (const client of clients) {
-    if (!client.salt || !client.hash) continue;
-    const hash = await hashCode(clean, client.salt);
-    if (!safeEqual(hash, client.hash)) continue;
-    const status = statusOf(client);
-    if (status === "suspendido")
-      return { ok: false, error: "Tu acceso está suspendido. Contacta a MA² para reactivarlo." };
-    if (status === "vencido")
-      return { ok: false, error: "Tu acceso venció. Contacta a MA² para renovarlo." };
-    return { ok: true, client };
-  }
-  return { ok: false, error: "Clave incorrecta" };
+  const user = username.trim().toLowerCase();
+  const clean = password;
+  if (!user) return { ok: false, error: "Escribe tu usuario" };
+  if (!clean) return { ok: false, error: "Escribe tu contraseña" };
+  const client = clients.find((c) => c.username.trim().toLowerCase() === user);
+  if (!client || !client.salt || !client.hash) return { ok: false, error: "Usuario o contraseña incorrectos" };
+  const hash = await hashCode(clean, client.salt);
+  if (!safeEqual(hash, client.hash)) return { ok: false, error: "Usuario o contraseña incorrectos" };
+  const status = statusOf(client);
+  if (status === "suspendido") return { ok: false, error: "Tu acceso está suspendido. Contacta a MA² para reactivarlo." };
+  if (status === "vencido") return { ok: false, error: "Tu acceso venció. Contacta a MA² para renovarlo." };
+  return { ok: true, client };
 }

@@ -50,6 +50,7 @@ CREATE TABLE public.notification_settings (
 
 GRANT ALL ON public.notification_settings TO service_role;
 ALTER TABLE public.notification_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "No direct access to notification settings" ON public.notification_settings FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
 INSERT INTO public.notification_settings (id) VALUES (1);
 
@@ -64,3 +65,4 @@ CREATE TABLE public.push_subscriptions (
 
 GRANT ALL ON public.push_subscriptions TO service_role;
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "No direct access to push subscriptions" ON public.push_subscriptions FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);

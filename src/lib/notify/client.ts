@@ -6,7 +6,20 @@ const CODE_KEY = "ma2-avisos-code-v1";
 export function getSavedCode() {
   if (typeof window === "undefined") return "";
   try {
+    const session = window.localStorage.getItem("ma2-admin-session-v2") ?? "";
+    if (session.startsWith("ma2s_")) return session;
     return window.localStorage.getItem(CODE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The PIN form must not display or save an internal session token as a PIN. */
+export function getSavedPin() {
+  if (typeof window === "undefined") return "";
+  try {
+    const value = window.localStorage.getItem(CODE_KEY) ?? "";
+    return value.startsWith("ma2s_") ? "" : value;
   } catch {
     return "";
   }
@@ -14,6 +27,7 @@ export function getSavedCode() {
 
 export function saveCode(code: string) {
   if (typeof window === "undefined") return;
+  if (code.startsWith("ma2s_")) return;
   try {
     window.localStorage.setItem(CODE_KEY, code);
   } catch {
@@ -34,26 +48,31 @@ export function clearCode() {
  * Avisa a la nube que se hizo un pedido. Nunca interrumpe al cliente:
  * si falla (sin internet, etc.) simplemente se ignora.
  */
-export function reportOrder(order: OrderInput) {
-  if (typeof window === "undefined") return;
+export async function reportOrder(order: OrderInput): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   try {
-    void fetch("/api/public/orders", {
+    const response = await fetch("/api/public/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(order),
       keepalive: true,
-    }).catch(() => undefined);
+    });
+    return response.ok;
   } catch {
-    /* sin conexión: el pedido igual se envía por WhatsApp */
+    return false;
   }
 }
 
 function urlBase64ToUint8Array(base64: string) {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  const normalized = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const clean = base64.trim().replace(/\s+/g, "");
+  const padding = "=".repeat((4 - (clean.length % 4)) % 4);
+  const normalized = (clean + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(normalized);
   const output = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
+  if (output.length !== 65 || output[0] !== 4) {
+    throw new Error("La llave de notificaciones no es válida. Vuelve a abrir la app y reintenta.");
+  }
   return output;
 }
 
@@ -78,21 +97,27 @@ export async function subscribeToPush(vapidPublicKey: string): Promise<PushResul
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return { ok: false, reason: "No diste permiso de notificaciones" };
 
-  const registration = await navigator.serviceWorker.ready.catch(() => null);
-  if (!registration) {
+  let registration = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
+  if (!registration || !registration.active?.scriptURL.endsWith("/push-sw.js")) {
+    registration = await navigator.serviceWorker.register("/push-sw.js", { scope: "/" });
+  }
+  const ready = await navigator.serviceWorker.ready.catch(() => null);
+  if (!ready) {
     return {
       ok: false,
       reason: "Instala la app en la pantalla de inicio y vuelve a intentar (aquí no hay soporte).",
     };
   }
+  registration = ready;
 
+  // Si hubo intentos anteriores con otra llave VAPID, esa suscripción ya no sirve.
+  // La eliminamos y creamos una limpia con la llave vigente.
   const existing = await registration.pushManager.getSubscription();
-  const sub =
-    existing ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    }));
+  if (existing) await existing.unsubscribe().catch(() => false);
+  const sub = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+  });
 
   const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {

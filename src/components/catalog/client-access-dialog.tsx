@@ -1,5 +1,6 @@
+import { copyText } from "@/lib/browser/clipboard";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Copy, KeyRound, LogOut, Plus, Store, UserCog } from "lucide-react";
+import { AlertCircle, Copy, Eye, EyeOff, LogOut, Plus, Store, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCatalogStore } from "@/lib/catalog/store";
@@ -27,7 +21,6 @@ import {
   DEFAULT_PERMISSIONS,
   PERMISSIONS,
   addMonths,
-  generateAccessCode,
   hashCode,
   randomHex,
   statusOf,
@@ -48,8 +41,10 @@ const emptyDraft = (catalogId: string): ClientAccess => ({
   business: "",
   owner: "",
   whatsapp: "",
+  username: "",
   notes: "",
   catalogId,
+  catalogIds: [catalogId],
   startsOn: todayISO(),
   expiresOn: addMonths(todayISO(), 1),
   suspended: false,
@@ -67,12 +62,16 @@ export function ClientAccessDialog() {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ClientAccess | null>(null);
   const [newCode, setNewCode] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+  const [showCode, setShowCode] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setDraft(null);
       setNewCode("");
+      setConfirmCode("");
+      setShowCode(false);
     }
   }, [open]);
 
@@ -85,7 +84,8 @@ export function ClientAccessDialog() {
 
   const startNew = () => {
     setDraft(emptyDraft(catalogId));
-    setNewCode(generateAccessCode());
+    setNewCode("");
+    setConfirmCode("");
   };
 
   const setPerm = (key: keyof Permissions, value: boolean) =>
@@ -99,12 +99,33 @@ export function ClientAccessDialog() {
       toast.error("Escribe el nombre del negocio");
       return;
     }
+    const username = draft.username.trim().toLowerCase();
+    if (username.length < 3) {
+      toast.error("Escribe un usuario de al menos 3 caracteres");
+      return;
+    }
+    if (clients.some((c) => c.id !== draft.id && c.username.trim().toLowerCase() === username)) {
+      toast.error("Ese usuario ya está asignado a otro cliente");
+      return;
+    }
+    if (!(draft.catalogIds?.length || draft.catalogId)) {
+      toast.error("Selecciona al menos un catálogo");
+      return;
+    }
+    if (!draft.hash && newCode.length < 6) {
+      toast.error("Escribe una contraseña de al menos 6 caracteres");
+      return;
+    }
+    if (newCode && newCode !== confirmCode) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
     setBusy(true);
     try {
       let { salt, hash } = draft;
       if (newCode.trim()) {
         salt = randomHex(16);
-        hash = await hashCode(newCode.trim().toUpperCase(), salt);
+        hash = await hashCode(newCode.trim(), salt);
       }
       if (!hash) {
         toast.error("Genera una clave de acceso para este cliente");
@@ -114,7 +135,10 @@ export function ClientAccessDialog() {
         ...draft,
         business: draft.business.trim(),
         owner: draft.owner.trim(),
+        username,
         whatsapp: draft.whatsapp.replace(/\D/g, ""),
+        catalogId: (draft.catalogIds?.[0] || draft.catalogId),
+        catalogIds: draft.catalogIds?.length ? draft.catalogIds : [draft.catalogId],
         salt,
         hash,
         updatedAt: new Date().toISOString(),
@@ -172,23 +196,31 @@ export function ClientAccessDialog() {
                   />
                 </div>
               </div>
-              <div className="grid gap-1.5">
-                <Label>Catálogo asignado</Label>
-                <Select
-                  value={draft.catalogId}
-                  onValueChange={(v) => setDraft({ ...draft, catalogId: v })}
-                >
-                  <SelectTrigger aria-label="Catálogo asignado">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCatalogIds.map((id) => (
-                      <SelectItem key={id} value={id}>
-                        {state.catalogs[id].name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid gap-2">
+                <div>
+                  <Label>Catálogos que puede ver</Label>
+                  <p className="text-xs text-muted-foreground">Marca uno o varios. Si marcas uno, solo verá ese catálogo.</p>
+                </div>
+                <div className="grid gap-2 rounded-xl border p-2 sm:grid-cols-2">
+                  {allCatalogIds.map((id) => {
+                    const selected = (draft.catalogIds?.length ? draft.catalogIds : [draft.catalogId]).includes(id);
+                    return (
+                      <label key={id} className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-primary"
+                          checked={selected}
+                          onChange={(e) => {
+                            const current = draft.catalogIds?.length ? draft.catalogIds : [draft.catalogId];
+                            const next = e.target.checked ? [...new Set([...current, id])] : current.filter((x) => x !== id);
+                            setDraft({ ...draft, catalogIds: next, catalogId: next[0] || draft.catalogId });
+                          }}
+                        />
+                        <span className="truncate">{state.catalogs[id].name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="grid gap-1.5">
@@ -211,60 +243,49 @@ export function ClientAccessDialog() {
                 </div>
               </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="cl-code">Clave de acceso</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="cl-code"
-                    value={newCode}
-                    placeholder={draft.hash ? "Sin cambios" : "MA2-XXXX-XXXX"}
-                    onChange={(e) => setNewCode(e.target.value.toUpperCase())}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label="Generar clave"
-                    onClick={() => setNewCode(generateAccessCode())}
-                  >
-                    <KeyRound className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label="Copiar clave"
-                    disabled={!newCode}
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(newCode);
-                        toast.success("Clave copiada");
-                      } catch {
-                        toast.error("Copia la clave manualmente");
-                      }
-                    }}
-                  >
-                    <Copy className="size-4" />
-                  </Button>
+              <div className="grid gap-3 rounded-2xl border border-border bg-muted/30 p-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="cl-user">Usuario</Label>
+                  <Input id="cl-user" value={draft.username} placeholder="Ej. cliente01" autoCapitalize="none" autoCorrect="off" onChange={(e) => setDraft({ ...draft, username: e.target.value })} />
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  La clave se guarda cifrada. Cópiala ahora: después ya no se puede volver a ver.
-                </p>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="cl-code">Contraseña</Label>
+                  <div className="relative">
+                    <Input id="cl-code" type={showCode ? "text" : "password"} value={newCode} placeholder={draft.hash ? "Escribe una nueva solo si deseas cambiarla" : "Mínimo 6 caracteres"} onChange={(e) => setNewCode(e.target.value)} className="pr-10" />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowCode((v) => !v)} aria-label={showCode ? "Ocultar contraseña" : "Mostrar contraseña"}>{showCode ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button>
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="cl-code2">Confirmar contraseña</Label>
+                  <Input id="cl-code2" type={showCode ? "text" : "password"} value={confirmCode} onChange={(e) => setConfirmCode(e.target.value)} className={newCode && confirmCode && newCode !== confirmCode ? "border-destructive" : undefined} />
+                  {newCode && confirmCode && newCode !== confirmCode ? <p className="text-xs font-medium text-destructive">Las contraseñas no coinciden.</p> : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" disabled={!newCode} onClick={async () => { try { await copyText(newCode); toast.success("Contraseña copiada"); } catch { toast.error("Copia la contraseña manualmente"); } }}><Copy className="mr-1 size-4" />Copiar contraseña</Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Tú eliges el usuario y la contraseña. La contraseña se guarda cifrada y no se muestra después de guardar.</p>
               </div>
 
               <div className="rounded-2xl border border-border bg-muted/40 p-3">
-                <p className="text-xs font-semibold text-muted-foreground">Permisos</p>
-                <div className="mt-2 grid gap-2">
-                  {PERMISSIONS.map((p) => (
-                    <label key={p.key} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="text-foreground">{p.label}</span>
-                      <Switch
-                        checked={draft.permissions[p.key]}
-                        onCheckedChange={(v) => setPerm(p.key, v)}
-                      />
-                    </label>
-                  ))}
-                </div>
+                <p className="text-sm font-semibold text-foreground">Funciones y permisos del cliente</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Tú decides qué verá y qué podrá editar. Tu modo administradora conserva todas las funciones.</p>
+                {[
+                  ["ver", "Contenido visible"],
+                  ["funciones", "Botones del catálogo"],
+                  ["editar", "Permisos de edición"],
+                ].map(([group, title]) => (
+                  <div key={group} className="mt-3 rounded-xl border border-border bg-card p-2.5">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+                    <div className="grid gap-2">
+                      {PERMISSIONS.filter((p) => p.group === group).map((p) => (
+                        <label key={p.key} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-foreground">{p.label}</span>
+                          <Switch checked={draft.permissions[p.key]} onCheckedChange={(v) => setPerm(p.key, v)} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <label className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
@@ -319,7 +340,7 @@ export function ClientAccessDialog() {
                             {c.business || "Sin nombre"}
                           </p>
                           <p className="text-[11px] text-muted-foreground">
-                            {state.catalogs[c.catalogId]?.name ?? c.catalogId} · vence {c.expiresOn}{" "}
+                            {(c.catalogIds?.length ? c.catalogIds : [c.catalogId]).map((id) => state.catalogs[id]?.name ?? id).join(" · ")} · vence {c.expiresOn}{" "}
                             · {perms} permiso(s)
                           </p>
                         </div>
@@ -332,6 +353,7 @@ export function ClientAccessDialog() {
                           onClick={() => {
                             setDraft(c);
                             setNewCode("");
+                            setConfirmCode("");
                           }}
                         >
                           Editar
@@ -394,7 +416,9 @@ export function ClientMenuButton() {
   const { isAdmin, isClient, clientSession, clientLogin, clientLogout, catalog } =
     useCatalogStore();
   const [open, setOpen] = useState(false);
+  const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -443,7 +467,7 @@ export function ClientMenuButton() {
           <DialogHeader>
             <DialogTitle>Entrar a mi menú</DialogTitle>
             <DialogDescription>
-              Escribe la clave que te dio MA² para ver y editar tu menú.
+              Escribe el usuario y contraseña que te asignó MA².
             </DialogDescription>
           </DialogHeader>
           <form
@@ -452,9 +476,10 @@ export function ClientMenuButton() {
               e.preventDefault();
               setBusy(true);
               setError("");
-              const res = await clientLogin(code);
+              const res = await clientLogin(username, code);
               setBusy(false);
               if (res.ok) {
+                setUsername("");
                 setCode("");
                 setOpen(false);
               } else {
@@ -463,18 +488,15 @@ export function ClientMenuButton() {
             }}
           >
             <div className="grid gap-1.5">
-              <Label htmlFor="client-code">Clave de acceso</Label>
-              <Input
-                id="client-code"
-                value={code}
-                placeholder="MA2-XXXX-XXXX"
-                aria-invalid={!!error}
-                className={error ? "border-destructive" : undefined}
-                onChange={(e) => {
-                  setCode(e.target.value.toUpperCase());
-                  if (error) setError("");
-                }}
-              />
+              <Label htmlFor="client-user">Usuario</Label>
+              <Input id="client-user" value={username} placeholder="Tu usuario" autoCapitalize="none" autoCorrect="off" onChange={(e) => { setUsername(e.target.value); if (error) setError(""); }} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="client-code">Contraseña</Label>
+              <div className="relative">
+                <Input id="client-code" type={showPassword ? "text" : "password"} value={code} placeholder="Tu contraseña" aria-invalid={!!error} className={`${error ? "border-destructive " : ""}pr-10`} onChange={(e) => { setCode(e.target.value); if (error) setError(""); }} />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button>
+              </div>
             </div>
 
             <p className="text-[12px] leading-snug text-muted-foreground">
@@ -495,7 +517,7 @@ export function ClientMenuButton() {
                   {error}
                 </p>
                 <p className="text-[12px] leading-snug text-muted-foreground">
-                  Revisa que la clave esté completa (formato MA2-XXXX-XXXX) y sin espacios. Si ya
+                  Revisa que la clave esté completa y sin espacios. Si ya
                   venció o sigue sin funcionar, pide a MA² que te renueve el acceso.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -505,6 +527,7 @@ export function ClientMenuButton() {
                     variant="outline"
                     className="h-8 rounded-full text-xs"
                     onClick={() => {
+                      setUsername("");
                       setCode("");
                       setError("");
                       document.getElementById("client-code")?.focus();

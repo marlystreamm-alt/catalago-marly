@@ -1,4 +1,5 @@
-import { ArrowLeft, Link2, MessageCircle, Star } from "lucide-react";
+import { copyText } from "@/lib/browser/clipboard";
+import { ArrowLeft, Link2, MessageCircle, ShoppingCart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { reportOrder } from "@/lib/notify/client";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import { buildServiceLink } from "@/lib/catalog/links";
 import type { Service } from "@/lib/catalog/types";
 import { isImageValue } from "@/lib/catalog/image";
 import { resolveServiceMedia } from "@/lib/catalog/platforms";
+import { addToCart } from "@/lib/catalog/cart";
 
 /**
  * Detalle de un servicio, listo para "Pedir por WhatsApp".
@@ -38,7 +40,7 @@ export function ServiceDetailDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { catalog } = useCatalogStore();
+  const { catalog, prefs, isClient, can } = useCatalogStore();
   const online = useOnline();
   const { enqueue } = useOrderQueue();
 
@@ -51,7 +53,7 @@ export function ServiceDetailDialog({
     ["Catálogo", catalog.name],
     ["Categoría", category?.name ?? "—"],
     ["Subsección", subsection?.name ?? "—"],
-    ...serviceFacts(service).map((f) => [f.label, f.value.trim()] as [string, string]),
+    ...serviceFacts(service, catalog).map((f) => [f.label, f.value.trim()] as [string, string]),
     ["Estado", service.active ? "Disponible" : "No disponible"],
   ];
 
@@ -122,14 +124,24 @@ export function ServiceDetailDialog({
           </Badge>
         ) : null}
 
-
         <DialogFooter className="flex-col gap-2 sm:flex-row">
+          {!(catalog.spaceType === "directory" || catalog.spaceType === "provider") ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                addToCart(service, catalog.id);
+                toast.success("Agregado al carrito");
+              }}
+            >
+              <ShoppingCart className="size-4" />
+              Agregar al carrito
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             onClick={() => {
               const url = buildServiceLink(catalog.id, service.id);
-              navigator.clipboard
-                .writeText(url)
+              copyText(url)
                 .then(() => toast.success("Enlace del servicio copiado"))
                 .catch(() => toast.error("No se pudo copiar el enlace"));
             }}
@@ -137,47 +149,49 @@ export function ServiceDetailDialog({
             <Link2 className="size-4" />
             Copiar enlace
           </Button>
-          {online ? (
-            <Button asChild size="lg" className="flex-1 rounded-full shadow-sm">
-              <a
-                href={buildWhatsappLink(service, catalog)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() =>
-                  reportOrder({
+          {prefs.showWhatsapp && (!isClient || can("usarWhatsapp")) ? (
+            online ? (
+              <Button asChild size="lg" className="flex-1 rounded-full shadow-sm">
+                <a
+                  href={buildWhatsappLink(service, catalog)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    reportOrder({
+                      catalogId: catalog.id,
+                      catalogName: catalog.name,
+                      serviceName: service.name,
+                      total: service.price,
+                      items: [{ name: service.name, price: service.price }],
+                      message: buildWhatsappMessage(service, catalog),
+                      link: buildWhatsappLink(service, catalog),
+                      recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
+                    })
+                  }
+                >
+                  <MessageCircle className="size-4" />
+                  Pedir por WhatsApp
+                </a>
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 rounded-full shadow-sm"
+                onClick={() => {
+                  enqueue({
                     catalogId: catalog.id,
                     catalogName: catalog.name,
                     serviceName: service.name,
-                    total: service.price,
-                    items: [{ name: service.name, price: service.price }],
+                    price: service.price,
                     message: buildWhatsappMessage(service, catalog),
                     link: buildWhatsappLink(service, catalog),
-                    recipient: (catalog.whatsappNumber || "").replace(/\D/g, ""),
-                  })
-                }
+                  });
+                }}
               >
                 <MessageCircle className="size-4" />
-                Pedir por WhatsApp
-              </a>
-            </Button>
-          ) : (
-            <Button
-              className="flex-1 rounded-full shadow-sm"
-              onClick={() => {
-                enqueue({
-                  catalogId: catalog.id,
-                  catalogName: catalog.name,
-                  serviceName: service.name,
-                  price: service.price,
-                  message: buildWhatsappMessage(service, catalog),
-                  link: buildWhatsappLink(service, catalog),
-                });
-              }}
-            >
-              <MessageCircle className="size-4" />
-              Guardar pedido (sin conexión)
-            </Button>
-          )}
+                Guardar pedido (sin conexión)
+              </Button>
+            )
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>

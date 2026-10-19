@@ -1,3 +1,4 @@
+import { copyText } from "@/lib/browser/clipboard";
 import { useEffect, useRef, useState } from "react";
 import { Copy, Download, KeyRound, LockKeyhole, LogOut, RotateCcw, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCatalogStore } from "@/lib/catalog/store";
+import { RECOVERY_EMAIL } from "@/lib/catalog/auth";
 import { ConfirmButton } from "./confirm-button";
 
 function RecoveryNotice({ code }: { code: string }) {
@@ -34,7 +36,7 @@ function RecoveryNotice({ code }: { code: string }) {
           aria-label="Copiar código"
           onClick={async () => {
             try {
-              await navigator.clipboard.writeText(code);
+              await copyText(code);
               toast.success("Código copiado");
             } catch {
               toast.error("Copia el código manualmente");
@@ -76,8 +78,23 @@ function PasswordDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => (code && !v ? onOpenChange(false) : onOpenChange(v))}>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (forced && !code && !value) return;
+        onOpenChange(value);
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-sm"
+        hideClose={Boolean(forced && !code)}
+        onEscapeKeyDown={(event) => {
+          if (forced && !code) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (forced && !code) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {forced ? "Cambia la contraseña inicial" : "Cambiar contraseña"}
@@ -85,7 +102,7 @@ function PasswordDialog({
           <DialogDescription>
             {forced
               ? "Por seguridad, rota la contraseña temporal antes de seguir editando."
-              : "La contraseña se guarda cifrada (hash) solo en este dispositivo."}
+              : "La contraseña se guarda protegida en el servidor y se aplica a tus herramientas privadas."}
           </DialogDescription>
         </DialogHeader>
 
@@ -113,7 +130,8 @@ function PasswordDialog({
                 setError(result.error ?? "No se pudo cambiar la contraseña");
                 return;
               }
-              setCode(result.recoveryCode ?? null);
+              if (result.recoveryCode) setCode(result.recoveryCode);
+              else onOpenChange(false);
             }}
           >
             <div className="grid gap-1.5">
@@ -169,8 +187,8 @@ function LoginDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { login, resetPassword } = useCatalogStore();
-  const [mode, setMode] = useState<"login" | "reset">("login");
+  const { login, resetPassword, requestRecoveryEmail, completeEmailRecovery } = useCatalogStore();
+  const [mode, setMode] = useState<"login" | "reset" | "email-reset">("login");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [next, setNext] = useState("");
@@ -199,7 +217,9 @@ function LoginDialog({
           <DialogDescription>
             {mode === "login"
               ? "Escribe la contraseña para editar los catálogos."
-              : "Usa tu código de recuperación para crear una contraseña nueva."}
+              : mode === "email-reset"
+                ? `El enlace de recuperación se envía a ${RECOVERY_EMAIL}.`
+                : "Usa tu código de recuperación para crear una contraseña nueva."}
           </DialogDescription>
         </DialogHeader>
 
@@ -235,7 +255,12 @@ function LoginDialog({
               />
             </div>
             <DialogFooter className="sm:justify-between">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setMode("reset")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setMode("email-reset")}
+              >
                 ¿Olvidaste tu contraseña?
               </Button>
               <Button type="submit" disabled={busy}>
@@ -243,6 +268,64 @@ function LoginDialog({
               </Button>
             </DialogFooter>
           </form>
+        ) : mode === "email-reset" ? (
+          <div className="grid gap-3">
+            <div className="rounded-2xl border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">Correo de recuperación</p>
+              <p className="mt-1 text-muted-foreground">{RECOVERY_EMAIL}</p>
+            </div>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                const result = await requestRecoveryEmail();
+                setBusy(false);
+                if (!result.ok) setError(result.error ?? "No se pudo enviar el correo");
+              }}
+            >
+              {busy ? "Enviando…" : "Enviar enlace a mi correo"}
+            </Button>
+            <div className="grid gap-1.5">
+              <Label htmlFor="email-rec-pass">Nueva contraseña</Label>
+              <Input
+                id="email-rec-pass"
+                type="password"
+                autoComplete="new-password"
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+                placeholder="Mínimo 8 caracteres"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy || next.length < 8}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                const result = await completeEmailRecovery(next);
+                setBusy(false);
+                if (!result.ok) {
+                  setError(result.error ?? "No se pudo restablecer la contraseña");
+                  return;
+                }
+                setNewCode(result.recoveryCode ?? null);
+              }}
+            >
+              Ya abrí el enlace · Guardar nueva contraseña
+            </Button>
+            {error ? <p className="text-sm font-medium text-destructive">{error}</p> : null}
+            <div className="flex justify-between gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setMode("login")}>
+                Volver
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setMode("reset")}>
+                Usar código de recuperación
+              </Button>
+            </div>
+          </div>
         ) : (
           <form
             className="grid gap-3"
@@ -299,6 +382,7 @@ export function AdminBar() {
     useCatalogStore();
   const [open, setOpen] = useState(false);
   const [passOpen, setPassOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -318,52 +402,73 @@ export function AdminBar() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" onClick={exportBackup}>
-        <Download className="size-4" />
-        Exportar
-      </Button>
-      <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-        <Upload className="size-4" />
-        Importar
-      </Button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="application/json"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          const text = await file.text();
-          importBackup(text);
-        }}
-      />
-      <Button
-        variant={mustChangePassword ? "default" : "outline"}
-        size="sm"
-        onClick={() => setPassOpen(true)}
-      >
-        <KeyRound className="size-4" />
-        Contraseña
-      </Button>
-      <ConfirmButton
-        title="¿Restaurar los catálogos iniciales?"
-        description="Se perderán los cambios que no hayas exportado."
-        confirmLabel="Restaurar"
-        onConfirm={resetAll}
-      >
-        <Button variant="outline" size="sm">
-          <RotateCcw className="size-4" />
-          Restaurar
+    <>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => setToolsOpen(true)}>
+          <KeyRound className="size-4" />
+          Cuenta y respaldo
         </Button>
-      </ConfirmButton>
-      <Button variant="secondary" size="sm" onClick={logout}>
-        <LogOut className="size-4" />
-        Salir
-      </Button>
+        <Button variant="secondary" size="sm" onClick={logout}>
+          <LogOut className="size-4" />
+          Cerrar sesión
+        </Button>
+      </div>
+      <Dialog open={toolsOpen} onOpenChange={setToolsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cuenta y respaldo</DialogTitle>
+            <DialogDescription>
+              Acceso, contraseña y respaldo general de MA² en un solo lugar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Button variant="outline" className="justify-start" onClick={exportBackup}>
+              <Download className="size-4" /> Exportar respaldo general
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="size-4" /> Importar respaldo general
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                const text = await file.text();
+                importBackup(text);
+              }}
+            />
+            <Button
+              variant={mustChangePassword ? "default" : "outline"}
+              className="justify-start"
+              onClick={() => setPassOpen(true)}
+            >
+              <KeyRound className="size-4" /> Cambiar contraseña
+            </Button>
+            <ConfirmButton
+              title="¿Restaurar los catálogos iniciales?"
+              description="Se perderán los cambios que no hayas exportado."
+              confirmLabel="Restaurar"
+              onConfirm={resetAll}
+            >
+              <Button variant="outline" className="w-full justify-start">
+                <RotateCcw className="size-4" /> Restaurar catálogos iniciales
+              </Button>
+            </ConfirmButton>
+            <Button variant="secondary" className="justify-start" onClick={logout}>
+              <LogOut className="size-4" /> Cerrar sesión de administradora
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <PasswordDialog open={passOpen} onOpenChange={setPassOpen} forced={mustChangePassword} />
-    </div>
+    </>
   );
 }

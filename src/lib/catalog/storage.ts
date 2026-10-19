@@ -37,11 +37,18 @@ export function normalizeState(raw: unknown): AppState {
   const input = raw as Partial<AppState>;
   const catalogs = (input.catalogs ?? {}) as Partial<Record<CatalogId, Catalog>>;
   const result = { version: seed.version, catalogs: { ...seed.catalogs } } as AppState;
+  // v20.40: fuerza la actualización de los dos catálogos comerciales base una sola vez.
+  // Antes, localStorage conservaba las versiones viejas y ocultaba los cambios del ZIP.
+  const refreshCommercialCatalogs = Number(input.version ?? 0) < 2;
 
   const ids = Array.from(new Set([...CATALOG_IDS, ...Object.keys(catalogs)]));
   for (const id of ids) {
     const c = catalogs[id];
     const base = seed.catalogs[id];
+    if (refreshCommercialCatalogs && (id === "clientes" || id === "revendedores")) {
+      result.catalogs[id] = base;
+      continue;
+    }
     // Los catálogos base se conservan aunque vengan vacíos; los creados por el
     // administrador se aceptan aunque todavía no tengan servicios.
     if (!c) continue;
@@ -50,11 +57,36 @@ export function normalizeState(raw: unknown): AppState {
       id,
       name: typeof c.name === "string" && c.name.trim() ? c.name : (base?.name ?? id),
       subtitle: typeof c.subtitle === "string" ? c.subtitle : (base?.subtitle ?? ""),
+      spaceType: c.spaceType === "menu" || c.spaceType === "directory" || c.spaceType === "provider" || c.spaceType === "marketplace" ? c.spaceType : "catalog",
+      imageUrl: typeof c.imageUrl === "string" ? c.imageUrl : "",
       whatsappNumber: typeof c.whatsappNumber === "string" ? c.whatsappNumber : "",
       whatsappTemplate:
         typeof c.whatsappTemplate === "string" && c.whatsappTemplate.trim()
           ? c.whatsappTemplate
           : DEFAULT_TEMPLATE,
+      individualWhatsappEnabled: c.individualWhatsappEnabled === true,
+      commercialFieldsEnabled: c.commercialFieldsEnabled !== false,
+      sectionLabels: {
+        perfiles: c.sectionLabels?.perfiles?.trim() || "Perfiles",
+        completas: c.sectionLabels?.completas?.trim() || "Completas",
+        tramites: c.sectionLabels?.tramites?.trim() || "Trámites",
+      },
+      sectionTabs:
+        c.spaceType === "menu" || c.spaceType === "directory" || c.spaceType === "provider" || c.spaceType === "marketplace"
+          ? []
+          : Array.isArray(c.sectionTabs) && c.sectionTabs.length
+            ? c.sectionTabs
+                .map((tab) => ({
+                  id: String(tab.id ?? "").trim(),
+                  name: String(tab.name ?? "").trim(),
+                  hidden: tab.hidden === true,
+                }))
+                .filter((tab) => tab.id && tab.name)
+            : [
+                { id: "perfiles", name: c.sectionLabels?.perfiles?.trim() || "Perfiles", hidden: false },
+                { id: "completas", name: c.sectionLabels?.completas?.trim() || "Completas", hidden: false },
+                { id: "tramites", name: c.sectionLabels?.tramites?.trim() || "Trámites", hidden: false },
+              ],
       categories:
         Array.isArray(c.categories) && c.categories.length
           ? c.categories.map((cat) => ({
@@ -90,7 +122,24 @@ export function normalizeState(raw: unknown): AppState {
           users: opt(sv.users),
           vigencia: opt(sv.vigencia),
           requirements: opt(sv.requirements),
+          whatsapp: opt(sv.whatsapp),
+          personalWhatsappEnabled: sv.personalWhatsappEnabled === true,
+          whatsappMessage: opt(sv.whatsappMessage),
+          serviceDays: opt(sv.serviceDays),
+          businessHours: opt(sv.businessHours),
+          address: opt(sv.address),
+          mapsUrl: opt(sv.mapsUrl),
+          homeDelivery: sv.homeDelivery === true,
+          paymentMethods: Array.isArray(sv.paymentMethods) ? sv.paymentMethods.filter((m) => ["cash", "transfer", "card"].includes(String(m))) : [],
+          linkedMenuUrl: opt(sv.linkedMenuUrl),
+          customFields: Array.isArray(sv.customFields) ? sv.customFields.map((field, fi) => ({
+            id: String(field?.id ?? `cf-${i}-${fi}`),
+            label: String(field?.label ?? ""),
+            value: String(field?.value ?? ""),
+            visible: field?.visible !== false,
+          })).filter((field) => field.label.trim() || field.value.trim()) : [],
           sortIndex: Number.isFinite(Number(sv.sortIndex)) ? Number(sv.sortIndex) : i,
+          sectionId: opt(sv.sectionId),
         };
       }),
       hidden: c.hidden === true,

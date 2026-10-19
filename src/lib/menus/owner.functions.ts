@@ -1,22 +1,22 @@
 /** Funciones del dueño del catálogo (modo "Mi menú"), validadas con su token de sesión. */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { MenuCategory, MenuItem, OwnerData } from "./types";
+import type { MenuCategory, MenuItem, MenuSpace, OwnerData } from "./types";
 
 const token = z.string().min(10);
 
 export const ownerSignIn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
-    z.object({ slug: z.string().min(1).max(80), password: z.string().min(4).max(120) }).parse(d),
+  .validator((d: unknown) =>
+    z.object({ username: z.string().min(1).max(80), password: z.string().min(4).max(120) }).parse(d),
   )
   .handler(async ({ data }): Promise<{ token: string; mustChangePassword: boolean }> => {
     const { ownerLogin } = await import("./menus.server");
-    const { token: t, mustChange } = await ownerLogin(data.slug, data.password);
+    const { token: t, mustChange } = await ownerLogin(data.username, data.password);
     return { token: t, mustChangePassword: mustChange };
   });
 
 export const ownerLoad = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ token }).parse(d))
+  .validator((d: unknown) => z.object({ token }).parse(d))
   .handler(async ({ data }): Promise<OwnerData> => {
     const { requireOwnerCtx, loadMenu } = await import("./menus.server");
     const { business, actor, kind } = await requireOwnerCtx(data.token);
@@ -29,8 +29,16 @@ export const ownerLoad = createServerFn({ method: "POST" })
     };
   });
 
+export const ownerSignOut = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({ token }).parse(d))
+  .handler(async ({ data }) => {
+    const { ownerLogout } = await import("./menus.server");
+    await ownerLogout(data.token);
+    return { ok: true as const };
+  });
+
 export const ownerChangePassword = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ token, password: z.string().min(6, "Mínimo 6 caracteres").max(120) }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -71,7 +79,7 @@ export const ownerChangePassword = createServerFn({ method: "POST" })
   });
 
 export const ownerSaveBusiness = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         token,
@@ -120,13 +128,67 @@ export const ownerSaveBusiness = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+export const ownerSaveSpace = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({
+    token,
+    id: z.string().uuid().optional(),
+    kind: z.enum(["catalog", "menu", "directory", "marketplace"]),
+    name: z.string().min(1).max(80),
+    subtitle: z.string().max(180).default(""),
+    imageUrl: z.string().default(""),
+    slug: z.string().default(""),
+    hidden: z.boolean().default(false),
+    sortIndex: z.number().int().default(0),
+    noticeEnabled: z.boolean().default(false),
+    noticeTitle: z.string().max(80).default(""),
+    noticeMessage: z.string().max(500).default(""),
+  }).parse(d))
+  .handler(async ({ data }): Promise<MenuSpace> => {
+    const { requireOwnerCtx, rowToSpace } = await import("./menus.server");
+    const { business } = await requireOwnerCtx(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (!data.id) {
+      const { count } = await supabaseAdmin.from("menu_spaces").select("id", { count: "exact", head: true }).eq("business_id", business.id);
+      if ((count ?? 0) >= business.allowedSpaces) throw new Error(`Tu contratación permite ${business.allowedSpaces} pestaña(s). Solicita una pestaña adicional al administrador.`);
+    }
+    let slug = (data.slug || data.name).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || `espacio-${Date.now()}`;
+    if (!data.id) { let n = 2; while ((await supabaseAdmin.from("menu_spaces").select("id").eq("slug", slug).maybeSingle()).data) slug = `${slug}-${n++}`; }
+    const payload = { business_id: business.id, kind: data.kind, name: data.name.trim(), subtitle: data.subtitle, image_url: data.imageUrl, slug, hidden: data.hidden, sort_index: data.sortIndex, notice_enabled: business.features.notices ? data.noticeEnabled : false, notice_title: business.features.notices ? data.noticeTitle : "", notice_message: business.features.notices ? data.noticeMessage : "", updated_at: new Date().toISOString() };
+    const q = data.id ? supabaseAdmin.from("menu_spaces").update(payload).eq("id", data.id).eq("business_id", business.id).select("*").single() : supabaseAdmin.from("menu_spaces").insert(payload).select("*").single();
+    const { data: row, error } = await q; if (error) throw new Error(error.message);
+    if (!data.id) {
+      const saved = rowToSpace(row as Record<string, unknown>);
+      const cname = data.kind === "menu" ? "Platillos" : data.kind === "directory" ? "Negocios" : data.kind === "marketplace" ? "Productos" : "General";
+      const { data: cat } = await supabaseAdmin.from("menu_categories").insert({ business_id: business.id, space_id: saved.id, name: cname, sort_index: 0 }).select("id").single();
+      await supabaseAdmin.from("menu_items").insert({ business_id: business.id, space_id: saved.id, category_id: cat?.id ?? null, name: data.kind === "menu" ? "Platillo de ejemplo" : data.kind === "directory" ? "Negocio de ejemplo" : data.kind === "marketplace" ? "Producto de ejemplo" : "Producto o servicio de ejemplo", description: "Edita esta tarjeta con tu información.", price: 0, price_text: data.kind === "directory" ? "" : "Consultar", available: true, sort_index: 0 });
+    }
+    return rowToSpace(row as Record<string, unknown>);
+  });
+
+export const ownerDeleteSpace = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({ token, id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { requireOwnerCtx } = await import("./menus.server");
+    const { business } = await requireOwnerCtx(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin.from("menu_spaces").select("id", { count: "exact", head: true }).eq("business_id", business.id);
+    if ((count ?? 0) <= 1) throw new Error("Debes conservar al menos una pestaña.");
+    const { error } = await supabaseAdmin.from("menu_spaces").delete().eq("id", data.id).eq("business_id", business.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
 export const ownerSaveCategory = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         token,
         id: z.string().optional(),
+        spaceId: z.string().uuid(),
+        parentId: z.string().uuid().nullable().default(null),
         name: z.string().min(1).max(60),
+        imageUrl: z.string().max(1000).default(""),
+        hidden: z.boolean().default(false),
         sortIndex: z.number().int().default(0),
       })
       .parse(d),
@@ -139,7 +201,11 @@ export const ownerSaveCategory = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const payload = {
       business_id: business.id,
+      space_id: data.spaceId,
+      parent_id: data.parentId,
       name: data.name.trim(),
+      image_url: data.imageUrl,
+      hidden: data.hidden,
       sort_index: data.sortIndex,
     };
     const q = data.id
@@ -165,7 +231,7 @@ export const ownerSaveCategory = createServerFn({ method: "POST" })
   });
 
 export const ownerDeleteCategory = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ token, id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ token, id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { requireOwnerCtx, requireFeature, logAudit } = await import("./menus.server");
     const { business, actor, kind } = await requireOwnerCtx(data.token);
@@ -194,18 +260,22 @@ export const ownerDeleteCategory = createServerFn({ method: "POST" })
   });
 
 export const ownerSaveItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         token,
         id: z.string().optional(),
+        spaceId: z.string().uuid(),
         categoryId: z.string().nullable().default(null),
         name: z.string().min(1).max(80),
         description: z.string().max(400).default(""),
         price: z.number().min(0).default(0),
-        priceText: z.string().max(40).default(""),
-        imageUrl: z.string().max(500).default(""),
+        priceText: z.string().default(""),
+        imageUrl: z.string().default(""),
+        whatsapp: z.string().max(40).default(""),
+        whatsappMessage: z.string().max(240).default(""),
         available: z.boolean().default(true),
+        condition: z.enum(["new","used"]).default("new"),
         sortIndex: z.number().int().default(0),
       })
       .parse(d),
@@ -221,13 +291,17 @@ export const ownerSaveItem = createServerFn({ method: "POST" })
         .from("menu_items")
         .insert({
           business_id: business.id,
+          space_id: data.spaceId,
           category_id: data.categoryId,
           name: data.name.trim(),
           description: data.description,
           price: data.price,
           price_text: data.priceText,
           image_url: data.imageUrl,
+          whatsapp: data.whatsapp,
+          whatsapp_message: data.whatsappMessage,
           available: data.available,
+          item_condition: data.condition,
           sort_index: data.sortIndex,
         })
         .select("*")
@@ -255,22 +329,27 @@ export const ownerSaveItem = createServerFn({ method: "POST" })
 
     if (data.price !== prev.price || data.priceText !== prev.priceText)
       requireFeature(business, "edit_prices");
-    if (data.name.trim() !== prev.name || data.description !== prev.description)
+    if (data.name.trim() !== prev.name || data.description !== prev.description || data.condition !== (prev.condition ?? "new"))
       requireFeature(business, "edit_item_text");
     if (data.imageUrl !== prev.imageUrl) requireFeature(business, "edit_photos");
+    if (data.whatsapp !== prev.whatsapp || data.whatsappMessage !== prev.whatsappMessage) requireFeature(business, "per_item_whatsapp");
     if (data.available !== prev.available) requireFeature(business, "toggle_items");
-    if (data.categoryId !== prev.categoryId) requireFeature(business, "edit_categories");
+    if (data.categoryId !== prev.categoryId || data.spaceId !== prev.spaceId) requireFeature(business, "edit_categories");
 
     const { data: row, error } = await supabaseAdmin
       .from("menu_items")
       .update({
+        space_id: data.spaceId,
         category_id: data.categoryId,
         name: data.name.trim(),
         description: data.description,
         price: data.price,
         price_text: data.priceText,
         image_url: data.imageUrl,
+        whatsapp: data.whatsapp,
+        whatsapp_message: data.whatsappMessage,
         available: data.available,
+        item_condition: data.condition,
         sort_index: data.sortIndex,
       })
       .eq("id", data.id)
@@ -313,7 +392,7 @@ export const ownerSaveItem = createServerFn({ method: "POST" })
   });
 
 export const ownerDeleteItem = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ token, id: z.string().min(1) }).parse(d))
+  .validator((d: unknown) => z.object({ token, id: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const { requireOwnerCtx, requireFeature, logAudit } = await import("./menus.server");
     const { business, actor, kind } = await requireOwnerCtx(data.token);

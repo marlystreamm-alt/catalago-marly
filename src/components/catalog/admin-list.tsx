@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   ArrowDown,
   ArrowUp,
   ChevronDown,
+  GripVertical,
   Copy,
   Eye,
   EyeOff,
@@ -33,15 +35,14 @@ import {
 import { ConfirmButton } from "./confirm-button";
 import { useCatalogStore } from "@/lib/catalog/store";
 import { displayPrice, formatMXN, serviceFacts } from "@/lib/catalog/whatsapp";
-import { fileToCompressedDataUrl, isImageValue } from "@/lib/catalog/image";
+import { isImageValue } from "@/lib/catalog/image";
+import { saveLibraryImage } from "@/lib/image-library";
 import type { Service } from "@/lib/catalog/types";
 
-type TabKey = "perfiles" | "completas" | "tramites";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "perfiles", label: "Perfiles" },
-  { key: "completas", label: "Completas" },
-  { key: "tramites", label: "Trámites" },
+const DEFAULT_SECTIONS = [
+  { id: "perfiles", name: "Perfiles", hidden: false },
+  { id: "completas", name: "Completas", hidden: false },
+  { id: "tramites", name: "Trámites", hidden: false },
 ];
 
 /** El precio se edita como texto libre; si aún no existe se parte del monto en MXN. */
@@ -135,8 +136,9 @@ function ImageField({ value, onChange }: { value: string; onChange: (v: string) 
           e.target.value = "";
           if (!file) return;
           try {
-            onChange(await fileToCompressedDataUrl(file));
-            toast.success("Imagen insertada");
+            const image = await saveLibraryImage(file);
+            onChange(image.dataUrl);
+            toast.success("Imagen guardada y disponible para compartir");
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "No se pudo insertar la imagen");
           }
@@ -165,7 +167,8 @@ function ImageField({ value, onChange }: { value: string; onChange: (v: string) 
 
 /** Tarjeta de solo lectura que refleja cómo se verá el servicio en el catálogo público. */
 function PreviewCard({ service, categoryName }: { service: Service; categoryName?: string }) {
-  const meta = serviceFacts(service).map((f) => `${f.label}: ${f.value.trim()}`);
+  const { prefs, catalog } = useCatalogStore();
+  const meta = serviceFacts(service, catalog).map((f) => `${f.label}: ${f.value.trim()}`);
   return (
     <article className="card-soft w-[15rem] shrink-0 rounded-2xl border border-border bg-card p-3">
       <div className="flex items-start gap-2">
@@ -205,9 +208,11 @@ function PreviewCard({ service, categoryName }: { service: Service; categoryName
       {meta.length ? (
         <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground">{meta.join(" · ")}</p>
       ) : null}
-      <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1 text-center text-[11px] font-medium text-primary">
-        Pedir por WhatsApp
-      </div>
+      {prefs.showWhatsapp ? (
+        <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1 text-center text-[11px] font-medium text-primary">
+          Pedir por WhatsApp
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -246,14 +251,20 @@ const lockedStyle = (editable: boolean) =>
 
 
 export function AdminList() {
-  const { catalog, canEdit, can, replaceServices, isClient } = useCatalogStore();
-  const [tab, setTab] = useState<TabKey>("perfiles");
+  const { catalog, canEdit, can, replaceServices, isClient, isAdmin, updateCatalogMeta } = useCatalogStore();
+  const legacyGrouping = ["clientes", "cyberdoc", "revendedores"].includes(catalog.id);
+  const sectionGrouping = catalog.spaceType === "catalog";
+  const sectionTabs = useMemo(() => (catalog.sectionTabs?.length ? catalog.sectionTabs : DEFAULT_SECTIONS), [catalog.sectionTabs]);
+  const [tab, setTab] = useState<string>("perfiles");
+  const [editSectionNames, setEditSectionNames] = useState(false);
   const [rows, setRows] = useState<Service[]>(() => fromCatalog(catalog.services));
   const [dirty, setDirty] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "activos" | "ocultos">("todos");
   const [selected, setSelected] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(true);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragTargetRef = useRef<string | null>(null);
   const [expandedMap, setExpandedMap] = useState<Record<string, string[]>>(() => loadExpanded());
   const expanded = expandedMap[catalog.id] ?? [];
   const dirtyRef = useRef(dirty);
@@ -277,19 +288,25 @@ export function AdminList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog.id]);
 
-  const tabOf = (s: Service): TabKey => {
+  const tabOf = (s: Service): string => {
+    if (s.sectionId && sectionTabs.some((t) => t.id === s.sectionId)) return s.sectionId;
     const category = catalog.categories.find((c) => c.id === s.categoryId);
     const sub = category?.subsections.find((x) => x.id === s.subsectionId)?.name.toLowerCase() ?? "";
     const plan = (s.plan ?? "").toLowerCase();
-    if (sub.includes("perfil") || plan.includes("perfil")) return "perfiles";
-    if (sub.includes("complet") || plan.includes("complet")) return "completas";
-    return "tramites";
+    if (sectionTabs.some((t) => t.id === "perfiles") && (sub.includes("perfil") || plan.includes("perfil"))) return "perfiles";
+    if (sectionTabs.some((t) => t.id === "completas") && (sub.includes("complet") || plan.includes("complet"))) return "completas";
+    if (legacyGrouping && sectionTabs.some((t) => t.id === "tramites")) return "tramites";
+    return sectionTabs[0]?.id ?? "general";
   };
+
+  useEffect(() => {
+    if (!sectionTabs.some((t) => t.id === tab)) setTab(sectionTabs[0]?.id ?? "perfiles");
+  }, [sectionTabs, tab]);
 
   const visibleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((s) => {
-      if (tabOf(s) !== tab) return false;
+      if (sectionGrouping && tabOf(s) !== tab) return false;
       if (statusFilter === "activos" && !s.active) return false;
       if (statusFilter === "ocultos" && s.active) return false;
       if (!q) return true;
@@ -300,14 +317,17 @@ export function AdminList() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, tab, query, statusFilter, catalog.categories]);
+  }, [rows, tab, query, statusFilter, catalog.categories, sectionGrouping]);
 
   const counts = useMemo(() => {
-    const base: Record<TabKey, number> = { perfiles: 0, completas: 0, tramites: 0 };
-    rows.forEach((s) => (base[tabOf(s)] += 1));
+    const base: Record<string, number> = Object.fromEntries(sectionTabs.map((t) => [t.id, 0]));
+    rows.forEach((s) => {
+      const key = tabOf(s);
+      base[key] = (base[key] ?? 0) + 1;
+    });
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, catalog.categories]);
+  }, [rows, catalog.categories, sectionTabs]);
 
   if (!canEdit) return null;
 
@@ -327,6 +347,31 @@ export function AdminList() {
       next.splice(target, 0, item);
       return next;
     });
+  };
+
+  const moveTo = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setRows((prev) => {
+      const from = prev.findIndex((s) => s.id === sourceId);
+      const to = prev.findIndex((s) => s.id === targetId);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const handleDragPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggingId || typeof document === "undefined") return;
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-service-id]");
+    const targetId = target?.dataset.serviceId;
+    if (!targetId || targetId === draggingId || dragTargetRef.current === targetId) return;
+    dragTargetRef.current = targetId;
+    moveTo(draggingId, targetId);
   };
 
   const addRow = () => {
@@ -354,7 +399,8 @@ export function AdminList() {
       warranty: "",
       vigencia: "",
       requirements: "",
-      plan: tab === "perfiles" ? "Perfil" : tab === "completas" ? "Completa" : "",
+      plan: sectionGrouping ? (tab === "perfiles" ? "Perfil" : tab === "completas" ? "Completa" : "") : "",
+      sectionId: sectionGrouping ? tab : undefined,
       icon: "",
       active: true,
       favorite: false,
@@ -430,23 +476,85 @@ export function AdminList() {
 
   return (
     <section className="grid min-w-0 max-w-full gap-3" aria-label="Vista lista del administrador">
-      <div className="grid gap-1.5 rounded-2xl bg-muted p-1 sm:grid-cols-3">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            aria-current={tab === t.key}
-            onClick={() => setTab(t.key)}
-            className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
-              tab === t.key
-                ? "bg-card text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label} ({counts[t.key]})
-          </button>
-        ))}
-      </div>
+      <p className="rounded-xl bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">Orden de tarjetas:</span> mantén presionado el asa ⋮⋮ y arrastra la tarjeta a su nueva posición. Después toca <span className="font-semibold">Guardar todos los cambios</span>.
+      </p>
+
+      {sectionGrouping ? (
+        <div className="rounded-2xl bg-muted p-2">
+          <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
+            {isAdmin ? (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => setEditSectionNames((v) => !v)}>
+                  <Pencil className="size-3.5" />{editSectionNames ? "Terminar" : "Editar secciones"}
+                </Button>
+                {editSectionNames ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const id = `seccion-${Date.now()}`;
+                      updateCatalogMeta(catalog.id, { sectionTabs: [...sectionTabs, { id, name: "Nueva sección", hidden: false }] });
+                      setTab(id);
+                    }}
+                  >
+                    <Plus className="size-3.5" />Agregar sección
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(sectionTabs.length, 1), 4)}, minmax(0, 1fr))` }}>
+          {sectionTabs.map((t) => {
+            const label = t.name;
+            return (
+              <div key={t.id} className={`rounded-xl ${tab === t.id ? "bg-card shadow-sm" : ""}`}>
+                <button
+                  type="button"
+                  aria-current={tab === t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`w-full rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${
+                    tab === t.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label} ({counts[t.id] ?? 0})
+                </button>
+                {isAdmin && editSectionNames ? (
+                  <div className="flex items-center gap-1 px-1 pb-1">
+                    <Input
+                      className="h-8 border-0 bg-transparent text-center text-[11px]"
+                      value={label}
+                      aria-label={`Editar nombre de ${label}`}
+                      onChange={(e) => updateCatalogMeta(catalog.id, {
+                        sectionTabs: sectionTabs.map((x) => x.id === t.id ? { ...x, name: e.target.value || x.name } : x),
+                      })}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8"
+                      disabled={sectionTabs.length <= 1}
+                      aria-label={`Eliminar sección ${label}`}
+                      onClick={() => {
+                        if (sectionTabs.length <= 1) return;
+                        const next = sectionTabs.filter((x) => x.id !== t.id);
+                        updateCatalogMeta(catalog.id, { sectionTabs: next });
+                        if (tab === t.id) setTab(next[0]?.id ?? "perfiles");
+                      }}
+                    >
+                      <Trash2 className="size-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+          </div>
+        </div>
+      ) : null}
 
       {isClient ? (
         <div className="card-soft grid gap-2 rounded-2xl border border-primary/25 bg-primary/5 p-3">
@@ -496,12 +604,6 @@ export function AdminList() {
             <SelectItem value="ocultos">Solo desactivados</SelectItem>
           </SelectContent>
         </Select>
-        {can("agregarServicio") ? (
-          <Button size="sm" variant="outline" onClick={addRow}>
-            <Plus className="size-4" />
-            Agregar fila
-          </Button>
-        ) : null}
         {can("editEstado") ? (
           <>
             <Button
@@ -577,9 +679,10 @@ export function AdminList() {
           visibleRows.map((s) => (
             <article
               key={s.id}
-              className={`card-soft rounded-2xl border bg-card p-3 ${
+              data-service-id={s.id}
+              className={`card-soft rounded-2xl border bg-card p-3 transition ${
                 selected.includes(s.id) ? "border-primary ring-2 ring-primary/30" : "border-border"
-              }`}
+              } ${draggingId === s.id ? "scale-[0.99] opacity-70 ring-2 ring-primary/40" : ""}`}
             >
               <div className="flex items-center gap-2">
                 <input
@@ -589,6 +692,31 @@ export function AdminList() {
                   aria-label={`Seleccionar ${s.name || "servicio"}`}
                   onChange={() => toggleSelect(s.id)}
                 />
+                <button
+                  type="button"
+                  className="flex size-8 shrink-0 touch-none items-center justify-center rounded-lg text-muted-foreground active:bg-muted active:text-foreground"
+                  aria-label={`Mover ${s.name || "servicio"}`}
+                  title="Mantén presionado y arrastra para reordenar"
+                  onPointerDown={(event) => {
+                    setDraggingId(s.id);
+                    dragTargetRef.current = s.id;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={handleDragPointerMove}
+                  onPointerUp={(event) => {
+                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                    }
+                    setDraggingId(null);
+                    dragTargetRef.current = null;
+                  }}
+                  onPointerCancel={() => {
+                    setDraggingId(null);
+                    dragTargetRef.current = null;
+                  }}
+                >
+                  <GripVertical className="size-4" />
+                </button>
                 <button
                   type="button"
                   aria-label={s.favorite ? "Quitar destacado" : "Destacar"}
@@ -605,7 +733,7 @@ export function AdminList() {
                     type="text"
                     aria-label="Nombre"
                     title={can("editNombre") ? undefined : "Campo bloqueado por permisos"}
-                    placeholder={tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma"}
+                    placeholder={sectionGrouping ? (tab === "tramites" ? "Nombre del trámite" : "Nombre de plataforma") : (catalog.spaceType === "menu" ? "Nombre del platillo o producto" : catalog.spaceType === "directory" ? "Nombre del negocio o profesional" : "Nombre del producto o servicio")}
                     value={s.name}
                     readOnly={!can("editNombre")}
                     onChange={(e) => patch(s.id, { name: e.target.value })}
@@ -712,83 +840,56 @@ export function AdminList() {
 
                   {can("editDetalles") ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
-
-                    {tab === "tramites" ? (
-                      <label className="grid gap-1 text-xs">
-                        <span className="font-medium text-muted-foreground">Categoría</span>
-                        <Select
-                          value={s.categoryId}
-                          onValueChange={(v) => patch(s.id, { categoryId: v })}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {catalog.categories.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </label>
-                    ) : (
-                      <TextField
-                        label={tab === "completas" ? "Tipo de cuenta o plan" : "Plan o modalidad"}
-                        value={s.plan ?? ""}
-                        onChange={(v) => patch(s.id, { plan: v })}
-                        placeholder="Completa, 1 perfil…"
-                      />
-                    )}
-                    <TextField
-                      label="Tiempo de entrega"
-                      value={s.delivery}
-                      onChange={(v) => patch(s.id, { delivery: v })}
-                      placeholder="20 a 25 min…"
-                    />
-                    {tab !== "tramites" ? (
+                    {sectionGrouping ? (
                       <>
-                        <TextField
-                          label="Dispositivos"
-                          value={s.devices}
-                          onChange={(v) => patch(s.id, { devices: v })}
-                          placeholder="3 a 4, Sin límite…"
-                        />
-                        <TextField
-                          label="Perfiles"
-                          value={s.profiles}
-                          onChange={(v) => patch(s.id, { profiles: v })}
-                          placeholder="1 perfil, Completa…"
-                        />
-                        <TextField
-                          label="Usuarios"
-                          value={s.users ?? ""}
-                          onChange={(v) => patch(s.id, { users: v })}
-                          placeholder="1, 2 a 4…"
-                        />
+                        <label className="grid gap-1 text-xs">
+                          <span className="font-medium text-muted-foreground">Sección pública</span>
+                          <Select value={tabOf(s)} onValueChange={(v) => patch(s.id, { sectionId: v })}>
+                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                            <SelectContent>{sectionTabs.map((x) => <SelectItem key={x.id} value={x.id}>{x.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </label>
+                        {tab === "tramites" ? (
+                          <label className="grid gap-1 text-xs">
+                            <span className="font-medium text-muted-foreground">Categoría</span>
+                            <Select value={s.categoryId} onValueChange={(v) => patch(s.id, { categoryId: v })}>
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>{catalog.categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </label>
+                        ) : (
+                          <TextField label={tab === "completas" ? "Tipo de cuenta o plan" : "Plan o modalidad"} value={s.plan ?? ""} onChange={(v) => patch(s.id, { plan: v })} placeholder="Completa, 1 perfil…" />
+                        )}
+                        <TextField label="Tiempo de entrega" value={s.delivery} onChange={(v) => patch(s.id, { delivery: v })} placeholder="20 a 25 min…" />
+                        {tab !== "tramites" ? (<>
+                          <TextField label="Dispositivos" value={s.devices} onChange={(v) => patch(s.id, { devices: v })} placeholder="3 a 4, Sin límite…" />
+                          <TextField label="Perfiles" value={s.profiles} onChange={(v) => patch(s.id, { profiles: v })} placeholder="1 perfil, Completa…" />
+                          <TextField label="Usuarios" value={s.users ?? ""} onChange={(v) => patch(s.id, { users: v })} placeholder="1, 2 a 4…" />
+                        </>) : <TextField label="Requisitos" value={s.requirements ?? ""} onChange={(v) => patch(s.id, { requirements: v })} placeholder="CURP, correo…" />}
+                        <TextField label="Garantía" value={s.warranty} onChange={(v) => patch(s.id, { warranty: v })} placeholder="25 días…" />
+                        {tab !== "tramites" ? <TextField label="Vigencia o duración" value={s.vigencia ?? ""} onChange={(v) => patch(s.id, { vigencia: v })} placeholder="25 días…" /> : null}
+                      </>
+                    ) : catalog.spaceType === "menu" ? (
+                      <>
+                        <TextField label="Presentación / extras" value={s.plan ?? ""} onChange={(v) => patch(s.id, { plan: v })} placeholder="Tamaño, extras, acompañamientos…" />
+                        <TextField label="Tiempo de preparación" value={s.delivery} onChange={(v) => patch(s.id, { delivery: v })} placeholder="15 min, inmediato…" />
+                        <TextField label="Disponibilidad / horario" value={s.vigencia ?? ""} onChange={(v) => patch(s.id, { vigencia: v })} placeholder="Disponible hoy, 9:00–18:00…" />
+                      </>
+                    ) : catalog.spaceType === "directory" ? (
+                      <>
+                        <TextField label="Giro / especialidad" value={s.plan ?? ""} onChange={(v) => patch(s.id, { plan: v })} placeholder="Dentista, estética, taller…" />
+                        <TextField label="Horario" value={s.delivery} onChange={(v) => patch(s.id, { delivery: v })} placeholder="Lun–Vie 9:00–18:00…" />
+                        <TextField label="Teléfono / contacto" value={s.users ?? ""} onChange={(v) => patch(s.id, { users: v })} placeholder="844…" />
+                        <TextField label="Dirección / ubicación" value={s.requirements ?? ""} onChange={(v) => patch(s.id, { requirements: v })} placeholder="Dirección o referencia…" />
+                        <TextField label="Enlace / mapa" value={s.vigencia ?? ""} onChange={(v) => patch(s.id, { vigencia: v })} placeholder="https://…" />
                       </>
                     ) : (
-                      <TextField
-                        label="Requisitos"
-                        value={s.requirements ?? ""}
-                        onChange={(v) => patch(s.id, { requirements: v })}
-                        placeholder="CURP, correo…"
-                      />
+                      <>
+                        <TextField label="Tipo / modalidad" value={s.plan ?? ""} onChange={(v) => patch(s.id, { plan: v })} placeholder="Producto, servicio, paquete…" />
+                        <TextField label="Entrega / disponibilidad" value={s.delivery} onChange={(v) => patch(s.id, { delivery: v })} placeholder="Inmediata, 2 días…" />
+                        <TextField label="Vigencia / duración" value={s.vigencia ?? ""} onChange={(v) => patch(s.id, { vigencia: v })} placeholder="Opcional" />
+                      </>
                     )}
-                    <TextField
-                      label="Garantía"
-                      value={s.warranty}
-                      onChange={(v) => patch(s.id, { warranty: v })}
-                      placeholder="25 días, Reimpresión 7 días…"
-                    />
-                    {tab !== "tramites" ? (
-                      <TextField
-                        label="Vigencia o duración"
-                        value={s.vigencia ?? ""}
-                        onChange={(v) => patch(s.id, { vigencia: v })}
-                        placeholder="25 días…"
-                      />
-                    ) : null}
                   </div>
                   ) : isClient ? (
                     <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">
@@ -801,22 +902,19 @@ export function AdminList() {
                   {can("verDescripciones") ? (
                   <label className="mt-2 grid gap-1 text-xs">
                     <span className="flex items-center gap-2 font-medium text-muted-foreground">
-                      {tab === "tramites" ? "Descripción corta" : "Descripción"}
+                      {sectionGrouping && tab === "tramites" ? "Descripción corta" : catalog.spaceType === "menu" ? "Descripción / ingredientes" : catalog.spaceType === "directory" ? "Descripción del negocio" : "Descripción"}
                       <FieldFlag editable={can("editDescripcion")} show={isClient} />
                     </span>
                     <Textarea
                       rows={3}
                       className={lockedStyle(can("editDescripcion"))}
                       value={s.description}
-                      placeholder={
-                        findPlatform(s.name)?.description ??
-                        "Escribe la descripción que verán tus clientes…"
-                      }
+                      placeholder={sectionGrouping ? (findPlatform(s.name)?.description ?? "Escribe la descripción que verán tus clientes…") : (catalog.spaceType === "menu" ? "Ingredientes, presentación o información del platillo…" : catalog.spaceType === "directory" ? "Describe el negocio o profesional…" : "Escribe la descripción que verán tus clientes…")}
                       readOnly={!can("editDescripcion")}
                       onChange={(e) => patch(s.id, { description: e.target.value })}
                     />
 
-                    {findPlatform(s.name) && !s.description.trim() ? (
+                    {sectionGrouping && findPlatform(s.name) && !s.description.trim() ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[11px] text-muted-foreground">
                           Sin texto propio se muestra la descripción sugerida.

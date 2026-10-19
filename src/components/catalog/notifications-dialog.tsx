@@ -10,8 +10,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyServerError } from "@/lib/server-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +34,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  notifyChangeCode,
   notifyDeleteDevice,
   notifyListDevices,
   notifyListLog,
@@ -66,23 +67,21 @@ const when = (iso: string) =>
 
 export function NotificationsDialog() {
   const [open, setOpen] = useState(false);
-  const [code, setCode] = useState(getSavedCode());
-  const [hasCode, setHasCode] = useState(true);
+  const [code, setCode] = useState(() => getSavedCode());
   const [vapid, setVapid] = useState("");
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [settings, setSettings] = useState<NotifySettings>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<CloudOrder[]>([]);
   const [devices, setDevices] = useState<NotifyDevice[]>([]);
   const [log, setLog] = useState<NotifyLogEntry[]>([]);
   const [logFilter, setLogFilter] = useState("todos");
-  const [newCode, setNewCode] = useState("");
 
   useEffect(() => {
     if (!open) return;
     void notifyStatus()
       .then((s) => {
-        setHasCode(s.hasCode);
         setVapid(s.vapidPublicKey);
       })
       .catch(() => undefined);
@@ -114,20 +113,33 @@ export function NotificationsDialog() {
 
   const login = async () => {
     setBusy(true);
+    setLoadError("");
+    const credential = getSavedCode().trim();
+    setCode(credential);
     try {
-      const s = await notifyLogin({ data: { code: code.trim() } });
+      const s = await notifyLogin({ data: { code: credential } });
       setSettings(s);
       setLogged(true);
-      setHasCode(true);
-      saveCode(code.trim());
-      await Promise.all([loadOrders(code.trim()), loadDevices(code.trim()), loadLog(code.trim())]);
-      toast.success("Panel de avisos abierto");
+      saveCode(credential);
+      await Promise.all([loadOrders(credential), loadDevices(credential), loadLog(credential)]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Código incorrecto");
+      const message = friendlyServerError(error, "No se pudo abrir Avisos de pedidos");
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!open) {
+      setLogged(false);
+      return;
+    }
+    // La administradora ya inició sesión en MA²: este módulo abre directamente.
+    void login();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const save = async (next: NotifySettings) => {
     setSettings(next);
@@ -203,24 +215,6 @@ export function NotificationsDialog() {
     }
   };
 
-  const cambiarCodigo = async () => {
-    if (newCode.trim().length < 4) {
-      toast.error("El código nuevo debe tener al menos 4 caracteres");
-      return;
-    }
-    setBusy(true);
-    try {
-      await notifyChangeCode({ data: { code: code.trim(), newCode: newCode.trim() } });
-      setCode(newCode.trim());
-      saveCode(newCode.trim());
-      setNewCode("");
-      toast.success("Código actualizado");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo cambiar el código");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const marcar = async (order: CloudOrder) => {
     const status = order.status === "nuevo" ? "atendido" : "nuevo";
@@ -253,25 +247,13 @@ export function NotificationsDialog() {
         </DialogHeader>
 
         {!logged ? (
-          <div className="space-y-3">
-            <Label htmlFor="avisos-code">
-              {hasCode ? "Código de acceso a los avisos" : "Crea tu código de acceso (mínimo 4)"}
-            </Label>
-            <Input
-              id="avisos-code"
-              type="password"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void login();
-              }}
-              placeholder="••••••"
-              autoComplete="off"
-            />
-            <Button className="w-full rounded-xl" disabled={busy} onClick={() => void login()}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <BellRing className="size-4" />}
-              {hasCode ? "Entrar" : "Crear código y entrar"}
-            </Button>
+          loadError ? <div role="alert" className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+            <p className="font-semibold">No se pudieron abrir los avisos</p>
+            <p className="text-sm">{loadError}</p>
+            <p className="text-sm text-muted-foreground">Si tu sesión terminó, vuelve a iniciar sesión como administradora. Tus pedidos permanecen guardados.</p>
+            <Button onClick={() => void login()} disabled={busy}>Reintentar</Button>
+          </div> : <div className="flex items-center justify-center gap-2 rounded-2xl border p-6 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Abriendo avisos…
           </div>
         ) : (
           <Tabs defaultValue="config">
@@ -334,21 +316,40 @@ export function NotificationsDialog() {
                 )}
 
                 <Row
-                  label="WhatsApp"
+                  label="WhatsApp (preparado para después)"
+                  hint="Puedes dejarlo apagado. MA² ya queda listo para Twilio, Whapi.Cloud o GREEN-API."
                   checked={settings.channelWhatsapp}
                   onChange={(v) => void save({ ...settings, channelWhatsapp: v })}
                 />
                 {settings.channelWhatsapp && (
-                  <Input
-                    value={settings.whatsappNumber}
-                    placeholder="+52..."
-                    onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
-                    onBlur={() => void save(settings)}
-                  />
+                  <div className="grid gap-2">
+                    <Select
+                      value={settings.whatsappProvider}
+                      onValueChange={(v) =>
+                        void save({
+                          ...settings,
+                          whatsappProvider: v as NotifySettings["whatsappProvider"],
+                        })
+                      }
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="twilio">Twilio</SelectItem>
+                        <SelectItem value="whapi">Whapi.Cloud</SelectItem>
+                        <SelectItem value="greenapi">GREEN-API</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={settings.whatsappNumber}
+                      placeholder="+52..."
+                      onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+                      onBlur={() => void save(settings)}
+                    />
+                  </div>
                 )}
 
                 <Row
-                  label="Alexa"
+                  label="Alexa (Echo)"
                   checked={settings.channelAlexa}
                   onChange={(v) => void save({ ...settings, channelAlexa: v })}
                 />
@@ -356,6 +357,7 @@ export function NotificationsDialog() {
                   code={code.trim()}
                   settings={settings}
                   onSaved={(next) => setSettings(next)}
+                  onSaveSettings={(next) => save(next)}
                 />
 
               </div>
@@ -387,6 +389,34 @@ export function NotificationsDialog() {
                   checked={settings.autoOffMidnight}
                   onChange={(v) => void save({ ...settings, autoOffMidnight: v })}
                 />
+                <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                  <div>
+                    <Label className="text-xs">Mensaje de pedido nuevo para Alexa</Label>
+                    <Textarea
+                      value={settings.alexaOrderNewMessage}
+                      onChange={(e) =>
+                        setSettings({ ...settings, alexaOrderNewMessage: e.target.value })
+                      }
+                      onBlur={() => void save(settings)}
+                      placeholder="Tienes un nuevo pedido de {catalogo}. Revisa MA² Connect."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mensaje de recordatorio para Alexa</Label>
+                    <Textarea
+                      value={settings.alexaOrderReminderMessage}
+                      onChange={(e) =>
+                        setSettings({ ...settings, alexaOrderReminderMessage: e.target.value })
+                      }
+                      onBlur={() => void save(settings)}
+                      placeholder="Tienes un pedido pendiente de {catalogo}. Revisa MA² Connect."
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Puedes usar: {"{catalogo}"}, {"{servicio}"}, {"{productos}"} y {"{total}"}.
+                  </p>
+                </div>
+
                 <Row
                   label="Recordarme mientras no atienda el pedido"
                   checked={settings.repeatEnabled}
@@ -461,25 +491,6 @@ export function NotificationsDialog() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2 rounded-2xl border p-3">
-                <p className="text-sm font-medium">Seguridad</p>
-                <Input
-                  type="password"
-                  value={newCode}
-                  placeholder="Nuevo código de acceso"
-                  onChange={(e) => setNewCode(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl"
-                  disabled={busy}
-                  onClick={() => void cambiarCodigo()}
-                >
-                  Cambiar código
-                </Button>
               </div>
 
               <Button

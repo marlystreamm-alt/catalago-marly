@@ -45,6 +45,4 @@ CREATE TRIGGER update_menu_subscriptions_updated_at
 BEFORE UPDATE ON public.menu_subscriptions
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-INSERT INTO public.menu_subscriptions (business_name, owner_name, whatsapp, slug, catalog_id, plan, price, started_on, expires_on, notes)
-VALUES ('Boutique Marly', 'Marly Gómez', '528112345678', 'boutique-marly', 'clientes', 'mensual', 250, (now() AT TIME ZONE 'America/Monterrey')::date - 10, (now() AT TIME ZONE 'America/Monterrey')::date + 20, 'Registro de demostración para probar activar, suspender y renovar.')
-ON CONFLICT (slug) DO NOTHING;
+-- Sin datos de demostración: MA2-Connect inicia limpio.

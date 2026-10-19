@@ -32,7 +32,9 @@ export const Route = createFileRoute("/acceso")({
 
 function AccessPage() {
   const navigate = useNavigate();
-  const [slug, setSlug] = useState("");
+  const requestedCatalog = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("catalogo") || "" : "";
+  const requestedUsername = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("usuario") || "" : "";
+  const [username, setUsername] = useState(requestedUsername);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,10 +42,11 @@ function AccessPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await ownerSignIn({ data: { slug: slug.trim().toLowerCase(), password } });
+      const res = await ownerSignIn({ data: { username: username.trim().toLowerCase(), password } });
       saveOwnerToken(res.token);
       toast.success("Bienvenido");
-      void navigate({ to: "/mi-catalogo" });
+      if (requestedCatalog) window.location.assign(`/mi-catalogo?catalogo=${encodeURIComponent(requestedCatalog)}`);
+      else void navigate({ to: "/mi-catalogo" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo entrar");
     } finally {
@@ -61,16 +64,16 @@ function AccessPage() {
           <KeyRound className="mx-auto mb-2 size-7 text-primary" />
           <h1 className="text-xl font-bold">Mi menú</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Entra con el nombre de tu enlace y tu contraseña.
+            Entra con el usuario y contraseña que te asignó MA².
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="slug">Tu enlace</Label>
+          <Label htmlFor="username">Usuario</Label>
           <Input
-            id="slug"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            placeholder="tacos-don-beto"
+            id="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Tu usuario"
             autoCapitalize="none"
             autoCorrect="off"
           />

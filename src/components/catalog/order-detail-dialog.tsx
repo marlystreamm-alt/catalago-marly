@@ -1,3 +1,4 @@
+import { copyText } from "@/lib/browser/clipboard";
 import { Copy, Download, MessageCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -36,8 +37,7 @@ export function OrderDetailDialog({
   const items = order.items?.length ? order.items : [{ name: order.serviceName, price: order.price }];
 
   const copyMessage = () => {
-    navigator.clipboard
-      .writeText(order.message)
+    copyText(order.message)
       .then(() => toast.success("Mensaje copiado"))
       .catch(() => toast.error("No se pudo copiar el mensaje"));
   };

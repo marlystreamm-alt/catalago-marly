@@ -4,22 +4,28 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
 import {
   clearFailedAttempts,
-  ensureAuthRecord,
   formatLockWait,
   getLockStatus,
   registerFailedAttempt,
+  completeRecoveryFromEmail,
+  requestRecoveryEmail,
   resetWithRecoveryCode,
-  rotatePassword,
-  verifyPassword,
 } from "./auth";
 import {
-  findClientByCode,
+  adminSessionLogin,
+  adminSessionLogout,
+  adminSessionChangePassword,
+  adminSessionValidate,
+} from "@/lib/admin-session.functions";
+import {
+  findClientByCredentials,
   loadClients,
   saveClients,
   type ClientAccess,
@@ -28,6 +34,8 @@ import {
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type CatalogPrefs, type PrefsMap } from "./prefs";
 import { createEmptyCatalog, createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
+import { catalogSyncLoad, catalogSyncSave } from "./sync.functions";
+import { clearCode, getSavedCode, saveCode } from "@/lib/notify/client";
 
 import {
   CATALOG_IDS,
@@ -40,6 +48,7 @@ import {
   type LogEntry,
   type Service,
   type Subsection,
+  type SpaceType,
 } from "./types";
 
 const newId = () =>
@@ -66,6 +75,28 @@ const entry = (
 
 const mxn = (n: number) => `$${Number(n || 0).toLocaleString("es-MX")} MXN`;
 
+const ADMIN_SESSION_KEY = "ma2-admin-session-v2";
+const LEGACY_ADMIN_SESSION_KEY = "ma2-admin-session-v1";
+
+function getRememberedAdminSession() {
+  if (typeof window === "undefined" || !window.localStorage) return "";
+  try {
+    window.localStorage.removeItem(LEGACY_ADMIN_SESSION_KEY);
+    return window.localStorage.getItem(ADMIN_SESSION_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberAdminSession(token: string) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    if (token) window.localStorage.setItem(ADMIN_SESSION_KEY, token);
+    else window.localStorage.removeItem(ADMIN_SESSION_KEY);
+  } catch {
+    // Si el navegador bloquea almacenamiento, la sesión seguirá funcionando hasta recargar.
+  }
+}
 
 interface StoreValue {
   state: AppState;
@@ -74,8 +105,30 @@ interface StoreValue {
   catalog: Catalog;
   visibleCatalogIds: CatalogId[];
   allCatalogIds: CatalogId[];
-  addCatalog: (data: { name: string; subtitle: string }) => void;
+  addCatalog: (data: {
+    name: string;
+    subtitle: string;
+    spaceType: SpaceType;
+    imageUrl?: string;
+  }) => void;
+  duplicateCatalog: (id: CatalogId) => void;
   deleteCatalog: (id: CatalogId) => void;
+  updateCatalogMeta: (
+    id: CatalogId,
+    patch: Partial<
+      Pick<
+        Catalog,
+        | "name"
+        | "subtitle"
+        | "spaceType"
+        | "imageUrl"
+        | "sectionLabels"
+        | "sectionTabs"
+        | "commercialFieldsEnabled"
+      >
+    >,
+  ) => void;
+  moveCatalog: (id: CatalogId, direction: -1 | 1) => void;
   setCatalogId: (id: CatalogId) => void;
   isAdmin: boolean;
   mustChangePassword: boolean;
@@ -86,6 +139,10 @@ interface StoreValue {
   ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
   resetPassword: (
     code: string,
+    next: string,
+  ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
+  requestRecoveryEmail: () => Promise<{ ok: boolean; error?: string; email?: string }>;
+  completeEmailRecovery: (
     next: string,
   ) => Promise<{ ok: boolean; error?: string; recoveryCode?: string }>;
   logout: () => void;
@@ -99,7 +156,7 @@ interface StoreValue {
   clients: ClientAccess[];
   saveClient: (client: ClientAccess) => void;
   deleteClient: (id: string) => void;
-  clientLogin: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  clientLogin: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   clientLogout: () => void;
 
   prefs: CatalogPrefs;
@@ -133,19 +190,50 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [catalogId, setCatalogIdRaw] = useState<CatalogId>("clientes");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminToken, setAdminToken] = useState("");
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [prefsMap, setPrefsMap] = useState<PrefsMap>(() => loadPrefs());
   const [clients, setClients] = useState<ClientAccess[]>([]);
   const [clientSession, setClientSession] = useState<ClientAccess | null>(null);
+  const syncQueue = useRef<Promise<void>>(Promise.resolve());
+  const syncSuccessNotified = useRef(false);
 
   useEffect(() => {
-    setState(loadState());
+    let cancelled = false;
+    const local = loadState();
     setPrefsMap(loadPrefs());
     setClients(loadClients());
-    setHydrated(true);
-    void ensureAuthRecord();
+    const remembered = getRememberedAdminSession();
+    if (remembered)
+      void adminSessionValidate({ data: { token: remembered } })
+        .then((session) => {
+          if (cancelled) return;
+          setAdminToken(remembered);
+          setIsAdmin(true);
+          setMustChangePassword(session.mustChangePassword);
+        })
+        .catch(() => {
+          rememberAdminSession("");
+          clearCode();
+        });
+    void (async () => {
+      try {
+        const remote = await catalogSyncLoad();
+        if (cancelled) return;
+        // Supabase manda cuando ya existe un estado compartido. Si todavía no existe,
+        // se conserva el estado local del administrador para subirlo sin perder cambios.
+        setState(remote.state ? normalizeState(remote.state) : local);
+      } catch (error) {
+        console.error("No se pudo cargar el catálogo compartido:", error);
+        if (!cancelled) setState(local);
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
 
   useEffect(() => {
     if (!hydrated) return;
@@ -160,13 +248,44 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated || !isAdmin) return;
+    const timer = window.setTimeout(() => {
+      const code = getSavedCode();
+      syncQueue.current = syncQueue.current
+        .catch(() => undefined)
+        .then(async () => {
+          await catalogSyncSave({ data: { code, state } });
+          if (!syncSuccessNotified.current) {
+            syncSuccessNotified.current = true;
+            toast.success("Catálogos y subsecciones sincronizados con Supabase");
+          }
+        })
+        .catch((error) => {
+          console.error("No se pudo sincronizar con Supabase:", error);
+          toast.error(
+            "No se pudo sincronizar el catálogo. Revisa el código administrador y vuelve a intentarlo.",
+          );
+        });
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [state, hydrated, isAdmin]);
+
   const allCatalogIds = useMemo(() => Object.keys(state.catalogs), [state]);
 
   const visibleCatalogIds = useMemo(() => {
     if (isAdmin) return allCatalogIds;
+    if (clientSession) {
+      const allowed = (
+        clientSession.catalogIds?.length ? clientSession.catalogIds : [clientSession.catalogId]
+      ).filter((id) => !!state.catalogs[id] && !state.catalogs[id].hidden);
+      return allowed.length
+        ? allowed
+        : [clientSession.catalogId].filter((id) => !!state.catalogs[id]);
+    }
     const shown = allCatalogIds.filter((id) => !state.catalogs[id].hidden);
     return shown.length ? shown : [allCatalogIds[0]];
-  }, [state, isAdmin, allCatalogIds]);
+  }, [state, isAdmin, clientSession, allCatalogIds]);
 
   // Si el catálogo actual queda oculto en modo público, se cambia al primero visible.
   useEffect(() => {
@@ -240,9 +359,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           "users",
           "vigencia",
           "requirements",
+          "sectionId",
         ],
       ],
       ["editEstado", ["active"]],
+      ["editWhatsappTarjeta", ["whatsapp", "whatsappMessage"]],
     ];
 
     const sanitizeService = <T extends Partial<Service>>(next: T, prev?: Service): T => {
@@ -260,7 +381,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       return out;
     };
 
-
     return {
       state,
       hydrated,
@@ -268,7 +388,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       catalog,
       visibleCatalogIds,
       allCatalogIds,
-      addCatalog: ({ name, subtitle }) =>
+      addCatalog: ({ name, subtitle, spaceType, imageUrl }) =>
         guard(() => {
           const clean = name.trim();
           if (!clean) {
@@ -285,27 +405,108 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           let id = slug;
           let n = 2;
           while (state.catalogs[id]) id = `${slug}-${n++}`;
-          const fresh = createEmptyCatalog(id, clean, subtitle.trim());
+          const fresh = createEmptyCatalog(
+            id,
+            clean,
+            subtitle.trim(),
+            spaceType,
+            imageUrl?.trim() ?? "",
+          );
           fresh.log = [entry("catalogo", clean, "Catálogo creado")];
           setState((prev) => ({ ...prev, catalogs: { ...prev.catalogs, [id]: fresh } }));
           setCatalogIdRaw(id);
           toast.success(`Catálogo "${clean}" creado`);
         }),
+      duplicateCatalog: (id) =>
+        guard(() => {
+          const source = state.catalogs[id];
+          if (!source) return;
+          const base = `${id}-copia`;
+          let nextId = base;
+          let n = 2;
+          while (state.catalogs[nextId]) nextId = `${base}-${n++}`;
+          const copy = JSON.parse(JSON.stringify(source)) as Catalog;
+          copy.id = nextId;
+          copy.name = `${source.name} copia`;
+          copy.hidden = true;
+          copy.log = [
+            entry("catalogo", copy.name, `Duplicado de ${source.name}`),
+            ...(copy.log || []),
+          ].slice(0, MAX_LOG_ENTRIES);
+          setState((prev) => ({ ...prev, catalogs: { ...prev.catalogs, [nextId]: copy } }));
+          setCatalogIdRaw(nextId);
+          toast.success(`Catálogo duplicado: ${copy.name}`);
+        }),
       deleteCatalog: (id) =>
         guard(() => {
-          if (CATALOG_IDS.includes(id)) {
-            toast.error("Los catálogos base no se pueden eliminar");
-            return;
-          }
           const target = state.catalogs[id];
           if (!target) return;
+          const ids = Object.keys(state.catalogs);
+          if (ids.length <= 1) {
+            toast.error("Debe existir al menos un espacio");
+            return;
+          }
+          const fallback = ids.find((x) => x !== id) ?? ids[0];
           setState((prev) => {
             const catalogs = { ...prev.catalogs };
             delete catalogs[id];
             return { ...prev, catalogs };
           });
-          setCatalogIdRaw((prev) => (prev === id ? CATALOG_IDS[0] : prev));
-          toast.success(`Catálogo "${target.name}" eliminado`);
+          setCatalogIdRaw((prev) => (prev === id ? fallback : prev));
+          toast.success(`Espacio "${target.name}" eliminado`);
+        }),
+      updateCatalogMeta: (id, patch) =>
+        guard(() => {
+          const target = state.catalogs[id];
+          if (!target) return;
+          const cleanPatch = { ...patch };
+          if (typeof cleanPatch.name === "string")
+            cleanPatch.name = cleanPatch.name.trim() || target.name;
+          if (cleanPatch.spaceType && cleanPatch.spaceType !== target.spaceType) {
+            if (cleanPatch.spaceType === "catalog") {
+              cleanPatch.sectionLabels = {
+                perfiles: "Perfiles",
+                completas: "Completas",
+                tramites: "Trámites",
+              };
+              cleanPatch.sectionTabs = target.sectionTabs?.length
+                ? target.sectionTabs
+                : [
+                    { id: "perfiles", name: "Perfiles", hidden: false },
+                    { id: "completas", name: "Completas", hidden: false },
+                    { id: "tramites", name: "Trámites", hidden: false },
+                  ];
+            } else {
+              cleanPatch.sectionTabs = [];
+              cleanPatch.sectionLabels = undefined;
+            }
+          }
+          mutate(
+            (c) => ({ ...c, ...cleanPatch }),
+            entry("catalogo", cleanPatch.name ?? target.name, "Datos del espacio actualizados"),
+            id,
+          );
+          if (
+            patch.name !== undefined ||
+            patch.subtitle !== undefined ||
+            patch.spaceType !== undefined ||
+            patch.imageUrl !== undefined
+          )
+            toast.success("Espacio actualizado");
+        }),
+      moveCatalog: (id, direction) =>
+        guard(() => {
+          setState((prev) => {
+            const ids = Object.keys(prev.catalogs);
+            const from = ids.indexOf(id);
+            const to = from + direction;
+            if (from < 0 || to < 0 || to >= ids.length) return prev;
+            const nextIds = [...ids];
+            const [moved] = nextIds.splice(from, 1);
+            nextIds.splice(to, 0, moved);
+            const catalogs = Object.fromEntries(nextIds.map((key) => [key, prev.catalogs[key]]));
+            return { ...prev, catalogs };
+          });
         }),
       setCatalogId: (id: CatalogId) => {
         if (!visibleCatalogIds.includes(id)) return;
@@ -321,8 +522,19 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           );
           return false;
         }
-        const result = await verifyPassword(password);
-        if (!result.ok) {
+        try {
+          const result = await adminSessionLogin({
+            data: { code: password, actorName: "Marla" },
+          });
+          clearFailedAttempts();
+          saveCode(password);
+          setAdminToken(result.token);
+          setIsAdmin(true);
+          setMustChangePassword(result.mustChangePassword);
+          rememberAdminSession(result.token);
+          toast.success("Sesión de administradora iniciada");
+          return true;
+        } catch {
           const state = registerFailedAttempt();
           if (state.locked) {
             toast.error(
@@ -335,27 +547,29 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           }
           return false;
         }
-        clearFailedAttempts();
-        setIsAdmin(true);
-        setMustChangePassword(result.mustChange);
-        if (result.mustChange) {
-          toast.warning("Cambia la contraseña inicial para proteger tus catálogos");
-        } else {
-          toast.success("Modo administrador activado");
-        }
-        return true;
       },
 
       changePassword: async (current: string, next: string) => {
-        const result = await rotatePassword(current, next);
-        if (!result.ok) {
-          toast.error(result.error ?? "No se pudo cambiar la contraseña");
-          return result;
+        const token = adminToken || getRememberedAdminSession();
+        if (!token) return { ok: false, error: "La sesión expiró. Inicia sesión nuevamente." };
+        try {
+          await adminSessionChangePassword({
+            data: { token, currentCode: current, newCode: next },
+          });
+          saveCode(next);
+          setMustChangePassword(false);
+          mutate(
+            (c) => c,
+            entry("sistema", catalog.name, "Contraseña de administrador actualizada"),
+          );
+          toast.success("Contraseña actualizada");
+          return { ok: true };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "No se pudo cambiar la contraseña";
+          toast.error(message);
+          return { ok: false, error: message };
         }
-        setMustChangePassword(false);
-        mutate((c) => c, entry("sistema", catalog.name, "Contraseña de administrador actualizada"));
-        toast.success("Contraseña actualizada");
-        return result;
       },
       resetPassword: async (code: string, next: string) => {
         const result = await resetWithRecoveryCode(code, next);
@@ -365,13 +579,37 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }
         setIsAdmin(false);
         setMustChangePassword(false);
+        rememberAdminSession("");
         toast.success("Contraseña restablecida, inicia sesión de nuevo");
         return result;
       },
-      logout: () => {
+      requestRecoveryEmail: async () => {
+        const result = await requestRecoveryEmail();
+        if (!result.ok) toast.error(result.error ?? "No se pudo enviar el correo de recuperación");
+        else toast.success(`Enlace enviado a ${result.email}`);
+        return result;
+      },
+      completeEmailRecovery: async (next: string) => {
+        const result = await completeRecoveryFromEmail(next);
+        if (!result.ok) {
+          toast.error(result.error ?? "No se pudo restablecer la contraseña");
+          return result;
+        }
         setIsAdmin(false);
         setMustChangePassword(false);
-        toast.success("Saliste del modo administrador");
+        rememberAdminSession("");
+        toast.success("Contraseña restablecida. Inicia sesión con la nueva contraseña.");
+        return result;
+      },
+      logout: () => {
+        const token = adminToken || getRememberedAdminSession();
+        setIsAdmin(false);
+        setAdminToken("");
+        setMustChangePassword(false);
+        rememberAdminSession("");
+        clearCode();
+        if (token) void adminSessionLogout({ data: { token } }).catch(() => undefined);
+        toast.success("Sesión cerrada. Las herramientas privadas quedaron ocultas.");
       },
       clientSession,
       isClient: !!clientSession,
@@ -415,15 +653,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setClientSession((prev) => (prev && prev.id === id ? null : prev));
         toast.success("Acceso eliminado");
       },
-      clientLogin: async (code: string) => {
-        const result = await findClientByCode(code, loadClients());
+      clientLogin: async (username: string, password: string) => {
+        const result = await findClientByCredentials(username, password, loadClients());
         if (!result.ok) {
           return { ok: false, error: result.error };
         }
         setClients(loadClients());
         setClientSession(result.client);
-        if (result.client.catalogId && state.catalogs[result.client.catalogId]) {
-          setCatalogIdRaw(result.client.catalogId);
+        const firstAllowed = result.client.catalogIds?.[0] || result.client.catalogId;
+        if (firstAllowed && state.catalogs[firstAllowed]) {
+          setCatalogIdRaw(firstAllowed);
         }
         toast.success(`Bienvenida, ${result.client.business || "cliente"}`);
         return { ok: true };
@@ -440,7 +679,20 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           ...prev,
           [activeId]: { ...(prev[activeId] ?? DEFAULT_PREFS), ...patch },
         })),
-      resetPrefs: () => setPrefsMap((prev) => ({ ...prev, [activeId]: { ...DEFAULT_PREFS } })),
+      resetPrefs: () =>
+        setPrefsMap((prev) => {
+          const current = prev[activeId] ?? DEFAULT_PREFS;
+          return {
+            ...prev,
+            [activeId]: {
+              ...DEFAULT_PREFS,
+              themeMode: current.themeMode,
+              accentColor: current.accentColor,
+              backgroundStyle: current.backgroundStyle,
+              markedIds: current.markedIds,
+            },
+          };
+        }),
       updateCatalog: (patch) =>
         gp(["ajustesCatalogo"])(() => {
           const changes: string[] = [];
@@ -448,11 +700,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           if (patch.name && patch.name !== catalog.name) {
             changes.push(`nombre → ${patch.name}`);
             entries.push(
-              entry("catalogo", patch.name, `Nombre del catálogo: "${catalog.name}" → "${patch.name}"`, {
-                field: "Nombre del catálogo",
-                before: catalog.name,
-                after: patch.name,
-              }),
+              entry(
+                "catalogo",
+                patch.name,
+                `Nombre del catálogo: "${catalog.name}" → "${patch.name}"`,
+                {
+                  field: "Nombre del catálogo",
+                  before: catalog.name,
+                  after: patch.name,
+                },
+              ),
             );
           }
           if (patch.subtitle !== undefined && patch.subtitle !== catalog.subtitle) {
@@ -465,7 +722,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
               }),
             );
           }
-          if (patch.whatsappNumber !== undefined && patch.whatsappNumber !== catalog.whatsappNumber) {
+          if (
+            patch.whatsappNumber !== undefined &&
+            patch.whatsappNumber !== catalog.whatsappNumber
+          ) {
             changes.push("número de WhatsApp");
             entries.push(
               entry("catalogo", patch.name ?? catalog.name, "Se cambió el número de WhatsApp", {
@@ -515,7 +775,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
       saveService: (incoming) =>
-        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","agregarServicio"])(() => {
+        gp([
+          "editNombre",
+          "editPrecio",
+          "editDescripcion",
+          "editImagen",
+          "editDetalles",
+          "agregarServicio",
+        ])(() => {
           const prev = incoming.id ? catalog.services.find((s) => s.id === incoming.id) : undefined;
           if (!prev && !isAdmin && !can("agregarServicio")) {
             toast.error("Tu acceso no permite agregar servicios");
@@ -580,10 +847,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
                     entry(
                       "edicion",
                       service.name,
-                      changes.length ? `Se actualizó ${changes.join(", ")}` : "Guardado sin cambios",
+                      changes.length
+                        ? `Se actualizó ${changes.join(", ")}`
+                        : "Guardado sin cambios",
                     ),
                   ]
-
               : entry("creacion", service.name, `Servicio creado en ${mxn(service.price)}`, {
                   field: "Precio",
                   before: "—",
@@ -594,7 +862,16 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
 
       replaceServices: (services, summary) =>
-        gp(["editNombre","editPrecio","editDescripcion","editImagen","editDetalles","editEstado","agregarServicio","eliminarServicio"])(() => {
+        gp([
+          "editNombre",
+          "editPrecio",
+          "editDescripcion",
+          "editImagen",
+          "editDetalles",
+          "editEstado",
+          "agregarServicio",
+          "eliminarServicio",
+        ])(() => {
           // Se vuelve a validar campo por campo: la interfaz nunca es la única barrera.
           let safe = services as Service[];
           if (!isAdmin && clientSession) {
@@ -658,7 +935,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
                 after: nowActive ? "Activo" : "Oculto",
               },
             ),
-
           );
           toast.success(nowActive ? "Servicio activado" : "Servicio desactivado");
         }),
@@ -759,13 +1035,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           mutate((c) => ({ ...c, log: [] }), entry("sistema", catalog.name, "Historial vaciado"));
           toast.success("Historial vaciado");
         }),
-      auditLog: allCatalogIds.flatMap((id) =>
-        state.catalogs[id].log.map((e) => ({
-          ...e,
-          catalogId: id,
-          catalogName: state.catalogs[id].name,
-        })),
-      ).sort((a, b) => b.at.localeCompare(a.at)),
+      auditLog: allCatalogIds
+        .flatMap((id) =>
+          state.catalogs[id].log.map((e) => ({
+            ...e,
+            catalogId: id,
+            catalogName: state.catalogs[id].name,
+          })),
+        )
+        .sort((a, b) => b.at.localeCompare(a.at)),
 
       exportBackup: () =>
         guard(() => {
@@ -830,6 +1108,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     activeId,
     catalog,
     isAdmin,
+    adminToken,
     mustChangePassword,
     prefsMap,
     mutate,
@@ -837,7 +1116,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     allCatalogIds,
     clients,
     clientSession,
-
   ]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

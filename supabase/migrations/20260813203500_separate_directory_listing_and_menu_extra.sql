@@ -1,0 +1,12 @@
+alter table public.directory_menu_requests add column if not exists directory_status text not null default 'pending';
+alter table public.directory_menu_requests add column if not exists menu_status text not null default 'not_requested';
+alter table public.directory_menu_requests add column if not exists directory_description text not null default '';
+alter table public.directory_menu_requests add column if not exists directory_category text not null default '';
+alter table public.directory_menu_requests add column if not exists directory_schedule text not null default '';
+alter table public.directory_menu_requests add column if not exists directory_address text not null default '';
+alter table public.directory_menu_requests add column if not exists directory_map_url text not null default '';
+alter table public.directory_menu_requests add column if not exists directory_service_id text;
+alter table public.directory_menu_requests add column if not exists directory_approved_at timestamptz;
+alter table public.directory_menu_requests add column if not exists menu_requested_at timestamptz;
+alter table public.directory_menu_requests add column if not exists payment_confirmed_at timestamptz;
+alter table public.directory_menu_requests add column if not exists client_prepared_at timestamptz;

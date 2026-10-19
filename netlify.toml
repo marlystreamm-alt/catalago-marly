@@ -1,0 +1,39 @@
+[build]
+  command = "npm run build"
+  publish = "dist/client"
+
+[dev]
+  command = "npm run dev"
+  port = 3000
+
+[build.environment]
+  NODE_VERSION = "22"
+  MA2_BUILD_ID = "v20.43-stock-perfiles-whatsapp-recordatorios-20260923"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-store, max-age=0, must-revalidate"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "microphone=(), geolocation=(), payment=(), usb=()"
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+
+# Recordatorios de pedidos pendientes. El endpoint respeta la frecuencia elegida
+# en MA² Connect y detiene avisos al finalizar el pedido.
+[functions."order-reminders"]
+  schedule = "*/15 * * * *"
