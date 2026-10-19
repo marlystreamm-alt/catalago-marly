@@ -25,7 +25,7 @@ export function AdminDashboard() {
     { label: 'Pedidos pendientes', value: data.pending, detail: 'Cyberdoc nuevos o en proceso', icon: Clock3, tone: 'purple' },
     { label: 'Reposiciones', value: data.replacements, detail: 'Cliente o proveedor', icon: Wrench, tone: 'pink' },
     { label: 'Ventas registradas', value: money(data.revenue), detail: `${data.sales} entregas este mes`, icon: Banknote, tone: 'teal' },
-    { label: 'Ganancia estimada', value: data.marginSales ? money(data.margin) : 'Sin datos', detail: `${data.marginSales} ventas con precio y costo válidos`, icon: CircleDollarSign, tone: 'green' },
+    { label: data.margin < 0 ? 'Pérdida estimada' : 'Ganancia estimada', value: data.marginSales ? money(data.margin) : 'Sin datos', detail: `${data.marginSales} ventas con precio y costo válidos`, icon: CircleDollarSign, tone: data.margin < 0 ? 'red' : 'green' },
   ] : [];
   return (
     <section className="ma2-home mt-4" aria-labelledby="ma2-home-title">
