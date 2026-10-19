@@ -204,3 +204,27 @@ body {
     font-size: max(16px, 1em);
   }
 }
+
+/* Scoped private panel layout; dialogs and public catalog keep their own styles. */
+.ma2-admin-panel { display:flex; flex-direction:column; height:100dvh; max-height:100dvh; gap:0; background:var(--background); }
+.ma2-panel-header { display:flex; flex:0 0 auto; align-items:center; gap:.875rem; padding:max(1.5rem, env(safe-area-inset-top)) 2.75rem 1.25rem 1.25rem; border-bottom:1px solid var(--border); background:linear-gradient(125deg,color-mix(in oklch,var(--primary) 10%,var(--card)),var(--card)); }
+.ma2-panel-brand { display:grid; flex:0 0 3rem; height:3rem; place-items:center; border-radius:1rem; color:var(--primary-foreground); background:var(--primary); font-size:1.15rem; font-weight:800; box-shadow:0 6px 16px color-mix(in oklch,var(--primary) 20%,transparent); }
+.ma2-panel-eyebrow { margin:0 0 .125rem; color:var(--primary); font-size:.625rem; font-weight:750; letter-spacing:.16em; }
+.ma2-panel-scroll { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:1rem 1rem max(1.25rem, env(safe-area-inset-bottom)); scrollbar-width:thin; }
+.ma2-panel-group { margin-bottom:.875rem; padding:1rem; border:1px solid var(--border); border-radius:1.25rem; background:var(--card); box-shadow:0 3px 12px color-mix(in oklch,var(--foreground) 3%,transparent); }
+.ma2-panel-group-heading { margin-bottom:.75rem; }
+.ma2-panel-group-heading h3 { margin:0; color:var(--foreground); font-size:.875rem; line-height:1.5; font-weight:750; }
+.ma2-panel-group-heading p { margin:.125rem 0 0; color:var(--muted-foreground); font-size:.75rem; line-height:1.5; }
+.ma2-panel-actions { display:grid; gap:.5rem; }
+.ma2-panel-actions > div.flex { display:grid; gap:.5rem; }
+.ma2-panel-actions button { display:flex; width:100%; height:auto; min-height:2.875rem; justify-content:flex-start; gap:.625rem; padding:.625rem .75rem; border:1px solid var(--border); border-radius:.875rem; color:var(--foreground); background:var(--card); text-align:left; white-space:normal; overflow-wrap:anywhere; font-size:.8125rem; font-weight:550; line-height:1.4; box-shadow:none; transition:background-color 150ms,border-color 150ms; }
+.ma2-panel-actions button:hover:not(:disabled) { background:color-mix(in oklch,var(--primary) 6%,var(--card)); border-color:color-mix(in oklch,var(--primary) 35%,var(--border)); }
+.ma2-panel-actions button:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.ma2-panel-actions button:disabled { opacity:.45; }
+.ma2-panel-actions button svg { width:1.125rem; height:1.125rem; flex-shrink:0; margin:0; color:var(--primary); }
+.ma2-panel-primary { border-color:color-mix(in oklch,var(--primary) 30%,var(--border)); }
+.ma2-panel-primary .ma2-panel-actions button { background:color-mix(in oklch,var(--primary) 7%,var(--card)); border-color:transparent; font-weight:650; }
+.ma2-panel-export-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+.ma2-panel-export-grid button { justify-content:center; }
+.ma2-panel-footer { display:flex; align-items:center; justify-content:center; gap:.375rem; margin:1.25rem 0 0; font-size:.6875rem; color:var(--muted-foreground); }
+@media (prefers-reduced-motion:reduce) { .ma2-panel-actions button { transition:none; } }

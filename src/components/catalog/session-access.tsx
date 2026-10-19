@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
@@ -406,153 +406,85 @@ export function SessionAccess(props: AdminDrawerProps) {
   );
 }
 
+function PanelGroup({ title, description, children, className = "" }: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`ma2-panel-group ${className}`} aria-label={title}>
+      <div className="ma2-panel-group-heading">
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <div className="ma2-panel-actions">{children}</div>
+    </section>
+  );
+}
+
 function AdminDrawer({ onExportCsv, onExportPdf, exportDisabled }: AdminDrawerProps) {
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button size="sm" className="h-10 rounded-xl px-3">
-          <Menu className="size-4" />
-          Panel
+          <Menu className="size-4" /> Panel
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-[88vw] max-w-sm overflow-y-auto p-0">
-        <div className="border-b bg-card p-5">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-2xl bg-primary text-primary-foreground">
-              <Shield className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold tracking-[0.2em] text-primary">MA²</p>
-              <SheetHeader className="text-left">
-                <SheetTitle>Panel de administradora</SheetTitle>
-                <SheetDescription>Herramientas privadas de MA²</SheetDescription>
-              </SheetHeader>
-            </div>
-          </div>
-        </div>
+      <SheetContent side="left" className="ma2-admin-panel w-[92vw] max-w-sm overflow-hidden p-0 sm:max-w-sm">
+        <header className="ma2-panel-header">
+          <div className="ma2-panel-brand" aria-hidden="true">MA²</div>
+          <SheetHeader className="min-w-0 text-left">
+            <p className="ma2-panel-eyebrow">MI TIENDA MA²</p>
+            <SheetTitle className="text-xl leading-tight">Tu panel</SheetTitle>
+            <SheetDescription className="text-xs leading-relaxed">
+              Todo para administrar tu negocio.
+            </SheetDescription>
+          </SheetHeader>
+        </header>
 
-        <div className="grid gap-5 p-4 pb-8">
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Pedidos
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Revisa fecha, hora, origen, cliente, detalle y estatus en un solo lugar.
-              </p>
-            </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <CyberDocsOrdersDialog />
-            </div>
-          </section>
+        <nav aria-label="Administración del negocio" className="ma2-panel-scroll">
+          <PanelGroup title="Tu operación" description="Pedidos e inventario, a la mano." className="ma2-panel-primary">
+            <CyberDocsOrdersDialog />
+            <StockManagerDialog />
+          </PanelGroup>
 
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Operación
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Inventario, entregas e instrucciones de trabajo.
-              </p>
-            </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <StockManagerDialog />
-              <MethodsDialog />
-            </div>
-          </section>
-
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Servicios / Catálogos
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Clientes, páginas, servicios y funciones visibles.
-              </p>
-            </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <MenusDialog />
-              <SalesDialog />
-              <SheetClose asChild>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="justify-start"
-                  onClick={() =>
-                    setTimeout(
-                      () =>
-                        document
-                          .getElementById("ma2-catalog-workspace")
-                          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-                      120,
-                    )
-                  }
-                >
-                  <Store className="size-4" /> Administrar servicios del catálogo
-                </Button>
-              </SheetClose>
-            </div>
-          </section>
-
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Notificaciones
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Alexa, correo y recordatorios de pedidos.
-              </p>
-            </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <NotificationsDialog />
-            </div>
-          </section>
-
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Herramientas
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Búsqueda, exportación, seguridad, cuenta y respaldos sin botones duplicados.
-              </p>
-            </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <Button
-                variant="outline"
-                className="justify-start"
-                onClick={onExportCsv}
-                disabled={exportDisabled}
-              >
-                <FileDown className="size-4" /> Exportar búsqueda · CSV
+          <PanelGroup title="Clientes y catálogo" description="Organiza tus servicios y tus ventas.">
+            <MenusDialog />
+            <SalesDialog />
+            <SheetClose asChild>
+              <Button type="button" variant="outline" onClick={() =>
+                setTimeout(() => document.getElementById("ma2-catalog-workspace")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" }), 120)
+              }>
+                <Store className="size-4" /> Editar servicios del catálogo
               </Button>
-              <Button
-                variant="outline"
-                className="justify-start"
-                onClick={onExportPdf}
-                disabled={exportDisabled}
-              >
-                <FileText className="size-4" /> Exportar búsqueda · PDF
-              </Button>
-              <SecurityPinDialog />
-              <AdminBar />
-            </div>
-          </section>
+            </SheetClose>
+          </PanelGroup>
 
-          <section className="grid gap-2">
-            <div className="px-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Configuración
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Estado técnico y diagnóstico del sistema.
-              </p>
+          <PanelGroup title="Avisos e instrucciones" description="Notificaciones y métodos de trabajo.">
+            <NotificationsDialog />
+            <MethodsDialog />
+          </PanelGroup>
+
+          <PanelGroup title="Exportar información" description="Descarga los resultados de tu búsqueda.">
+            <div className="ma2-panel-export-grid">
+              <Button variant="outline" onClick={onExportCsv} disabled={exportDisabled}>
+                <FileDown className="size-4" /> CSV
+              </Button>
+              <Button variant="outline" onClick={onExportPdf} disabled={exportDisabled}>
+                <FileText className="size-4" /> PDF
+              </Button>
             </div>
-            <div className="grid gap-2 [&_button]:w-full [&_button]:justify-start">
-              <SystemStatusDialog />
-            </div>
-          </section>
-        </div>
+          </PanelGroup>
+
+          <PanelGroup title="Tu cuenta" description="Seguridad, respaldos y configuración.">
+            <SecurityPinDialog />
+            <SystemStatusDialog />
+            <AdminBar />
+          </PanelGroup>
+          <p className="ma2-panel-footer"><Shield className="size-3.5" aria-hidden="true" /> Área privada de administradora</p>
+        </nav>
       </SheetContent>
     </Sheet>
   );
