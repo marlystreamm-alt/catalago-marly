@@ -51,6 +51,7 @@ import { CartDialog } from "@/components/catalog/cart-dialog";
 import { DirectoryMenuRequestsDialog } from "@/components/catalog/directory-menu-requests-dialog";
 import { DirectoryListingRequestDialog } from "@/components/catalog/directory-listing-request-dialog";
 
+import { AdminDashboard } from "@/components/catalog/admin-dashboard";
 import { SessionAccess } from "@/components/catalog/session-access";
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
@@ -550,6 +551,8 @@ function CatalogPage() {
             </nav>
           ) : null}
         </header>
+
+        {isAdmin ? <AdminDashboard /> : null}
 
         {!online ? (
           <div
