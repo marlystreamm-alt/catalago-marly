@@ -56,6 +56,7 @@ import { saveOwnerToken } from "@/lib/menus/owner-session";
 import { NotificationsDialog } from "./notifications-dialog";
 import { CyberDocsOrdersDialog } from "./cyberdocs-orders-dialog";
 import { MenusDialog } from "./menus-dialog";
+import { PlatformGalleryDialog } from "./platform-gallery-dialog";
 import { MethodsDialog } from "./methods-dialog";
 import { SalesDialog } from "./sales-dialog";
 import { SystemStatusDialog } from "./system-status-dialog";
@@ -467,6 +468,7 @@ function AdminDrawer({ onExportCsv, onExportPdf, exportDisabled, onShowCatalog }
           <PanelGroup title="Avisos e instrucciones" description="Notificaciones y métodos de trabajo.">
             <NotificationsDialog />
             <MethodsDialog />
+            <PlatformGalleryDialog />
           </PanelGroup>
 
           <PanelGroup title="Exportar información" description="Descarga los resultados de tu búsqueda.">

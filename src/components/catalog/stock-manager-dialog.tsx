@@ -1,3 +1,4 @@
+import { GalleryDeliveryImages } from "./platform-gallery-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -156,6 +157,7 @@ export function StockManagerDialog({
   const [days, setDays] = useState(7);
   const [views, setViews] = useState("0");
   const [message, setMessage] = useState(whatsappTemplate);
+  const [deliveryImages, setDeliveryImages] = useState<string[]>([]);
   const [deliveryAttachment, setDeliveryAttachment] = useState<DeliveryAttachment | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -459,7 +461,7 @@ export function StockManagerDialog({
         itemId: deliver.id, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
         stockExpiresOn: deliverStockExpires || null, salePrice: Number(deliverSalePrice) || 0,
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
-        expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment,
+        expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
       };
       const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload } });
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
@@ -606,7 +608,7 @@ export function StockManagerDialog({
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(""); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(""); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
@@ -640,6 +642,7 @@ export function StockManagerDialog({
                   {deliverOrderRef ? <p className="text-xs text-muted-foreground">Al entregar, el pedido quedará finalizado con este documento, cuenta y vencimiento. Puedes corregir el contacto desde Cyberdoc.</p> : null}
                 </div> : null}
 
+                {admin ? <div className="sm:col-span-2"><GalleryDeliveryImages platform={deliver.platform} images={deliveryImages} onChange={setDeliveryImages} /></div> : null}
                 <div className="sm:col-span-2 space-y-2"><Label>Agregar documento desde tu celular (opcional)</Label><Input type="file" accept=".pdf,.doc,.docx,image/*" onChange={async (e) => { const file = e.target.files?.[0]; e.currentTarget.value = ""; if (!file) return; try { setDeliveryAttachment(await fileToAttachment(file)); } catch (error) { toast.error(err(error)); } }} />{deliveryAttachment ? <div className="flex items-center gap-2 rounded-xl border p-2 text-sm"><FileUp className="size-4" /><span className="min-w-0 flex-1 truncate">{deliveryAttachment.name}</span><Button type="button" size="sm" variant="ghost" onClick={() => setDeliveryAttachment(null)}>Quitar</Button></div> : <p className="text-[11px] text-muted-foreground">PDF, Word o imagen · máximo 5 MB.</p>}</div>
                 <div className="sm:col-span-2"><p className="mb-2 text-sm font-semibold">Documento protegido</p><div className="grid gap-2 sm:grid-cols-2"><Button type="button" variant={protect ? "default" : "outline"} onClick={() => setProtect(true)}>Con contraseña</Button><Button type="button" variant={!protect ? "default" : "outline"} onClick={() => { setProtect(false); setAccessPassword(""); setConfirmPassword(""); }}>Sin contraseña</Button></div></div>
                 {protect ? <><div><Label>Contraseña del documento</Label><Input type="password" value={accessPassword} onChange={(e) => setAccessPassword(e.target.value)} /></div><div><Label>Confirmar contraseña</Label><Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} /></div></> : null}

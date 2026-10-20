@@ -10,6 +10,7 @@ export interface LinkedStockDelivery {
   stockExpiresOn: string | null;
   salePrice: number;
   attachment: DeliveryAttachment | null;
+  images?: string[];
 }
 
 /** Reuse Cyberdoc's assignment path so orders and stock share one document. */
@@ -53,6 +54,7 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
       maxViews: input.maxViews,
       notes: input.notes,
       attachment: input.attachment,
+      images: input.images,
     });
     deliveryId = assigned.order.protectedDeliveryId;
     token = assigned.token;

@@ -444,6 +444,7 @@ export async function assignStockToOrder(input: {
   withPassword: boolean;
   attachment: { name: string; type: string; dataUrl: string } | null;
   actor?: string;
+  images?: string[];
 }) {
   const actor = input.actor || "Administradora";
   const order = await getCyberDocsOrder(input.orderId);
@@ -482,9 +483,9 @@ export async function assignStockToOrder(input: {
     platformMessage: "",
     passwordMessage: input.withPassword ? `Hola ${order.clientName || ""} 😊\nContraseña de tu documento protegido: ${input.accessPassword.trim()}` : "",
     notes: input.notes.trim() || item.notes || "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía.",
-    images: [],
+    images: input.images?.slice(0, 2) ?? [],
     attachment: input.attachment ?? null,
-    imageCount: 0,
+    imageCount: input.images?.length ?? 0,
     protectedWithPassword: input.withPassword,
     expiresAt: input.expiresAt,
     maxViews: input.maxViews,
