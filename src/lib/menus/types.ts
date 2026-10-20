@@ -1,3 +1,4 @@
+import type { Appearance } from '@/lib/appearance/theme';
 /** Tipos del apartado de catálogos vendidos (negocios de clientes). */
 
 export const VIEW_FEATURES = [
@@ -90,6 +91,7 @@ export const DEFAULT_FEATURES: Features = {
 };
 
 export type MenuBusiness = {
+  appearance?: Appearance;
   id: string;
   slug: string;
   name: string;

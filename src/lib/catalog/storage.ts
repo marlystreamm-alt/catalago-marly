@@ -1,3 +1,4 @@
+import { normalizeAppearance } from '@/lib/appearance/theme';
 import { createSeedState } from "./seed";
 import {
   CATALOG_IDS,
@@ -58,6 +59,7 @@ export function normalizeState(raw: unknown): AppState {
       name: typeof c.name === "string" && c.name.trim() ? c.name : (base?.name ?? id),
       subtitle: typeof c.subtitle === "string" ? c.subtitle : (base?.subtitle ?? ""),
       spaceType: c.spaceType === "menu" || c.spaceType === "directory" || c.spaceType === "provider" || c.spaceType === "marketplace" ? c.spaceType : "catalog",
+      appearance: normalizeAppearance(c.appearance),
       imageUrl: typeof c.imageUrl === "string" ? c.imageUrl : "",
       whatsappNumber: typeof c.whatsappNumber === "string" ? c.whatsappNumber : "",
       whatsappTemplate:

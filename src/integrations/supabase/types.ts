@@ -765,6 +765,7 @@ export type Database = {
           grace_days: number;
           id: string;
           logo_url: string;
+          appearance: Json;
           multi_admin: boolean;
           name: string;
           notes: string;
@@ -796,6 +797,7 @@ export type Database = {
           grace_days?: number;
           id?: string;
           logo_url?: string;
+          appearance?: Json;
           multi_admin?: boolean;
           name?: string;
           notes?: string;
@@ -827,6 +829,7 @@ export type Database = {
           grace_days?: number;
           id?: string;
           logo_url?: string;
+          appearance?: Json;
           multi_admin?: boolean;
           name?: string;
           notes?: string;

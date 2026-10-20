@@ -1,3 +1,4 @@
+import { BusinessAppearanceEditor } from './appearance-editor';
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 import { copyText } from "@/lib/browser/clipboard";
 /** Apartado "Menús" — solo visible dentro del modo administrador. */
@@ -633,6 +634,7 @@ export function MenusDialog() {
                   />
                 </div>
               </div>
+              <BusinessAppearanceEditor businessId={business.id} initial={business.appearance} />
               <div className="space-y-1.5">
                 <Label htmlFor="biz-slug">Enlace público</Label>
                 <Input

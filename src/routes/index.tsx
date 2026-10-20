@@ -1,3 +1,5 @@
+import { BusinessCover } from '@/components/catalog/business-cover';
+import { appearanceStyle, normalizeAppearance } from '@/lib/appearance/theme';
 import { copyText } from "@/lib/browser/clipboard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -467,6 +469,7 @@ function CatalogPage() {
 
   return (
     <main
+      style={appearanceStyle(catalog.appearance)} data-season={normalizeAppearance(catalog.appearance).season}
       className={`min-h-screen pb-24 ${
         prefs.backgroundStyle === "solido"
           ? "app-solid"
@@ -477,6 +480,7 @@ function CatalogPage() {
     >
       <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-4 sm:py-6 lg:max-w-6xl lg:px-8">
         <header id="ma2-catalog-workspace" className="card-soft rounded-3xl border border-border bg-card/90 p-3.5 backdrop-blur sm:p-4">
+          <div className={catalog.appearance?.coverImage || catalog.appearance?.logoImage ? "grid grid-cols-[minmax(0,1fr)_40%] items-center gap-3" : "block"}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               {catalog.imageUrl ? (
@@ -492,7 +496,7 @@ function CatalogPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 [&_button]:rounded-xl">
+            <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
               <SessionAccess
                 onShowCatalog={() => setHomeView(false)}
                 onAddService={openNew}
@@ -526,6 +530,8 @@ function CatalogPage() {
                 </Button>
               ) : null}
             </div>
+          </div>
+          <BusinessCover appearance={catalog.appearance} name={catalog.name} />
           </div>
 
           {isAdmin ? (

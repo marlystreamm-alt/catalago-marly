@@ -75,7 +75,7 @@ export function ServiceCard({
   if (!isAdmin && !isClient) {
     const isDirectory = catalog.spaceType === "directory" || catalog.spaceType === "provider";
     return (
-      <article data-public-service-card className="group flex min-w-0 flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-border/70 bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <article data-public-service-card className="ma2-themed-card group flex min-w-0 flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-border/70 bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
         <div className="aspect-[4/3] w-full overflow-hidden bg-muted">
           {media.icon && isImageValue(media.icon) ? (
             <img
@@ -170,7 +170,7 @@ export function ServiceCard({
 
   return (
     <article
-      className={`card-soft group relative overflow-hidden rounded-3xl border bg-card p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
+      className={`ma2-themed-card card-soft group relative overflow-hidden rounded-3xl border bg-card p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border/70"
       } ${!service.active ? "opacity-80" : ""}`}
     >

@@ -1,3 +1,5 @@
+import { BusinessCover } from '@/components/catalog/business-cover';
+import { appearanceStyle, normalizeAppearance, type Appearance } from '@/lib/appearance/theme';
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -64,9 +66,9 @@ export function waLink(phone: string, text: string) {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
-export function Shell({ children }: { children: ReactNode }) {
+export function Shell({ children, appearance }: { children: ReactNode; appearance?: Appearance }) {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/40 px-4 py-8">
+    <main style={appearanceStyle(appearance)} data-season={normalizeAppearance(appearance).season} className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/40 px-4 py-8">
       <div className="mx-auto w-full max-w-2xl">{children}</div>
     </main>
   );
@@ -140,7 +142,7 @@ function ItemCard({ item, business, icon, canAddToCart, onAdd, onViewMore }: Ite
       ? item.whatsappMessage
       : `Hola ${business.name}, quiero: ${item.name}`;
   return (
-    <li className="group overflow-hidden rounded-3xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+    <li className="ma2-themed-card group overflow-hidden rounded-3xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="aspect-[4/3] w-full overflow-hidden bg-secondary">
         {business.features.show_photos && item.imageUrl ? (
           <img
@@ -461,9 +463,9 @@ export function PublicMenuView({ data }: { data: MenuData & { space?: MenuSpace 
   };
 
   return (
-    <Shell>
+    <Shell appearance={business.appearance}>
       <header className="mb-5 overflow-hidden rounded-3xl border bg-card">
-        {catalogCoverUrl ? (
+        {catalogCoverUrl && !business.appearance?.coverImage && !business.appearance?.logoImage ? (
           <img
             src={catalogCoverUrl}
             alt={`Portada de ${business.name}`}
@@ -471,7 +473,7 @@ export function PublicMenuView({ data }: { data: MenuData & { space?: MenuSpace 
           />
         ) : null}
         <div className="p-5">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className={business.appearance?.coverImage || business.appearance?.logoImage ? "grid grid-cols-[minmax(0,1fr)_40%] items-center gap-3" : "flex flex-wrap items-center gap-3"}>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                 MA² CONNECT
@@ -481,6 +483,7 @@ export function PublicMenuView({ data }: { data: MenuData & { space?: MenuSpace 
                 <p className="text-sm text-muted-foreground">{space.subtitle}</p>
               ) : null}
             </div>
+            <BusinessCover appearance={business.appearance} name={business.name} />
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline" className="rounded-full">
                 <a href={loginUrl}>

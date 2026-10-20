@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -18,6 +19,7 @@ function DeliveryPage() {
   const search = Route.useSearch();
   const token = search.t;
   const [data, setData] = useState<DeliveryPublicView | null>(null);
+  const [guidePreview, setGuidePreview] = useState("");
   const [error, setError] = useState("");
   const [accessPassword, setAccessPassword] = useState("");
   const [showAccessPassword, setShowAccessPassword] = useState(false);
@@ -93,8 +95,9 @@ function DeliveryPage() {
 
           {data.attachment ? <div className="rounded-2xl border border-border p-3"><p className="text-xs text-muted-foreground">Documento adjunto</p><div className="mt-2 flex items-center gap-2"><FileText className="size-5 text-primary" /><span className="min-w-0 flex-1 truncate text-sm font-semibold">{data.attachment.name}</span><Button size="sm" variant="outline" onClick={() => window.open(data.attachment!.dataUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="mr-1 size-4" />Abrir</Button><a href={data.attachment.dataUrl} download={data.attachment.name}><Button size="sm"><Download className="mr-1 size-4" />Guardar</Button></a></div></div> : null}
           {data.notes ? <div className="rounded-2xl border border-border p-3 text-sm whitespace-pre-wrap">{data.notes}</div> : null}
-          <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => window.open("https://wa.me/528443852364", "_blank", "noopener,noreferrer")}><MessageCircle className="mr-2 size-4" />Soporte por WhatsApp</Button>
-          {data.images.length ? <div className="grid gap-3 sm:grid-cols-2">{data.images.map((src, i) => <a key={`${i}-${src.slice(0, 24)}`} href={src} target="_blank" rel="noreferrer" className="overflow-hidden rounded-2xl border border-border"><img src={src} alt={`Imagen protegida ${i + 1}`} className="h-56 w-full object-contain bg-muted/30" /></a>)}</div> : null}
+          <Button asChild variant="outline" className="w-full rounded-xl"><a href="https://wa.me/528443852364" target="_blank" rel="noopener noreferrer"><MessageCircle className="mr-2 size-4" />Soporte por WhatsApp</a></Button>
+          {data.images.length ? <section className="space-y-3"><div><h2 className="font-semibold">Guías de ingreso</h2><p className="text-xs text-muted-foreground">Sigue estas imágenes para ingresar a tu plataforma. Toca una guía para ampliarla.</p></div><div className="grid gap-3 sm:grid-cols-2">{data.images.map((src, i) => <div key={i} className="overflow-hidden rounded-2xl border border-border"><button type="button" className="block w-full" onClick={() => setGuidePreview(src)} aria-label={`Ampliar guía de ingreso ${i + 1}`}><img src={src} alt={`Guía de ingreso ${i + 1} a ${data.platform}`} className="h-56 w-full object-contain bg-muted/30" /></button><div className="flex items-center justify-between p-2"><Button size="sm" variant="ghost" onClick={() => setGuidePreview(src)}>Ampliar</Button><Button asChild size="sm" variant="outline"><a href={src} download={`guia-ingreso-${i+1}.jpg`}><Download className="mr-1 size-4"/>Guardar</a></Button></div></div>)}</div></section> : null}
+          <Dialog open={Boolean(guidePreview)} onOpenChange={v => {if(!v)setGuidePreview('');}}><DialogContent className="max-h-[95dvh] overflow-y-auto sm:max-w-3xl"><DialogHeader><DialogTitle>Guía de ingreso</DialogTitle><DialogDescription>{data.platform}</DialogDescription></DialogHeader>{guidePreview ? <img src={guidePreview} alt={`Guía de ingreso a ${data.platform}`} className="max-h-[75dvh] w-full object-contain"/> : null}</DialogContent></Dialog>
           <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2"><p className="flex items-center gap-1.5"><Clock3 className="size-3.5" />Vence: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.expiresAt))}</p><p className="flex items-center gap-1.5"><CheckCircle2 className="size-3.5" />Acceso #{data.viewCount}{data.remainingViews !== null ? ` · quedan ${data.remainingViews}` : " · sin límite"}</p></div>
         </section>
       ) : null}

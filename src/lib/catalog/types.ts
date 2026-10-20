@@ -1,3 +1,4 @@
+import type { Appearance } from '@/lib/appearance/theme';
 /** Identificador de catálogo: los tres base y cualquiera creado por el administrador. */
 export type CatalogId = string;
 
@@ -103,6 +104,7 @@ export interface CatalogSection {
 }
 
 export interface Catalog {
+  appearance?: Appearance;
   id: CatalogId;
   name: string;
   subtitle: string;

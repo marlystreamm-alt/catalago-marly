@@ -1,3 +1,4 @@
+import { normalizeAppearance } from '@/lib/appearance/theme';
 /** Acceso a datos de los catálogos de clientes (solo servidor). */
 import {
   DEFAULT_FEATURES,
@@ -46,6 +47,7 @@ export function rowToBusiness(row: Row): MenuBusiness {
     active: bool(row["active"]),
     sortIndex: num(row["sort_index"]),
     logoUrl: str(row["logo_url"]),
+    appearance: normalizeAppearance(row["appearance"]),
     expiresOn: row["expires_on"] ? str(row["expires_on"]) : null,
     features: parseFeatures(row["features"]),
     hasAccess: Boolean(str(row["access_hash"])),

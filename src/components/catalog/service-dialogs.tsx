@@ -1,3 +1,5 @@
+import { AppearanceEditor } from './appearance-editor';
+import { normalizeAppearance } from '@/lib/appearance/theme';
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -385,6 +387,8 @@ export function CatalogSettingsDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const { catalog, isAdmin, updateCatalog, prefs, setPrefs } = useCatalogStore();
+  const [uploadingAppearance, setUploadingAppearance] = useState(false);
+  const [appearance, setAppearance] = useState(normalizeAppearance(catalog.appearance));
   const [name, setName] = useState(catalog.name);
   const [subtitle, setSubtitle] = useState(catalog.subtitle);
   const [number, setNumber] = useState(catalog.whatsappNumber);
@@ -397,6 +401,7 @@ export function CatalogSettingsDialog({
 
   useEffect(() => {
     if (!open) return;
+    setAppearance(normalizeAppearance(catalog.appearance));
     setName(catalog.name);
     setSubtitle(catalog.subtitle);
     setNumber(catalog.whatsappNumber);
@@ -424,6 +429,7 @@ export function CatalogSettingsDialog({
     if (Object.keys(next).length) return;
 
     updateCatalog({
+      appearance,
       name: name.trim(),
       subtitle: subtitle.trim(),
       whatsappNumber: digits,
@@ -460,6 +466,7 @@ export function CatalogSettingsDialog({
             <Input id="cat-sub" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
           </div>
           <div className="grid gap-1.5">
+            <AppearanceEditor value={appearance} onChange={setAppearance} onBusyChange={setUploadingAppearance} />
             <Label htmlFor="cat-wa">Número de WhatsApp (con lada, solo dígitos) *</Label>
             <Input
               id="cat-wa"
@@ -546,7 +553,7 @@ export function CatalogSettingsDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submit}>Guardar</Button>
+          <Button onClick={submit} disabled={uploadingAppearance}>Guardar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

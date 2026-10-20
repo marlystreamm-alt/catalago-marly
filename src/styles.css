@@ -254,3 +254,13 @@ body {
 .ma2-home-details th { color:var(--muted-foreground); font-size:.6875rem; font-weight:550; }
 .ma2-home-notes p { margin:.5rem 0 0; color:var(--muted-foreground); font-size:.75rem; line-height:1.6; }
 @media(min-width:768px) { .ma2-home-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } .ma2-home-details { grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); } }
+
+/* Public catalog branding: decoration never changes the text opacity. */
+.ma2-business-cover { min-width:0; min-height:100px; width:100%; aspect-ratio:16/10; border-radius:1rem; background-size:cover; background-position:center; background-color:color-mix(in oklch,var(--primary) 8%,var(--card)); display:grid; place-items:center; overflow:hidden; border:1px solid var(--border); }
+.ma2-business-logo { width:75%; height:75%; max-height:200px; object-fit:contain; filter:drop-shadow(0 2px 5px #0002); }
+.ma2-themed-card { position:relative; isolation:isolate; background-color:color-mix(in oklch,var(--card) var(--ma2-card-opacity,95%),transparent)!important; }
+.ma2-themed-card::before { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; border-radius:inherit; background-image:var(--ma2-card-image,none),var(--ma2-season-gradient,none); background-size:cover; background-position:center; opacity:var(--ma2-decoration-opacity,.18); }
+[data-season="halloween"] { --ma2-season-gradient:linear-gradient(135deg,#fdba74,#a855f7 65%,#431407); }
+[data-season="navidad"] { --ma2-season-gradient:linear-gradient(135deg,#ef4444,#fef3c7 55%,#16a34a); }
+[data-season="primavera"] { --ma2-season-gradient:linear-gradient(135deg,#f9a8d4,#a7f3d0 55%,#fde68a); }
+[data-season="normal"] { --ma2-season-gradient:none; }
