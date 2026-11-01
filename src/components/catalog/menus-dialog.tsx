@@ -1,3 +1,4 @@
+import { ToolFrame } from '@/components/workspace/tool-frame';
 import { BusinessAppearanceEditor } from './appearance-editor';
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 import { copyText } from "@/lib/browser/clipboard";
@@ -62,9 +63,9 @@ const money = (n: number) =>
 
 const errText = (e: unknown) => friendlyServerError(e, "Ocurrió un error");
 
-export function MenusDialog() {
+export function MenusDialog({embedded=false}:{embedded?:boolean}={}) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(embedded);
   const [code, setCode] = useState(() => getSavedCode());
   const [unlocked, setUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -372,14 +373,10 @@ export function MenusDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-xl">
+    <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl">
           <UtensilsCrossed className="mr-1.5 size-4" />
           Mis clientes
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
+        </Button>} className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Mis clientes · catálogos vendidos</DialogTitle>
           <DialogDescription>
@@ -1017,7 +1014,6 @@ export function MenusDialog() {
             </section>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+    </ToolFrame>
   );
 }

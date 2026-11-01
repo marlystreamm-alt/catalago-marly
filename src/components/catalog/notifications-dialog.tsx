@@ -1,3 +1,4 @@
+import { ToolFrame } from '@/components/workspace/tool-frame';
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
@@ -65,8 +66,8 @@ const money = (n: number) =>
 const when = (iso: string) =>
   new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
 
-export function NotificationsDialog() {
-  const [open, setOpen] = useState(false);
+export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
+  const [open, setOpen] = useState(embedded);
   const [code, setCode] = useState(() => getSavedCode());
   const [vapid, setVapid] = useState("");
   const [logged, setLogged] = useState(false);
@@ -230,14 +231,10 @@ export function NotificationsDialog() {
   const filteredLog = log.filter((l) => logFilter === "todos" || l.channel === logFilter);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5 rounded-xl">
+    <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="gap-1.5 rounded-xl">
           <Bell className="size-4" />
           Avisos de pedidos
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        </Button>} className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Avisos de pedidos</DialogTitle>
           <DialogDescription>
@@ -649,8 +646,7 @@ export function NotificationsDialog() {
             </TabsContent>
           </Tabs>
         )}
-      </DialogContent>
-    </Dialog>
+    </ToolFrame>
   );
 }
 

@@ -1,3 +1,4 @@
+import { ToolFrame } from '@/components/workspace/tool-frame';
 import { GalleryDeliveryImages } from "./platform-gallery-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Eye, EyeOff, FileUp, History, ImagePlus, KeyRound, Link2, Loader2, MessageCircle, PackageCheck, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
@@ -73,8 +74,8 @@ async function fileToDataUrl(file: File) {
   });
 }
 
-export function ProtectedDeliveriesDialog() {
-  const [open, setOpen] = useState(false);
+export function ProtectedDeliveriesDialog({embedded=false}:{embedded?:boolean}={}) {
+  const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<ProtectedDelivery[]>([]);
   const [saleEnabled, setSaleEnabled] = useState(false);
@@ -229,9 +230,7 @@ export function ProtectedDeliveriesDialog() {
   const history = useMemo(() => items.find((d) => d.id === historyId) ?? null, [items, historyId]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline" size="sm" className="rounded-xl"><ShieldCheck className="mr-1.5 size-4" /> Entregas protegidas</Button></DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto rounded-3xl">
+    <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><ShieldCheck className="mr-1.5 size-4" /> Entregas protegidas</Button>} className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto rounded-3xl">
         <DialogHeader><DialogTitle>Entregas protegidas</DialogTitle><DialogDescription>Protege el documento completo, controla accesos, vigencia y fotografías.</DialogDescription></DialogHeader>
 
         <section className="rounded-2xl border border-border bg-muted/30 p-3">
@@ -291,7 +290,6 @@ export function ProtectedDeliveriesDialog() {
 
         {items.length === 0 && !busy ? <p className="rounded-2xl border border-dashed p-5 text-center text-sm text-muted-foreground">Todavía no tienes entregas protegidas.</p> : null}
         <ul className="space-y-2">{items.map((d) => { const state = stateOf(d); return <li key={d.id} className="rounded-2xl border border-border p-3"><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{d.platform}{d.client ? ` · ${d.client}` : ""}</p><p className="text-xs text-muted-foreground">{d.viewCount} acceso{d.viewCount === 1 ? "" : "s"} · {d.maxViews === null ? "sin límite" : `límite ${d.maxViews}`} · vence {fmt(d.expiresAt)}{d.imageCount ? ` · ${d.imageCount} foto${d.imageCount === 1 ? "" : "s"}` : ""}</p></div><Badge variant={state === "Activa" ? "default" : "secondary"}>{state}</Badge></div><div className="mt-2 flex flex-wrap gap-1.5"><Button size="sm" variant="outline" onClick={() => void copyPlatformDelivery(d)}><Link2 className="mr-1 size-3.5" />Plataforma</Button><Button size="sm" variant="outline" onClick={() => void sendWhatsappPassword(d)}><MessageCircle className="mr-1 size-3.5" />Contraseña WhatsApp</Button><Button size="sm" variant="outline" onClick={() => setHistoryId(d.id)}><Eye className="mr-1 size-3.5" />Historial</Button><Button size="sm" variant="outline" onClick={() => void openEdit(d)}><Pencil className="mr-1 size-3.5" />Editar</Button>{d.status === "active" ? <Button size="sm" variant="outline" onClick={() => void patch(d, { status: "suspended" })}>Suspender</Button> : d.status === "suspended" ? <Button size="sm" variant="outline" onClick={() => void patch(d, { status: "active" })}>Reactivar</Button> : null}{d.status !== "revoked" ? <Button size="sm" variant="outline" onClick={() => void patch(d, { status: "revoked" })}>Revocar</Button> : null}<Button size="sm" variant="ghost" className="text-destructive" onClick={async () => { if (!confirm("¿Eliminar definitivamente esta entrega y su historial?")) return; try { await deliveriesDelete({ data: { code, id: d.id } }); setItems((p) => p.filter((x) => x.id !== d.id)); } catch (e) { toast.error(errText(e)); } }}><Trash2 className="size-3.5" /></Button></div></li>; })}</ul>
-      </DialogContent>
-    </Dialog>
+    </ToolFrame>
   );
 }

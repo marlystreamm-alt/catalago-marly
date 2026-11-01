@@ -1528,6 +1528,8 @@ export type Database = {
           sale_price: number | null;
           status: string;
           stock_kind: string;
+          duration_months: number;
+          starts_on_sale: boolean;
           updated_at: string;
           username: string;
         };
@@ -1560,6 +1562,8 @@ export type Database = {
           sale_price?: number | null;
           status?: string;
           stock_kind?: string;
+          duration_months?: number;
+          starts_on_sale?: boolean;
           updated_at?: string;
           username?: string;
         };
@@ -1592,6 +1596,8 @@ export type Database = {
           sale_price?: number | null;
           status?: string;
           stock_kind?: string;
+          duration_months?: number;
+          starts_on_sale?: boolean;
           updated_at?: string;
           username?: string;
         };

@@ -19,14 +19,15 @@ export async function deliverAvailableStock(
   if (!input.clientName.trim()) throw new Error("Escribe a quién se entrega el producto");
   if (item.status !== "available") throw new Error("Esta cuenta ya no está disponible; revisa su entrega en el historial");
   const now = new Date().toISOString();
-  const deliveredOn = now.slice(0, 10);
+  const deliveredOn = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Monterrey",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(now));
   if (new Date(input.expiresAt).getTime() <= Date.now()) throw new Error("La vigencia del documento debe ser futura");
-  if (input.stockExpiresOn && input.stockExpiresOn < deliveredOn) throw new Error("El vencimiento no puede ser anterior a la entrega");
+  const finalExpiry = input.stockExpiresOn || item.expiresOn || (item.durationMonths ? (await import("./duration")).expiresAfterMonths(deliveredOn,item.durationMonths) : null);
+  if (finalExpiry && finalExpiry < deliveredOn) throw new Error("El vencimiento no puede ser anterior a la entrega");
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
   const scope = (query: any) => item.businessId ? query.eq("business_id", item.businessId) : query.is("business_id", null);
   const { data: reserved, error } = await scope(db.from("stock_items").update({
     status: "assigned", client_name: input.clientName.trim(), client_whatsapp: input.clientWhatsapp.trim(),
-    delivered_on: deliveredOn, expires_on: input.stockExpiresOn || null,
+    delivered_on: deliveredOn, expires_on: finalExpiry,
     sale_price: input.salePrice, related_order_id: input.relatedOrderId || "",
     protected_delivery_id: null, updated_at: now,
   }).eq("id", item.id).eq("status", "available").eq("updated_at", item.updatedAt))

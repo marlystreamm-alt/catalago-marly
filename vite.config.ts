@@ -6,6 +6,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import netlify from "@netlify/vite-plugin-tanstack-start";
 
 export default defineConfig({
+  server: { allowedHosts: ["terminal.local"] },
   plugins: [
     tsconfigPaths(),
     tanstackStart(),

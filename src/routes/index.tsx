@@ -1,3 +1,5 @@
+import { StoreNotices } from '@/components/workspace/store-notices';
+import { SellerWorkspace } from '@/components/workspace/seller-workspace';
 import { BusinessCover } from '@/components/catalog/business-cover';
 import { appearanceStyle, normalizeAppearance } from '@/lib/appearance/theme';
 import { copyText } from "@/lib/browser/clipboard";
@@ -467,6 +469,8 @@ function CatalogPage() {
     setFormOpen(true);
   };
 
+  if (isAdmin && homeView) return <SellerWorkspace onCatalog={() => setHomeView(false)} />;
+
   return (
     <main
       style={appearanceStyle(catalog.appearance)} data-season={normalizeAppearance(catalog.appearance).season}
@@ -564,6 +568,7 @@ function CatalogPage() {
           ) : null}
         </header>
 
+        {!isAdmin ? <StoreNotices /> : null}
         {isAdmin && homeView ? <AdminDashboard /> : null}
 
         <div hidden={isAdmin && homeView}>

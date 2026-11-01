@@ -10,7 +10,7 @@ import { galleryArchive, galleryGetImage, galleryList, gallerySave, type Gallery
 import { prepareGalleryImage } from '@/lib/gallery/image';
 const message = (e: unknown) => e instanceof Error ? e.message : 'No se pudo completar la operación';
 
-function GalleryContents({ initialPlatform = '', onSelect }: { initialPlatform?: string; onSelect?: (image: string) => void }) {
+export function GalleryContents({ initialPlatform = '', onSelect }: { initialPlatform?: string; onSelect?: (image: string) => void }) {
   const [platform, setPlatform] = useState(initialPlatform);
   const [title, setTitle] = useState('Cómo ingresar');
   const [search, setSearch] = useState(initialPlatform);

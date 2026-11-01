@@ -1,3 +1,6 @@
+import { Switch } from '@/components/ui/switch';
+import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
+import { ToolFrame } from '@/components/workspace/tool-frame';
 import { GalleryDeliveryImages } from "./platform-gallery-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -56,6 +59,8 @@ type StockTab = "available" | "sold" | "expiring" | "expired";
 
 
 const blank = (): StockItem => ({
+  durationMonths: 1,
+  startsOnSale: true,
   id: "",
   businessId: null,
   platform: "",
@@ -114,10 +119,16 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 }
 
 export function StockManagerDialog({
+  embedded = false,
+  initialTab = "available",
+  autoAdd = false,
   ownerToken,
   ownerFeatures,
   whatsappTemplate = "Hola {cliente}, aquí tienes tu entrega: {link}",
 }: {
+  embedded?: boolean;
+  initialTab?: StockTab;
+  autoAdd?: boolean;
   ownerToken?: string;
   ownerFeatures?: FeatureMap;
   whatsappTemplate?: string;
@@ -126,15 +137,15 @@ export function StockManagerDialog({
   const can = (key: string) => admin || Boolean(ownerFeatures?.[key]);
   const code = getSavedCode();
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<StockItem[]>([]);
-  const [stockTab, setStockTab] = useState<StockTab>("available");
+  const [stockTab, setStockTab] = useState<StockTab>(initialTab);
   const [stockKindTab, setStockKindTab] = useState<"complete" | "profile">("complete");
   const [q, setQ] = useState("");
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
 
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(autoAdd);
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [form, setForm] = useState<StockItem>(blank());
@@ -287,13 +298,13 @@ export function StockManagerDialog({
     const lines = bulkText.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
     if (!lines.length) return toast.error("Agrega al menos una cuenta");
     if (lines.length > 100) return toast.error("Puedes agregar hasta 100 cuentas por lote");
-    if (!window.confirm(`¿Está seguro de guardar ${lines.length} cuenta(s) completas?`)) return;
+    if (!window.confirm(`¿Está seguro de guardar ${lines.length} registro(s) de stock?`)) return;
     setBusy(true);
     try {
       for (const line of lines) {
         const [username = "", password = "", profilePin = ""] = line.split("|").map((x) => x.trim());
         // En modo lote nunca reutilizar credenciales capturadas previamente en modo individual.
-        await persist({ ...form, id: "", stockKind: "complete", accountType: "Completa", parentStockId: null, username, password, profilePin, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "", renewalNotifiedAt: null }, "");
+        await persist({ ...form, id: "", stockKind: form.stockKind, accountType: form.stockKind === "profile" ? "Perfil" : "Completa", parentStockId: null, username, password, profilePin, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "", renewalNotifiedAt: null }, "");
       }
       setBulkText("");
       setForm(blank());
@@ -507,11 +518,7 @@ export function StockManagerDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
+    <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>} className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Gestor</DialogTitle>
           <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
@@ -525,7 +532,7 @@ export function StockManagerDialog({
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
               <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Selecciona una subpestaña. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") && stockKindTab === "complete" ? <Button onClick={() => { setForm(blank()); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar completas</Button> : null}
+              {can("stock_add") ? <Button onClick={() => { setForm({...blank(),stockKind:stockKindTab}); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />{stockKindTab==="profile"?"Agregar perfiles":"Agregar completas"}</Button> : null}
             </div>
 
             <div className="flex flex-wrap gap-2"><Button size="sm" variant={stockKindTab === "complete" ? "default" : "outline"} onClick={() => setStockKindTab("complete")}>📺 Completas</Button><Button size="sm" variant={stockKindTab === "profile" ? "default" : "outline"} onClick={() => setStockKindTab("profile")}>👤 Perfiles</Button></div>
@@ -561,7 +568,7 @@ export function StockManagerDialog({
             {!form.id ? <div className="flex gap-2"><Button size="sm" variant={!bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(false); setBulkText(""); }}>Agregar individual</Button><Button size="sm" variant={bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(true); setForm((current) => ({ ...current, username: "", password: "", profilePin: "" })); }}>Agregar por lote</Button></div> : null}
             <div ref={formRef} className="grid gap-3 sm:grid-cols-3">
               <div><Label>Plataforma</Label><Input value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} /></div>
-              <div><Label>Tipo de stock</Label><Input value={form.stockKind === "profile" ? "Perfil" : "Completa"} disabled /></div>
+              <div><Label>Tipo de stock</Label><Select value={form.stockKind} disabled={Boolean(form.id)} onValueChange={v=>setForm({...form,stockKind:v as "complete"|"profile",accountType:v==="profile"?"Perfil":"Completa"})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="complete">Cuenta completa</SelectItem><SelectItem value="profile">Perfil individual</SelectItem></SelectContent></Select></div>
               {!bulkMode ? <div><Label>Usuario / correo</Label><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></div> : null}
               {!bulkMode ? <div><Label>Contraseña</Label><div className="relative"><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPass((v) => !v)}>{showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button></div></div> : null}
               {!bulkMode ? <div><Label>Perfil / PIN</Label><Input value={form.profilePin} onChange={(e) => setForm({ ...form, profilePin: e.target.value })} /></div> : null}
@@ -572,7 +579,7 @@ export function StockManagerDialog({
               <div><Label>Costo</Label><Input type="number" min={0} step="0.01" value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} /></div>
               <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={form.salePrice || ""} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} /></div>
               <div><Label>Fecha de compra</Label><Input type="date" value={form.acquiredOn || ""} onChange={(e) => setForm({ ...form, acquiredOn: e.target.value || null })} /></div>
-              <div><Label>Vencimiento base</Label><Input type="date" value={form.expiresOn || ""} onChange={(e) => setForm({ ...form, expiresOn: e.target.value || null })} /></div>
+              <div className="sm:col-span-3 rounded-2xl border bg-muted/20 p-3 space-y-3"><Label>¿De cuánto tiempo es la cuenta?</Label><div className="flex flex-wrap gap-2">{[1,2,3,6,12].map(months=><Button key={months} type="button" size="sm" variant={(form.durationMonths||1)===months?"default":"outline"} onClick={()=>setForm({...form,durationMonths:months})}>{months===12?"1 año":`${months} ${months===1?"mes":"meses"}`}</Button>)}</div><label className="flex items-center justify-between gap-3 text-sm"><span>Contar la vigencia desde la venta</span><Switch checked={form.startsOnSale!==false} onCheckedChange={v=>setForm({...form,startsOnSale:v})}/></label><p className="text-xs text-muted-foreground">{form.startsOnSale!==false?"Al entregar, se propondrá el vencimiento automáticamente. Puedes ajustarlo antes de confirmar.":"Si no indicas un vencimiento base, se calcula desde la fecha de compra."}</p></div><div><Label>Vencimiento base</Label><Input type="date" value={form.expiresOn || ""} onChange={(e) => setForm({ ...form, expiresOn: e.target.value || null })} /></div>
               {form.id && form.status !== "available" ? <><div><Label>Cliente</Label><Input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} /></div><div><Label>WhatsApp</Label><Input value={form.clientWhatsapp} onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })} /></div><div><Label>Pedido relacionado</Label><Input value={form.relatedOrderId} onChange={(e) => setForm({ ...form, relatedOrderId: e.target.value })} /></div></> : null}
               <div className="sm:col-span-3"><Label>Notas privadas</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
               {bulkMode ? <div className="sm:col-span-3"><Label>Cuentas del lote</Label><Textarea rows={7} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={'correo1@ejemplo.com | contraseña1 | PIN1\ncorreo2@ejemplo.com | contraseña2 | PIN2'} /><p className="mt-1 text-[11px] text-muted-foreground">Una cuenta por renglón: correo/usuario | contraseña | PIN. Se evita duplicar correos/usuarios ya registrados.</p></div> : null}
@@ -608,7 +615,7 @@ export function StockManagerDialog({
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(""); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
@@ -676,7 +683,6 @@ export function StockManagerDialog({
         </DialogContent>
       </Dialog>
 
-      </DialogContent>
-    </Dialog>
+    </ToolFrame>
   );
 }

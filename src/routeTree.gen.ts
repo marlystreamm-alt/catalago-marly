@@ -16,6 +16,7 @@ import { Route as ContratarRouteImport } from './routes/contratar'
 import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ClienteIdRouteImport } from './routes/cliente.$id'
 import { Route as DemoIdRouteImport } from './routes/demo.$id'
 import { Route as EIdRouteImport } from './routes/e.$id'
 import { Route as MSlugRouteImport } from './routes/m.$slug'
@@ -57,6 +58,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClienteIdRoute = ClienteIdRouteImport.update({
+  id: '/cliente/$id',
+  path: '/cliente/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoIdRoute = DemoIdRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/mi-catalogo': typeof MiCatalogoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/mi-catalogo': typeof MiCatalogoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/mi-catalogo': typeof MiCatalogoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/mi-catalogo'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/mi-catalogo'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/mi-catalogo'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
@@ -205,6 +217,7 @@ export interface RootRouteChildren {
   MiCatalogoRoute: typeof MiCatalogoRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ClienteIdRoute: typeof ClienteIdRoute
   DemoIdRoute: typeof DemoIdRoute
   EIdRoute: typeof EIdRoute
   MSlugRoute: typeof MSlugRoute
@@ -263,6 +276,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cliente/$id': {
+      id: '/cliente/$id'
+      path: '/cliente/$id'
+      fullPath: '/cliente/$id'
+      preLoaderRoute: typeof ClienteIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/$id': {
@@ -325,6 +345,7 @@ const rootRouteChildren: RootRouteChildren = {
   MiCatalogoRoute: MiCatalogoRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ClienteIdRoute: ClienteIdRoute,
   DemoIdRoute: DemoIdRoute,
   EIdRoute: EIdRoute,
   MSlugRoute: MSlugRoute,

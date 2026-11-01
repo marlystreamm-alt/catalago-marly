@@ -25,7 +25,8 @@ export function stockDashboardSummary(rows: DashboardStock[], today: string) {
     available: available.filter(r => (r.platform.trim() || 'Sin plataforma') === platform).length,
     sold: sold.filter(r => (r.platform.trim() || 'Sin plataforma') === platform).length,
   })).sort((a,b) => b.available - a.available || a.platform.localeCompare(b.platform, 'es'));
-  return { today, weekEnd, month, available: available.length, sold: sold.length, expiring: expiring.length,
+  const daily = Array.from({length:7},(_,index)=>{const d=new Date(`${today}T12:00:00Z`);d.setUTCDate(d.getUTCDate()-6+index);const date=d.toISOString().slice(0,10);const sold=units.filter(r=>r.delivered_on===date&&r.status!=='available');return {date,count:sold.length,total:Math.round(sold.reduce((sum,r)=>sum+Number(r.sale_price||0),0)*100)/100};});
+  return { daily, today, weekEnd, month, available: available.length, sold: sold.length, expiring: expiring.length,
     expired: units.filter(expired).length,
     renewToday: units.filter(r => r.status !== "available" && r.expires_on === today).length,
     renewUpcoming: units.filter(r => r.status !== "available" && r.expires_on && r.expires_on > today && r.expires_on <= weekEnd).length,

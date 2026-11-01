@@ -3,6 +3,8 @@ export const STOCK_STATUS_LABELS: Record<StockStatus,string> = {
   available: "Disponible", assigned: "Asignada", expiring: "Por vencer", expired: "Caducada", client_replacement: "Reposición cliente", provider_replacement: "Reposición proveedor",
 };
 export type StockItem = {
+  durationMonths?: number;
+  startsOnSale?: boolean;
   id: string;
   businessId: string | null;
   platform: string;

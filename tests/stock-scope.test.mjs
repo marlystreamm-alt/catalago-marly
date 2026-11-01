@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import ts from 'typescript';
+const url=s=>`data:text/javascript;base64,${Buffer.from(s).toString('base64')}`;
+const compile=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const db=url(`export const supabaseAdmin={from:()=>{const s=globalThis.__stockScope;const filters=[];const q={update:()=>q,eq:(k,v)=>{filters.push([k,v]);return q},is:(k,v)=>{filters.push([k,v]);return q},select:()=>q,single:async()=>{s.filters=filters;return filters.some(([k,v])=>k==='business_id'&&v===s.business)?{data:{id:'fixture',business_id:s.business},error:null}:{data:null,error:{message:'Scope denied'}}}};return q;}};`);
+const encryption=url(`export const encryptPayload=async()=>'';`);
+const duration=url(compile(await readFile(new URL('../src/lib/stock/duration.ts',import.meta.url),'utf8')));
+const source=compile(await readFile(new URL('../src/lib/stock/stock.server.ts',import.meta.url),'utf8')).replaceAll('"@/integrations/supabase/client.server"',JSON.stringify(db)).replaceAll('"@/lib/deliveries/deliveries.server"',JSON.stringify(encryption)).replaceAll("'./duration'",JSON.stringify(duration));
+const api=await import(url(source));
+test('stock updates enforce the owning business and cannot overwrite another business record',async()=>{globalThis.__stockScope={business:'owner-a',filters:[]};await assert.rejects(api.saveStock({id:'fixture',businessId:'owner-b'}));await api.saveStock({id:'fixture',businessId:'owner-a'});assert.ok(globalThis.__stockScope.filters.some(([k,v])=>k==='business_id'&&v==='owner-a'));});
+test('administrator stock updates remain scoped to stock with no customer business',async()=>{globalThis.__stockScope={business:'owner-a',filters:[]};await assert.rejects(api.saveStock({id:'fixture',businessId:null}));globalThis.__stockScope.business=null;await api.saveStock({id:'fixture',businessId:null});assert.ok(globalThis.__stockScope.filters.some(([k,v])=>k==='business_id'&&v===null));});

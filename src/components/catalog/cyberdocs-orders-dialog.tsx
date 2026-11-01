@@ -1,3 +1,4 @@
+import { ToolFrame } from '@/components/workspace/tool-frame';
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -130,9 +131,9 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
   return { name: file.name, type: file.type || "application/octet-stream", dataUrl };
 }
 
-export function CyberDocsOrdersDialog() {
+export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [orders, setOrders] = useState<CyberDocsOrder[]>([]);
   const [stock, setStock] = useState<CyberDocsStockOption[]>([]);
@@ -686,16 +687,12 @@ export function CyberDocsOrdersDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-xl">
+    <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl">
           <ClipboardList className="mr-1.5 size-4" /> Pedidos {pending ? `(${pending})` : ""}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="h-[100dvh] w-screen max-w-none gap-3 overflow-y-auto rounded-none p-3 sm:h-[94vh] sm:w-[calc(100vw-1.5rem)] sm:max-w-6xl sm:rounded-3xl sm:p-6">
+        </Button>} className="h-[100dvh] w-screen max-w-none gap-3 overflow-y-auto rounded-none p-3 sm:h-[94vh] sm:w-[calc(100vw-1.5rem)] sm:max-w-6xl sm:rounded-3xl sm:p-6">
         <DialogHeader className="sticky top-0 z-20 -mx-3 -mt-3 border-b bg-background/95 px-4 py-3 text-left backdrop-blur sm:static sm:mx-0 sm:mt-0 sm:border-0 sm:bg-transparent sm:p-0">
           <div className="flex items-center justify-between gap-2 pr-8 sm:pr-0">
-            <Button type="button" size="sm" variant="outline" className="shrink-0 rounded-full" onClick={() => setOpen(false)}>
+            <Button type="button" size="sm" variant="outline" className="shrink-0 rounded-full" onClick={() => setOpen(false)} hidden={embedded}>
               <ArrowLeft className="mr-1 size-4" />Regresar
             </Button>
             <Badge variant="secondary" className="shrink-0">
@@ -1123,7 +1120,6 @@ export function CyberDocsOrdersDialog() {
             })}
           </div>
         </section>
-      </DialogContent>
-    </Dialog>
+    </ToolFrame>
   );
 }
