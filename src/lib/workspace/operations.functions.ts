@@ -111,6 +111,11 @@ export const opsArchive = createServerFn({ method: "POST" })
     const s = await gate(data.code);
     const r = await s.readRecord(data.id);
     if (r.version !== data.version) throw new Error("Actualiza el registro antes de retirarlo");
+    if (r.module === "clients") {
+      const totals = s.totals(await s.walletEntries(r.id));
+      if (Math.round(totals.balance * 100) !== 0 || Math.round(totals.debt * 100) !== 0)
+        throw new Error("Primero salda el saldo y el crédito del cliente antes de retirarlo");
+    }
     await s.changeRecord(r, { archived_at: new Date().toISOString() });
     return { ok: true };
   });
@@ -184,11 +189,13 @@ export const portalLoad = createServerFn({ method: "POST" })
       name: client.title,
       ...s.totals(entries),
       entries: entries.slice(0, 50),
-      records: [...own, ...shared].map((r) =>
-        r.module === "codes" && (r.status !== "active" || Date.parse(r.data.expiresAt) <= now)
-          ? { ...r, data: { ...r.data, value: "" }, status: "expired" }
-          : r,
-      ),
+      records: [...own, ...shared].map((r) => {
+        const { attachment, ...metadata } = r.data;
+        return r.module === "codes" &&
+          (r.status !== "active" || Date.parse(r.data.expiresAt) <= now)
+          ? { ...r, data: { ...metadata, value: "" }, status: "expired" }
+          : { ...r, data: metadata };
+      }),
     };
   });
 export const portalSubmit = createServerFn({ method: "POST" })
@@ -255,4 +262,21 @@ export const opsImportClients = createServerFn({ method: "POST" })
       count++;
     }
     return { count };
+  });
+
+export const portalDocument = createServerFn({ method: "POST" })
+  .validator((v: unknown) => portal.extend({ documentId: id }).parse(v))
+  .handler(async ({ data }) => {
+    const s = await import("./operations.server");
+    const client = await s.portalClient(data.id, data.token);
+    const doc = await s.readRecord(data.documentId);
+    if (
+      doc.module !== "documents" ||
+      doc.status !== "active" ||
+      doc.data.clientId !== client.id ||
+      (doc.data.expiresAt && Date.parse(doc.data.expiresAt) <= Date.now()) ||
+      !doc.data.attachment
+    )
+      throw new Error("Documento no disponible");
+    return { attachment: doc.data.attachment, filename: doc.data.filename || "documento" };
   });

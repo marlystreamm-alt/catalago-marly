@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { portalLoad, portalSubmit } from "@/lib/workspace/operations.functions";
+import { portalLoad, portalSubmit, portalDocument } from "@/lib/workspace/operations.functions";
 import { money, STATUS, phoneNumber } from "@/lib/workspace/model";
 import { copyText } from "@/lib/browser/clipboard";
 export const Route = createFileRoute("/cliente/$id")({
@@ -222,11 +222,31 @@ function CustomerPortal() {
                         </p>
                       )
                     ) : null}
-                    {r.data.attachment ? (
-                      <Button asChild className="mt-3" variant="outline">
-                        <a href={r.data.attachment} download={r.data.filename || "documento"}>
-                          Guardar {r.data.filename || "documento"}
-                        </a>
+                    {r.module === "documents" && r.data.filename ? (
+                      <Button
+                        className="mt-3"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            const doc = await portalDocument({
+                              data: { id, token, documentId: r.id },
+                            });
+                            const a = document.createElement("a");
+                            a.href = doc.attachment;
+                            a.download = doc.filename;
+                            a.click();
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error ? e.message : "No se pudo descargar el archivo",
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Guardar {r.data.filename}
                       </Button>
                     ) : null}
                     {r.data.expiresAt ? (

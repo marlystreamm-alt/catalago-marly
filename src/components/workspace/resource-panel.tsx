@@ -53,9 +53,11 @@ export type Entry = {
   created_at: string;
 };
 export function balanceFor(entries: Entry[], id: string, debt = false) {
-  return entries
-    .filter((e) => e.client_id === id && ["credit", "repayment"].includes(e.kind) === debt)
-    .reduce((sum, e) => sum + Number(e.amount_cents) / 100, 0);
+  return (
+    entries
+      .filter((e) => e.client_id === id && ["credit", "repayment"].includes(e.kind) === debt)
+      .reduce((sum, e) => sum + Number(e.amount_cents), 0) / 100
+  );
 }
 export function exportRows(rows: Record<string, unknown>[], name: string) {
   const columns = Object.keys(rows[0] || {});

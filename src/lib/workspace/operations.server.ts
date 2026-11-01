@@ -99,14 +99,16 @@ export async function walletEntries(clientId?: string) {
   }[];
 }
 export function totals(entries: Awaited<ReturnType<typeof walletEntries>>) {
-  return entries.reduce(
+  const cents = entries.reduce(
     (a, r) => {
-      a[r.kind === "credit" || r.kind === "repayment" ? "debt" : "balance"] +=
-        Number(r.amount_cents) / 100;
+      a[r.kind === "credit" || r.kind === "repayment" ? "debt" : "balance"] += Number(
+        r.amount_cents,
+      );
       return a;
     },
     { balance: 0, debt: 0 },
   );
+  return { balance: cents.balance / 100, debt: cents.debt / 100 };
 }
 export async function hashToken(token: string) {
   return Array.from(
