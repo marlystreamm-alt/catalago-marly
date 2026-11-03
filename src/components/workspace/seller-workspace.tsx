@@ -1,3 +1,4 @@
+import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -552,7 +553,25 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
     content = <StockManagerDialog key={String(addStock)} embedded autoAdd={addStock} />;
   else if (section === "expiry") content = <StockInsights />;
   else if (section === "sales") content = <StockInsights sales />;
-  else if (section === "wallet" || section === "credit")
+  else if (section === "wallet")
+    content = (
+      <div className="space-y-5">
+        <RechargePanel records={records} onChanged={load} />
+        <details className="seller-card">
+          <summary className="cursor-pointer font-semibold">Recargas y ajustes manuales</summary>
+          <div className="mt-4">
+            <WalletPanel
+              key={walletClient}
+              records={records}
+              entries={entries}
+              reload={load}
+              initialClient={walletClient}
+            />
+          </div>
+        </details>
+      </div>
+    );
+  else if (section === "credit")
     content = (
       <WalletPanel
         key={section + walletClient}

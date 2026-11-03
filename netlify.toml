@@ -37,3 +37,7 @@
 # en MA² Connect y detiene avisos al finalizar el pedido.
 [functions."order-reminders"]
   schedule = "*/15 * * * *"
+
+# Lector privado de avisos bancarios para recargas automáticas.
+[functions."recharge-mail"]
+  schedule = "*/5 * * * *"

@@ -1,3 +1,4 @@
+import { CustomerRecharge } from "@/components/recharges/customer-recharge";
 import { useCallback, useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -81,6 +82,7 @@ function CustomerPortal() {
                 <strong>{money(data.debt)}</strong>
               </article>
             </div>
+            <CustomerRecharge id={id} token={token} onBalanceChange={load} />
             <div className="flex flex-wrap gap-2">
               <Button asChild>
                 <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">
