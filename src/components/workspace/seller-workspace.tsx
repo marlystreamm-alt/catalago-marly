@@ -1,3 +1,4 @@
+import { CostCalculator } from "./cost-calculator";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -58,6 +59,7 @@ const SECTIONS = [
   ["questions", "💬", "Dudas de clientes"],
   ["expiry", "⏰", "Por vencer"],
   ["sales", "🧾", "Ventas"],
+  ["calculator", "🧮", "Calculadora"],
   ["clients", "👥", "Clientes"],
   ["wallet", "💸", "Recargas"],
   ["credit", "💳", "Créditos"],
@@ -273,6 +275,7 @@ export function SellerLayout({
 const DESCRIPTIONS: Partial<Record<Section, string>> = {
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
   sales: "Entregas e importes registrados en tu inventario.",
+  calculator: "Calcula costos, precios de venta y ganancias de tus productos.",
   wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
   credit: "Registra crédito otorgado y sus abonos, con historial.",
   inventory: "Cuentas completas y perfiles. Agrega stock, copia credenciales y entrega.",
@@ -549,6 +552,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
         }}
       />
     ) : null;
+  else if (section === "calculator") content = <CostCalculator />;
   else if (section === "inventory")
     content = <StockManagerDialog key={String(addStock)} embedded autoAdd={addStock} />;
   else if (section === "expiry") content = <StockInsights />;
