@@ -23,6 +23,16 @@ const normalize = (x: unknown): Quote => {
   };
 };
 
+function EditableNumber({ value, onChange, min = 0, step = "any", className, label }: { value: number; onChange: (value: number) => void; min?: number; step?: string; className: string; label: string }) {
+  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setDraft(String(value)); }, [value, focused]);
+  return <input aria-label={label} type="number" min={min} step={step} className={className}
+    value={draft} onFocus={() => setFocused(true)}
+    onChange={e => { const text = e.target.value; setDraft(text); if (text !== "" && Number.isFinite(Number(text))) onChange(positive(text)); }}
+    onBlur={() => { setFocused(false); const finalValue = draft === "" ? 0 : positive(draft); onChange(finalValue); setDraft(String(finalValue)); }} />;
+}
+
 export function CostCalculator() {
   const [quote, setQuote] = useState<Quote>(initial);
   const [loaded, setLoaded] = useState(false);
@@ -98,10 +108,10 @@ export function CostCalculator() {
             <button className="text-xs text-rose-300 underline" onClick={() => { if (window.confirm("¿Eliminar este material?")) patch({ materials: quote.materials.filter(x => x.id !== m.id) }); }}>Eliminar</button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className="text-xs text-slate-300">Cantidad usada<input aria-label="Cantidad usada" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.quantity} onChange={e => update(m.id, { quantity: positive(e.target.value) })} /></label>
+            <label className="text-xs text-slate-300">Cantidad usada<EditableNumber label="Cantidad usada" min={0} step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.quantity} onChange={value => update(m.id, { quantity: positive(value) })} /></label>
             <label className="text-xs text-slate-300">Unidad<input aria-label="Unidad" placeholder="ml, g, piezas..." className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.unit} onChange={e => update(m.id, { unit: e.target.value })} /></label>
-            <label className="text-xs text-slate-300">Precio base ($)<input aria-label="Precio base" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.basePrice} onChange={e => update(m.id, { basePrice: positive(e.target.value) })} /></label>
-            <label className="text-xs text-slate-300">Contenido base<input aria-label="Contenido base" type="number" min="0.000001" step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.baseQuantity} onChange={e => update(m.id, { baseQuantity: positive(e.target.value) })} /></label>
+            <label className="text-xs text-slate-300">Precio base ($)<EditableNumber label="Precio base" min={0} step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.basePrice} onChange={value => update(m.id, { basePrice: positive(value) })} /></label>
+            <label className="text-xs text-slate-300">Contenido base<EditableNumber label="Contenido base" min={0.000001} step="any" className="mt-1 w-full rounded-md border border-slate-600 !bg-white p-2 !text-slate-950" value={m.baseQuantity} onChange={value => update(m.id, { baseQuantity: positive(value) })} /></label>
           </div>
           <div className="mt-2 text-right text-sm text-blue-200">Importe: {currency(costOf(m))}</div>
         </div>)}
@@ -125,9 +135,9 @@ export function CostCalculator() {
     <details className="rounded-2xl border border-slate-700 bg-[#151d32] p-4 text-white" open>
       <summary className="cursor-pointer text-lg font-bold">Costos y precio de venta</summary>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <label className="text-sm">Gastos adicionales ($)<input aria-label="Gastos adicionales" type="number" min="0" step="any" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.extra} onChange={e => patch({ extra: positive(e.target.value) })} /><span className="text-xs text-slate-400">Luz, gas, mano de obra, transporte, etc.</span></label>
-        <label className="text-sm">Multiplicador sugerido<input aria-label="Multiplicador sugerido" type="number" min="0.01" step="0.1" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.multiplier} onChange={e => patch({ multiplier: positive(e.target.value) })} /><span className="text-xs text-slate-400">Ejemplo: 1.7 equivale al 70% sobre costo.</span></label>
-        <label className="text-sm">Mi precio de venta ($)<input aria-label="Mi precio de venta" type="number" min="0" step="any" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.sellingPrice} onChange={e => patch({ sellingPrice: positive(e.target.value) })} /><span className="text-xs text-slate-400">En 0 se usa el precio sugerido.</span></label>
+        <label className="text-sm">Gastos adicionales ($)<EditableNumber label="Gastos adicionales" min={0} step="any" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.extra} onChange={value => patch({ extra: positive(value) })} /><span className="text-xs text-slate-400">Luz, gas, mano de obra, transporte, etc.</span></label>
+        <label className="text-sm">Multiplicador sugerido<EditableNumber label="Multiplicador sugerido" min={0.01} step="0.1" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.multiplier} onChange={value => patch({ multiplier: positive(value) })} /><span className="text-xs text-slate-400">Ejemplo: 1.7 equivale al 70% sobre costo.</span></label>
+        <label className="text-sm">Mi precio de venta ($)<EditableNumber label="Mi precio de venta" min={0} step="any" className="mt-1 w-full rounded-lg border border-slate-600 !bg-white p-2 !text-slate-950" value={quote.sellingPrice} onChange={value => patch({ sellingPrice: positive(value) })} /><span className="text-xs text-slate-400">En 0 se usa el precio sugerido.</span></label>
       </div>
       <p className="mt-4 text-sm">Costo total: <b>{currency(total)}</b> · Venta: <b>{currency(usedPrice)}</b> · Ganancia: <b className={gain >= 0 ? "text-emerald-200" : "text-rose-300"}>{currency(gain)}</b></p>
     </details>
