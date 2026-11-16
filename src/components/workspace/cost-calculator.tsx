@@ -27,6 +27,7 @@ export function CostCalculator() {
   const [quote, setQuote] = useState<Quote>(initial);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState("");
+  const [editingMaterials, setEditingMaterials] = useState(false);
   useEffect(() => {
     try { setQuote(normalize(JSON.parse(localStorage.getItem(STORAGE) || "null"))); }
     catch { setQuote(initial); }
@@ -79,32 +80,47 @@ export function CostCalculator() {
       <p className="mt-3 text-xs text-slate-400">Precio usado para calcular la ganancia: {currency(usedPrice)}</p>
     </div>
 
-    <details className="rounded-2xl border border-slate-700 bg-[#151d32] p-4 text-white" open>
-      <summary className="cursor-pointer text-lg font-bold">Editar materiales</summary>
-      <p className="mt-2 text-xs text-slate-400">Cambia materiales, cantidades, unidades, precio del envase y contenido del envase. Todo se recalcula automáticamente.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={add}>+ Agregar material</Button>
-        <input aria-label="Buscar materiales" placeholder="Buscar material..." className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-[#0b1020] px-3 py-2 text-sm !text-white placeholder:text-slate-400" value={query} onChange={e => setQuery(e.target.value)} />
+    <section className="rounded-2xl border border-slate-700 bg-[#151d32] p-4 text-white">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-bold">▼ Materiales</h3>
+        <button type="button" aria-label={editingMaterials ? "Cerrar edición de materiales" : "Editar materiales"} aria-expanded={editingMaterials} onClick={() => setEditingMaterials(v => !v)} className="rounded-lg border border-slate-600 bg-[#0b1020] px-3 py-2 text-xl text-white" title="Editar materiales">⚙️</button>
       </div>
-      <div className="mt-3 space-y-3">
+      {editingMaterials ? <div className="mt-3 space-y-3">
+        <p className="text-xs text-slate-300">Edita el nombre, cantidad, precio y contenido del envase. Los cambios se reflejan automáticamente en la tabla.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={add}>+ Agregar material</Button>
+          <input aria-label="Buscar materiales" placeholder="Buscar material..." className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-[#0b1020] px-3 py-2 text-sm !text-white placeholder:text-slate-400" value={query} onChange={e => setQuery(e.target.value)} />
+        </div>
         {visible.map(m => <div key={m.id} className="rounded-xl border border-slate-700 bg-[#0b1020] p-3">
           <div className="flex items-center gap-2">
             <input type="checkbox" checked={m.selected} aria-label="Incluir material" onChange={e => update(m.id, { selected: e.target.checked })} />
-            <input aria-label="Nombre del material" className="min-w-0 flex-1 rounded-md border border-slate-600 bg-[#121a2d] p-2 text-white placeholder:text-slate-400" placeholder="Nombre del material" value={m.name} onChange={e => update(m.id, { name: e.target.value })} />
+            <input aria-label="Nombre del material" className="min-w-0 flex-1 rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white placeholder:text-slate-400" placeholder="Nombre del material" value={m.name} onChange={e => update(m.id, { name: e.target.value })} />
             <button className="text-xs text-rose-300 underline" onClick={() => { if (window.confirm("¿Eliminar este material?")) patch({ materials: quote.materials.filter(x => x.id !== m.id) }); }}>Eliminar</button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <label className="text-xs text-slate-300">Cantidad usada<input aria-label="Cantidad usada" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white placeholder:text-slate-400" value={m.quantity} onChange={e => update(m.id, { quantity: positive(e.target.value) })} /></label>
-            <label className="text-xs text-slate-300">Unidad<input aria-label="Unidad" placeholder="ml, g, piezas..." className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white placeholder:text-slate-400" value={m.unit} onChange={e => update(m.id, { unit: e.target.value })} /></label>
-            <label className="text-xs text-slate-300">Precio base ($)<input aria-label="Precio base" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white placeholder:text-slate-400" value={m.basePrice} onChange={e => update(m.id, { basePrice: positive(e.target.value) })} /></label>
-            <label className="text-xs text-slate-300">Contenido base<input aria-label="Contenido base" type="number" min="0.000001" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white placeholder:text-slate-400" value={m.baseQuantity} onChange={e => update(m.id, { baseQuantity: positive(e.target.value) })} /></label>
+            <label className="text-xs text-slate-300">Cantidad usada<input aria-label="Cantidad usada" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white" value={m.quantity} onChange={e => update(m.id, { quantity: positive(e.target.value) })} /></label>
+            <label className="text-xs text-slate-300">Unidad<input aria-label="Unidad" placeholder="ml, g, piezas..." className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white" value={m.unit} onChange={e => update(m.id, { unit: e.target.value })} /></label>
+            <label className="text-xs text-slate-300">Precio base ($)<input aria-label="Precio base" type="number" min="0" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white" value={m.basePrice} onChange={e => update(m.id, { basePrice: positive(e.target.value) })} /></label>
+            <label className="text-xs text-slate-300">Contenido base<input aria-label="Contenido base" type="number" min="0.000001" step="any" className="mt-1 w-full rounded-md border border-slate-600 bg-[#121a2d] p-2 !text-white" value={m.baseQuantity} onChange={e => update(m.id, { baseQuantity: positive(e.target.value) })} /></label>
           </div>
-          <div className="mt-2 flex justify-between gap-2 text-sm"><span className="text-slate-400">Importe · {m.quantity} {m.unit} de {m.baseQuantity} {m.unit}</span><strong className="text-blue-200">{currency(costOf(m))}</strong></div>
+          <div className="mt-2 text-right text-sm text-blue-200">Importe: {currency(costOf(m))}</div>
         </div>)}
-        {!visible.length && <p className="text-sm text-slate-400">No hay materiales. Usa «Agregar material».</p>}
-      </div>
-      <div className="mt-3 text-right font-bold">Total materiales: {currency(materialsCost)}</div>
-    </details>
+        {!visible.length && <p className="text-sm text-slate-300">No hay materiales. Pulsa «Agregar material».</p>}
+        <Button onClick={() => setEditingMaterials(false)}>Listo ✓</Button>
+      </div> : <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[440px] text-left text-sm">
+          <thead><tr className="border-b border-slate-700 text-slate-200"><th className="py-2">Material</th><th className="py-2">Cantidad</th><th className="py-2">Precio base</th><th className="py-2 text-right">Importe</th></tr></thead>
+          <tbody>{quote.materials.map(m => <tr key={m.id} className="border-b border-slate-700/70">
+            <td className="py-3 pr-2"><div className="font-medium">{m.name || "Sin nombre"}</div><div className="text-xs text-slate-400">{m.unit} · precio por {m.baseQuantity} {m.unit}</div></td>
+            <td className="py-3 pr-2 text-slate-100">{m.quantity} {m.unit}</td>
+            <td className="py-3 pr-2 text-slate-100">{currency(m.basePrice)}</td>
+            <td className="py-3 text-right font-semibold text-blue-200">{m.selected ? currency(costOf(m)) : "Excluido"}</td>
+          </tr>)}</tbody>
+        </table>
+        {!quote.materials.length && <p className="py-4 text-sm text-slate-300">Todavía no hay materiales. Pulsa ⚙️ para agregarlos.</p>}
+        <p className="mt-3 text-right font-bold">Total materiales: {currency(materialsCost)}</p>
+      </div>}
+    </section>
 
     <details className="rounded-2xl border border-slate-700 bg-[#151d32] p-4 text-white" open>
       <summary className="cursor-pointer text-lg font-bold">Costos y precio de venta</summary>
