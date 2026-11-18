@@ -1,3 +1,4 @@
+import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
 import { ToolFrame } from '@/components/workspace/tool-frame';
@@ -30,8 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getSavedCode, saveCode } from "@/lib/notify/client";
-import { notifyLogin } from "@/lib/notify/notify.functions";
+import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { cyberdocsListOrders } from "@/lib/cyberdocs/cyberdocs.functions";
 import type { CyberDocsOrder } from "@/lib/cyberdocs/types";
@@ -170,43 +170,6 @@ export function StockManagerDialog({
   const [message, setMessage] = useState(whatsappTemplate);
   const [deliveryImages, setDeliveryImages] = useState<string[]>([]);
   const [deliveryAttachment, setDeliveryAttachment] = useState<DeliveryAttachment | null>(null);
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pinInput, setPinInput] = useState("");
-  const pinResolver = useRef<((ok: boolean) => void) | null>(null);
-  const pinAuthorized = useRef(false);
-
-  function requestStockPin() {
-    if (pinAuthorized.current) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => {
-      pinResolver.current = resolve;
-      setPinInput("");
-      setPinOpen(true);
-    });
-  }
-
-  function finishStockPin(ok: boolean) {
-    if (ok) pinAuthorized.current = true;
-    setPinOpen(false);
-    const resolve = pinResolver.current;
-    pinResolver.current = null;
-    resolve?.(ok);
-  }
-
-  async function verifyStockPin() {
-    const candidate = pinInput.trim();
-    if (candidate.length < 4) {
-      toast.error("Escribe tu PIN de seguridad");
-      return;
-    }
-    try {
-      await notifyLogin({ data: { code: candidate } });
-      saveCode(candidate);
-      finishStockPin(true);
-    } catch (error) {
-      toast.error(err(error));
-    }
-  }
-
   const load = useCallback(async () => {
     setBusy(true);
     try {
@@ -330,23 +293,25 @@ export function StockManagerDialog({
   }
 
   async function revertToComplete(x: StockItem) {
-    const parentId = x.parentStockId || x.id; const parent = items.find(i=>i.id===parentId); const children=items.filter(i=>i.parentStockId===parentId);
-    if (!parent) return toast.error("No se encontró la cuenta completa original");
-    if (children.some(i=>i.status !== "available")) return toast.error("No se puede revertir: uno o más perfiles ya están vendidos/asignados");
-    if (!window.confirm("Se eliminarán los perfiles disponibles y la cuenta volverá a Completas. ¿Continuar?")) return;
-    try { const ok=admin ? await requestStockPin() : true; if(!ok) return; for(const c of children) ownerToken ? await stockOwnerDelete({data:{token:ownerToken,id:c.id}}) : await stockAdminDelete({data:{code:getSavedCode(),id:c.id}}); await persist({...parent,status:"available",notes:parent.notes.replace(/\n?Convertida a \d+ perfiles/g,"")},""); await load(); setToolsItem(null); setStockKindTab("complete"); toast.success("Cuenta revertida a completa"); } catch(e){toast.error(err(e));}
+    if (busy) return;
+    if (!can("stock_edit")) return toast.error("No tienes permiso para editar stock");
+    let plan: ReturnType<typeof stockRevertPlan>;
+    try { plan = stockRevertPlan(items, x); } catch(e) { toast.error(err(e)); return; }
+    if (plan.children.length && !can("stock_delete")) return toast.error("No tienes permiso para retirar los perfiles derivados");
+    const message = plan.children.length ? "Se retirarán los perfiles disponibles y se restaurará la cuenta completa original. ¿Continuar?" : "Este registro pasará de Perfiles a Completas conservando sus datos. ¿Continuar?";
+    if (!window.confirm(message)) return;
+    setBusy(true);
+    try {
+      for (const child of plan.children) ownerToken ? await stockOwnerDelete({data:{token:ownerToken,id:child.id}}) : await stockAdminDelete({data:{code:getSavedCode(),id:child.id}});
+      await persist(plan.item, ""); await load(); setToolsItem(null); setStockKindTab("complete"); toast.success("Cuenta restaurada en Completas");
+    } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
 
   async function remove(id: string) {
     if (!can("stock_delete")) return toast.error("No tienes permiso para eliminar stock");
     if (!confirm("¿Eliminar este registro de stock?")) return;
     try {
-      let adminCode = code;
-      if (admin) {
-        const ok = await requestStockPin();
-        if (!ok) return;
-        adminCode = getSavedCode();
-      }
+      const adminCode = getSavedCode();
       ownerToken ? await stockOwnerDelete({ data: { token: ownerToken, id } }) : await stockAdminDelete({ data: { code: adminCode, id } });
       setItems((p) => p.filter((x) => x.id !== id));
       setToolsItem(null);
@@ -663,26 +628,6 @@ export function StockManagerDialog({
         <Dialog open={Boolean(historyItem)} onOpenChange={(value) => !value && setHistoryItem(null)}>
           <DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Historial · {historyItem?.platform || "Cuenta"}</DialogTitle></DialogHeader><div className="max-h-[60vh] space-y-2 overflow-y-auto">{history.map((h) => <p key={h.id} className="rounded-lg bg-muted/40 p-2 text-xs"><b>{new Date(h.createdAt).toLocaleString("es-MX")}</b> · {h.action} · {h.detail}</p>)}{!history.length ? <p className="text-sm text-muted-foreground">Sin movimientos registrados.</p> : null}</div></DialogContent>
         </Dialog>
-      <Dialog open={pinOpen} onOpenChange={(open) => { if (!open) finishStockPin(false); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Autorizar registro de stock</DialogTitle>
-            <DialogDescription>Ingresa tu PIN de autorización para registrar o modificar la cuenta.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <Label htmlFor="stock-pin">PIN de autorización</Label>
-            <Input id="stock-pin" type="password" inputMode="numeric" autoFocus value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void verifyStockPin(); } }}
-              placeholder="••••" />
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => finishStockPin(false)}>Cancelar</Button>
-              <Button type="button" onClick={() => void verifyStockPin()}>Continuar</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
     </ToolFrame>
   );
 }
