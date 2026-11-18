@@ -13,13 +13,16 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
 import { Route as AccesoRouteImport } from './routes/acceso'
 import { Route as ContratarRouteImport } from './routes/contratar'
+import { Route as CuentaRouteImport } from './routes/cuenta'
 import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
+import { Route as PlataformaRouteImport } from './routes/plataforma'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ClienteIdRouteImport } from './routes/cliente.$id'
 import { Route as DemoIdRouteImport } from './routes/demo.$id'
 import { Route as EIdRouteImport } from './routes/e.$id'
 import { Route as MSlugRouteImport } from './routes/m.$slug'
+import { Route as TiendaSlugRouteImport } from './routes/tienda.$slug'
 import { Route as ApiPublicNotifyPendingRouteImport } from './routes/api/public/notify-pending'
 import { Route as ApiPublicOrdersRouteImport } from './routes/api/public/orders'
 import { Route as ApiIntegrationsCyberdocsFallbackRouteImport } from './routes/api/integrations/cyberdocs/fallback'
@@ -45,9 +48,19 @@ const ContratarRoute = ContratarRouteImport.update({
   path: '/contratar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CuentaRoute = CuentaRouteImport.update({
+  id: '/cuenta',
+  path: '/cuenta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MiCatalogoRoute = MiCatalogoRouteImport.update({
   id: '/mi-catalogo',
   path: '/mi-catalogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlataformaRoute = PlataformaRouteImport.update({
+  id: '/plataforma',
+  path: '/plataforma',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -80,6 +93,11 @@ const MSlugRoute = MSlugRouteImport.update({
   path: '/m/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TiendaSlugRoute = TiendaSlugRouteImport.update({
+  id: '/tienda/$slug',
+  path: '/tienda/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicNotifyPendingRoute = ApiPublicNotifyPendingRouteImport.update({
   id: '/api/public/notify-pending',
   path: '/api/public/notify-pending',
@@ -108,13 +126,16 @@ export interface FileRoutesByFullPath {
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
   '/contratar': typeof ContratarRoute
+  '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/plataforma': typeof PlataformaRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
+  '/tienda/$slug': typeof TiendaSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
   '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
@@ -125,13 +146,16 @@ export interface FileRoutesByTo {
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
   '/contratar': typeof ContratarRoute
+  '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/plataforma': typeof PlataformaRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
+  '/tienda/$slug': typeof TiendaSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
   '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
@@ -143,13 +167,16 @@ export interface FileRoutesById {
   '/$slug': typeof SlugRoute
   '/acceso': typeof AccesoRoute
   '/contratar': typeof ContratarRoute
+  '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
+  '/plataforma': typeof PlataformaRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
   '/demo/$id': typeof DemoIdRoute
   '/e/$id': typeof EIdRoute
   '/m/$slug': typeof MSlugRoute
+  '/tienda/$slug': typeof TiendaSlugRoute
   '/api/public/notify-pending': typeof ApiPublicNotifyPendingRoute
   '/api/public/orders': typeof ApiPublicOrdersRoute
   '/api/integrations/cyberdocs/fallback': typeof ApiIntegrationsCyberdocsFallbackRoute
@@ -162,13 +189,16 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/acceso'
     | '/contratar'
+    | '/cuenta'
     | '/mi-catalogo'
+    | '/plataforma'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
+    | '/tienda/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
     | '/api/integrations/cyberdocs/fallback'
@@ -179,13 +209,16 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/acceso'
     | '/contratar'
+    | '/cuenta'
     | '/mi-catalogo'
+    | '/plataforma'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
+    | '/tienda/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
     | '/api/integrations/cyberdocs/fallback'
@@ -196,13 +229,16 @@ export interface FileRouteTypes {
     | '/$slug'
     | '/acceso'
     | '/contratar'
+    | '/cuenta'
     | '/mi-catalogo'
+    | '/plataforma'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
     | '/demo/$id'
     | '/e/$id'
     | '/m/$slug'
+    | '/tienda/$slug'
     | '/api/public/notify-pending'
     | '/api/public/orders'
     | '/api/integrations/cyberdocs/fallback'
@@ -214,13 +250,16 @@ export interface RootRouteChildren {
   SlugRoute: typeof SlugRoute
   AccesoRoute: typeof AccesoRoute
   ContratarRoute: typeof ContratarRoute
+  CuentaRoute: typeof CuentaRoute
   MiCatalogoRoute: typeof MiCatalogoRoute
+  PlataformaRoute: typeof PlataformaRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ClienteIdRoute: typeof ClienteIdRoute
   DemoIdRoute: typeof DemoIdRoute
   EIdRoute: typeof EIdRoute
   MSlugRoute: typeof MSlugRoute
+  TiendaSlugRoute: typeof TiendaSlugRoute
   ApiPublicNotifyPendingRoute: typeof ApiPublicNotifyPendingRoute
   ApiPublicOrdersRoute: typeof ApiPublicOrdersRoute
   ApiIntegrationsCyberdocsFallbackRoute: typeof ApiIntegrationsCyberdocsFallbackRoute
@@ -257,11 +296,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContratarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cuenta': {
+      id: '/cuenta'
+      path: '/cuenta'
+      fullPath: '/cuenta'
+      preLoaderRoute: typeof CuentaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mi-catalogo': {
       id: '/mi-catalogo'
       path: '/mi-catalogo'
       fullPath: '/mi-catalogo'
       preLoaderRoute: typeof MiCatalogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plataforma': {
+      id: '/plataforma'
+      path: '/plataforma'
+      fullPath: '/plataforma'
+      preLoaderRoute: typeof PlataformaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -306,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tienda/$slug': {
+      id: '/tienda/$slug'
+      path: '/tienda/$slug'
+      fullPath: '/tienda/$slug'
+      preLoaderRoute: typeof TiendaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/notify-pending': {
       id: '/api/public/notify-pending'
       path: '/api/public/notify-pending'
@@ -342,13 +402,16 @@ const rootRouteChildren: RootRouteChildren = {
   SlugRoute: SlugRoute,
   AccesoRoute: AccesoRoute,
   ContratarRoute: ContratarRoute,
+  CuentaRoute: CuentaRoute,
   MiCatalogoRoute: MiCatalogoRoute,
+  PlataformaRoute: PlataformaRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ClienteIdRoute: ClienteIdRoute,
   DemoIdRoute: DemoIdRoute,
   EIdRoute: EIdRoute,
   MSlugRoute: MSlugRoute,
+  TiendaSlugRoute: TiendaSlugRoute,
   ApiPublicNotifyPendingRoute: ApiPublicNotifyPendingRoute,
   ApiPublicOrdersRoute: ApiPublicOrdersRoute,
   ApiIntegrationsCyberdocsFallbackRoute: ApiIntegrationsCyberdocsFallbackRoute,

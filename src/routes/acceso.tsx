@@ -12,12 +12,12 @@ import { saveOwnerToken } from "@/lib/menus/owner-session";
 export const Route = createFileRoute("/acceso")({
   head: () => ({
     meta: [
-      { title: "Mi menú — Acceso para dueños | MA² Connect" },
+      { title: "Mi tienda — Acceso para negocios | MA² Connect" },
       {
         name: "description",
         content: "Entra a tu catálogo con la contraseña que te dio MA² Connect y edítalo.",
       },
-      { property: "og:title", content: "Mi menú — Acceso para dueños" },
+      { property: "og:title", content: "Mi tienda — Acceso para negocios" },
       {
         property: "og:description",
         content: "Entra a tu catálogo con la contraseña que te dio MA² Connect y edítalo.",
@@ -32,8 +32,14 @@ export const Route = createFileRoute("/acceso")({
 
 function AccessPage() {
   const navigate = useNavigate();
-  const requestedCatalog = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("catalogo") || "" : "";
-  const requestedUsername = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("usuario") || "" : "";
+  const requestedCatalog =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("catalogo") || ""
+      : "";
+  const requestedUsername =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("usuario") || ""
+      : "";
   const [username, setUsername] = useState(requestedUsername);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,10 +48,13 @@ function AccessPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await ownerSignIn({ data: { username: username.trim().toLowerCase(), password } });
+      const res = await ownerSignIn({
+        data: { username: username.trim().toLowerCase(), password },
+      });
       saveOwnerToken(res.token);
       toast.success("Bienvenido");
-      if (requestedCatalog) window.location.assign(`/mi-catalogo?catalogo=${encodeURIComponent(requestedCatalog)}`);
+      if (requestedCatalog)
+        window.location.assign(`/mi-catalogo?catalogo=${encodeURIComponent(requestedCatalog)}`);
       else void navigate({ to: "/mi-catalogo" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo entrar");
@@ -62,7 +71,7 @@ function AccessPage() {
       >
         <div className="text-center">
           <KeyRound className="mx-auto mb-2 size-7 text-primary" />
-          <h1 className="text-xl font-bold">Mi menú</h1>
+          <h1 className="text-xl font-bold">Mi tienda · Acceso del negocio</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Entra con el usuario y contraseña que te asignó MA².
           </p>

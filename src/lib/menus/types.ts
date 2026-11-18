@@ -1,4 +1,4 @@
-import type { Appearance } from '@/lib/appearance/theme';
+import type { Appearance } from "@/lib/appearance/theme";
 /** Tipos del apartado de catálogos vendidos (negocios de clientes). */
 
 export const VIEW_FEATURES = [
@@ -282,10 +282,16 @@ export const emptyBusiness = (): Omit<MenuBusiness, "id"> => ({
 
 /** Estado comercial. La fecha de vencimiento conserva un día completo de prórroga. */
 export type BusinessStatus = "activo" | "prorroga" | "apagado" | "vencido";
-export function businessStatus(b: { active: boolean; expiresOn: string | null; graceDays?: number }): BusinessStatus {
+export function businessStatus(b: {
+  active: boolean;
+  expiresOn: string | null;
+  graceDays?: number;
+}): BusinessStatus {
   if (!b.active) return "apagado";
   if (!b.expiresOn) return "activo";
-  const today = new Date(`${new Date().toISOString().slice(0,10)}T12:00:00`);
+  const today = new Date(
+    `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())}T12:00:00`,
+  );
   const expires = new Date(`${b.expiresOn}T12:00:00`);
   const grace = Math.max(0, b.graceDays ?? 1);
   const endGrace = new Date(expires);
@@ -297,7 +303,9 @@ export function businessStatus(b: { active: boolean; expiresOn: string | null; g
 
 export function daysUntilExpiry(expiresOn: string | null) {
   if (!expiresOn) return null;
-  const a = new Date(`${new Date().toISOString().slice(0,10)}T12:00:00`).getTime();
+  const a = new Date(
+    `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())}T12:00:00`,
+  ).getTime();
   const b = new Date(`${expiresOn}T12:00:00`).getTime();
-  return Math.ceil((b-a)/86400000);
+  return Math.ceil((b - a) / 86400000);
 }

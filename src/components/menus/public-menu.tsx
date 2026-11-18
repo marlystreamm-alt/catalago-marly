@@ -1,5 +1,5 @@
-import { BusinessCover } from '@/components/catalog/business-cover';
-import { appearanceStyle, normalizeAppearance, type Appearance } from '@/lib/appearance/theme';
+import { BusinessCover } from "@/components/catalog/business-cover";
+import { appearanceStyle, normalizeAppearance, type Appearance } from "@/lib/appearance/theme";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -68,7 +68,11 @@ export function waLink(phone: string, text: string) {
 
 export function Shell({ children, appearance }: { children: ReactNode; appearance?: Appearance }) {
   return (
-    <main style={appearanceStyle(appearance)} data-season={normalizeAppearance(appearance).season} className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/40 px-4 py-8">
+    <main
+      style={appearanceStyle(appearance)}
+      data-season={normalizeAppearance(appearance).season}
+      className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/40 px-4 py-8"
+    >
       <div className="mx-auto w-full max-w-2xl">{children}</div>
     </main>
   );
@@ -473,7 +477,13 @@ export function PublicMenuView({ data }: { data: MenuData & { space?: MenuSpace 
           />
         ) : null}
         <div className="p-5">
-          <div className={business.appearance?.coverImage || business.appearance?.logoImage ? "grid grid-cols-[minmax(0,1fr)_40%] items-center gap-3" : "flex flex-wrap items-center gap-3"}>
+          <div
+            className={
+              business.appearance?.coverImage || business.appearance?.logoImage
+                ? "grid grid-cols-[minmax(0,1fr)_40%] items-center gap-3"
+                : "flex flex-wrap items-center gap-3"
+            }
+          >
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                 MA² CONNECT
@@ -485,10 +495,17 @@ export function PublicMenuView({ data }: { data: MenuData & { space?: MenuSpace 
             </div>
             <BusinessCover appearance={business.appearance} name={business.name} />
             <div className="flex flex-wrap gap-2">
+              {business.features.stock_manager ? (
+                <Button asChild size="sm">
+                  <a href={`/tienda/${encodeURIComponent(business.slug)}`}>
+                    Mi cuenta · Comprar con saldo
+                  </a>
+                </Button>
+              ) : null}
               <Button asChild size="sm" variant="outline" className="rounded-full">
                 <a href={loginUrl}>
                   <LogIn className="size-4" />
-                  Iniciar sesión
+                  Acceso del negocio
                 </a>
               </Button>
               <Button
