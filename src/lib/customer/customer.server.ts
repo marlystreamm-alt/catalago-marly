@@ -10,11 +10,15 @@ export async function customerShop(slug: string) {
       .eq("id", 1)
       .maybeSingle();
     const brand = catalog.error ? null : catalog.data?.state?.catalogs?.clientes;
+    const support = [cfg?.data.whatsapp, brand?.whatsappNumber, "528443852364"].find(value => {
+      const digits = String(value || "").replace(/\D/g, "");
+      return digits.length >= 10 && !["5500000000", "525500000000", "5215500000000"].includes(digits);
+    });
     return {
       id: null as string | null,
       slug: "ma2",
       name: String(brand?.name || "Mi tienda MA²"),
-      whatsapp: String(cfg?.data.whatsapp || brand?.whatsappNumber || "528443852364"),
+      whatsapp: String(support || "528443852364"),
       logoUrl: String(brand?.appearance?.logoImage || brand?.imageUrl || ""),
       appearance: brand?.appearance || {},
     };
