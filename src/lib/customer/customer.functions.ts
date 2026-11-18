@@ -1,0 +1,412 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+const shop = z.object({ slug: z.string().regex(/^[a-z0-9-]{1,100}$/) });
+const password = z
+  .string()
+  .min(10, "Usa al menos 10 caracteres")
+  .max(128)
+  .refine((v) => /[a-záéíóúñ]/i.test(v) && /\d/.test(v), "Incluye letras y números");
+const credentials = shop.extend({
+  email: z
+    .string()
+    .trim()
+    .email()
+    .max(254)
+    .transform((v) => v.toLowerCase()),
+  password: z.string().min(1).max(128),
+});
+const server = () => import("./customer.server"),
+  ops = () => import("@/lib/workspace/operations.server");
+export const customerShopInfo = createServerFn({ method: "GET" })
+  .validator((v: unknown) => shop.parse(v))
+  .handler(async ({ data }) => (await server()).customerShop(data.slug));
+export const customerSignUp = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    credentials
+      .extend({
+        password,
+        name: z.string().trim().min(2).max(100),
+        whatsapp: z.string().regex(/^\+?[\d\s()-]{10,25}$/),
+      })
+      .parse(v),
+  )
+  .handler(async ({ data }) => {
+    const c = await server(),
+      s = await ops(),
+      store = await c.customerShop(data.slug);
+    await c.customerThrottle("signup", store.slug + ":" + data.email, 5);
+    const p = await import("./password.server"),
+      salt = p.customerSalt();
+    const payload = await (
+      await import("@/lib/deliveries/deliveries.server")
+    ).encryptPayload({ email: data.email, whatsapp: data.whatsapp, shopId: store.id || "main" });
+    const r = await s
+      .opsDB()
+      .rpc("ma2_customer_register", {
+        p_business: store.id,
+        p_email: data.email,
+        p_hash: await p.customerHash(data.password, salt),
+        p_salt: salt,
+        p_name: data.name,
+        p_payload: payload,
+      });
+    if (r.error)
+      throw new Error(
+        "No se pudo crear la cuenta. Si ya te registraste en esta tienda, inicia sesión.",
+      );
+    await c.customerSession(String(r.data));
+    return { ok: true };
+  });
+export const customerSignIn = createServerFn({ method: "POST" })
+  .validator((v: unknown) => credentials.parse(v))
+  .handler(async ({ data }) => {
+    const c = await server(),
+      s = await ops(),
+      store = await c.customerShop(data.slug);
+    await c.customerThrottle("login", store.slug + ":" + data.email, 10);
+    let q = s.opsDB().from("ma2_customer_accounts").select("*").eq("email", data.email);
+    q = store.id ? q.eq("business_id", store.id) : q.is("business_id", null);
+    const { data: a, error } = await q.maybeSingle();
+    if (error) throw new Error("No se pudo comprobar el acceso");
+    const p = await import("./password.server");
+    const matches = await p.customerMatches(
+      data.password,
+      a?.salt || "0".repeat(32),
+      a?.password_hash || "0".repeat(64),
+    );
+    if (!a || !a.active || !matches) throw new Error("Correo o contraseña incorrectos");
+    await c.customerSession(a.id);
+    return { ok: true };
+  });
+export const customerSignOut = createServerFn({ method: "POST" }).handler(async () => {
+  await (await server()).customerLogoutSession();
+  return { ok: true };
+});
+export const customerLoad = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.parse(v))
+  .handler(async ({ data }) => {
+    const c = await server(),
+      s = await ops(),
+      ctx = await c.customerContext(data.slug);
+    const [entries, orders, records] = await Promise.all([
+      s.walletEntries(ctx.client.id),
+      s
+        .opsDB()
+        .from("ma2_customer_orders")
+        .select("id,title,amount_cents,expires_on,created_at")
+        .eq("client_id", ctx.client.id)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      c.customerRecords(ctx.client.id, !ctx.shop.id),
+    ]);
+    if (orders.error) throw new Error("No se pudieron cargar tus compras");
+    const now = Date.now();
+    return {
+      shop: ctx.shop,
+      name: ctx.client.title,
+      email: String(ctx.account.email),
+      mustChange: Boolean(ctx.account.must_change),
+      ...s.totals(entries),
+      entries: entries.slice(0, 100),
+      orders: orders.data as {
+        id: string;
+        title: string;
+        amount_cents: number;
+        expires_on: string | null;
+        created_at: string;
+      }[],
+      records: records
+        .filter(
+          (r) =>
+            ((r.data.clientId === ctx.client.id &&
+              ["reports", "questions", "requests", "documents", "codes"].includes(r.module)) ||
+              (!ctx.shop.id && ["notices", "faq"].includes(r.module) && r.status === "active")) &&
+            (!r.data.expiresAt || Date.parse(r.data.expiresAt) > now) &&
+            (!["documents", "codes"].includes(r.module) || r.status === "active"),
+        )
+        .map((r) => ({
+          id: r.id,
+          module: r.module,
+          title: r.title,
+          status: r.status,
+          message: r.data.message || "",
+          reply: r.data.reply || "",
+          deliveryUrl: r.data.deliveryUrl || "",
+          value: r.module === "codes" ? r.data.value || "" : "",
+          expiresAt: r.data.expiresAt || "",
+        })),
+    };
+  });
+export const customerProducts = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops();
+    let q = s
+      .opsDB()
+      .from("stock_items")
+      .select(
+        "id,platform,account_type,stock_kind,sale_price,duration_months,expires_on,starts_on_sale",
+      )
+      .eq("status", "available")
+      .gt("sale_price", 0)
+      .neq("username", "")
+      .neq("password_cipher", "")
+      .order("created_at", { ascending: true })
+      .limit(1000);
+    q = ctx.shop.id ? q.eq("business_id", ctx.shop.id) : q.is("business_id", null);
+    const r = await q;
+    if (r.error) throw new Error("No se pudo cargar la tienda");
+    let children = s
+      .opsDB()
+      .from("stock_items")
+      .select("parent_stock_id")
+      .not("parent_stock_id", "is", null);
+    children = ctx.shop.id
+      ? children.eq("business_id", ctx.shop.id)
+      : children.is("business_id", null);
+    const cr = await children;
+    if (cr.error) throw new Error("No se pudo comprobar el stock");
+    const parents = new Set((cr.data || []).map((v: any) => v.parent_stock_id)),
+      today = (await import("@/lib/stock/duration")).businessToday();
+    return (r.data || [])
+      .filter(
+        (v: any) =>
+          !parents.has(v.id) &&
+          v.account_type !== "split_parent" &&
+          (!v.expires_on || v.expires_on >= today),
+      )
+      .map((v: any) => ({
+        id: String(v.id),
+        name: String(v.platform),
+        type: String(v.account_type),
+        kind: String(v.stock_kind),
+        priceCents: Math.round(Number(v.sale_price) * 100),
+        months: Number(v.duration_months),
+        expiresOn: v.starts_on_sale ? null : (v.expires_on as string | null),
+      }));
+  });
+export const customerBuy = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    shop
+      .extend({
+        stockId: z.string().uuid(),
+        priceCents: z.number().int().min(1).max(100000000),
+        requestId: z.string().uuid(),
+      })
+      .parse(v),
+  )
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops();
+    const r = await s
+      .opsDB()
+      .rpc("ma2_customer_buy", {
+        p_account: ctx.account.id,
+        p_stock: data.stockId,
+        p_price: data.priceCents,
+        p_request: data.requestId,
+      });
+    if (r.error)
+      throw new Error(
+        /insuficiente|disponible|precio|contraseña|sesión/i.test(r.error.message)
+          ? r.error.message
+          : "No se pudo completar. Revisa Mis compras antes de reintentar.",
+      );
+    return { id: String(r.data) };
+  });
+export const customerDelivery = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.extend({ orderId: z.string().uuid() }).parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops();
+    const { data: o, error } = await s
+      .opsDB()
+      .from("ma2_customer_orders")
+      .select("id,title,detail,expires_on")
+      .eq("id", data.orderId)
+      .eq("client_id", ctx.client.id)
+      .maybeSingle();
+    if (error || !o) throw new Error("Entrega no disponible");
+    if (o.expires_on && o.expires_on < (await import("@/lib/stock/duration")).businessToday())
+      throw new Error("La entrega venció. Contacta a soporte para renovar");
+    const cryptoLib = await import("@/lib/deliveries/deliveries.server"),
+      secret = await cryptoLib.decryptPayload<{ password: string }>(o.detail.password_cipher);
+    const guides: { title: string; image: string }[] = [];
+    if (!ctx.shop.id) {
+      const r = await s
+        .opsDB()
+        .from("ma2_platform_gallery")
+        .select("title,image_cipher")
+        .eq("platform", String(o.title).split(" · ")[0])
+        .is("archived_at", null)
+        .limit(4);
+      for (const row of r.error ? [] : r.data || []) {
+        try {
+          const img = await cryptoLib.decryptPayload<{ image: string }>(row.image_cipher);
+          if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img.image))
+            guides.push({ title: String(row.title), image: img.image });
+        } catch {}
+      }
+    }
+    return {
+      id: String(o.id),
+      title: String(o.title),
+      username: String(o.detail.username),
+      password: secret.password,
+      profilePin: String(o.detail.profilePin || ""),
+      expiresOn: o.expires_on as string | null,
+      guides,
+    };
+  });
+export const customerDocument = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.extend({ documentId: z.string().uuid() }).parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops(),
+      r = await s.readRecord(data.documentId);
+    if (
+      r.module !== "documents" ||
+      r.status !== "active" ||
+      r.data.clientId !== ctx.client.id ||
+      (r.data.expiresAt && Date.parse(r.data.expiresAt) <= Date.now()) ||
+      !/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(r.data.attachment || "")
+    )
+      throw new Error("Documento no disponible");
+    return { filename: r.data.filename || "documento.pdf", attachment: r.data.attachment };
+  });
+export const customerSubmit = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    shop
+      .extend({
+        module: z.enum(["reports", "questions", "requests"]),
+        title: z.string().trim().min(2).max(160),
+        message: z.string().trim().min(2).max(2000),
+        orderId: z.string().uuid().optional(),
+      })
+      .parse(v),
+  )
+  .handler(async ({ data }) => {
+    const c = await server(),
+      ctx = await c.customerContext(data.slug),
+      s = await ops();
+    if (data.orderId) {
+      const o = await s
+        .opsDB()
+        .from("ma2_customer_orders")
+        .select("id")
+        .eq("id", data.orderId)
+        .eq("client_id", ctx.client.id)
+        .maybeSingle();
+      if (o.error || !o.data) throw new Error("Selecciona una compra de tu cuenta");
+    }
+    const records = await c.customerRecords(ctx.client.id);
+    if (records.filter((r) => r.module === data.module && r.status === "pending").length >= 20)
+      throw new Error("Espera la atención de tus solicitudes pendientes");
+    await s.createRecord(data.module, data.title, "pending", {
+      clientId: ctx.client.id,
+      shopId: ctx.shop.id || "main",
+      message: data.message,
+      orderId: data.orderId || "",
+    });
+    return { ok: true };
+  });
+export const customerChangePassword = createServerFn({ method: "POST" })
+  .validator((v: unknown) =>
+    shop.extend({ currentPassword: z.string().max(128), password }).parse(v),
+  )
+  .handler(async ({ data }) => {
+    const c = await server(),
+      ctx = await c.customerContext(data.slug),
+      s = await ops();
+    await c.customerThrottle("change", ctx.account.id, 5);
+    const p = await import("./password.server");
+    if (
+      !(await p.customerMatches(data.currentPassword, ctx.account.salt, ctx.account.password_hash))
+    )
+      throw new Error("La contraseña actual no es correcta");
+    const salt = p.customerSalt();
+    const r = await s
+      .opsDB()
+      .from("ma2_customer_accounts")
+      .update({
+        salt,
+        password_hash: await p.customerHash(data.password, salt),
+        must_change: false,
+      })
+      .eq("id", ctx.account.id)
+      .eq("password_hash", ctx.account.password_hash)
+      .select("id")
+      .maybeSingle();
+    if (r.error || !r.data) throw new Error("La cuenta cambió. Vuelve a entrar");
+    const old = await s
+      .opsDB()
+      .from("ma2_customer_sessions")
+      .delete()
+      .eq("account_id", ctx.account.id);
+    if (old.error)
+      throw new Error(
+        "Contraseña guardada, pero no se pudieron cerrar las sesiones. Contacta a soporte",
+      );
+    await c.customerSession(ctx.account.id);
+    return { ok: true };
+  });
+export const customerRechargeLoad = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops();
+    if (ctx.shop.id)
+      return {
+        settings: null,
+        requests: [] as import("@/lib/recharges/settings").RechargeRequest[],
+      };
+    const cfg = await (await import("@/lib/recharges/mail.server")).readConfig(),
+      { paymentDetails } = await import("@/lib/recharges/settings");
+    const r = await s
+      .opsDB()
+      .from("ma2_recharge_requests")
+      .select("*")
+      .eq("client_id", ctx.client.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (r.error) throw new Error("No se pudieron cargar las recargas");
+    return {
+      settings: cfg ? paymentDetails(cfg.settings) : null,
+      requests: r.data as import("@/lib/recharges/settings").RechargeRequest[],
+    };
+  });
+export const customerRechargeCreate = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.extend({ amount: z.number().int().min(1).max(1000000) }).parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug);
+    if (ctx.shop.id) throw new Error("Solicita la recarga por soporte de esta tienda");
+    const s = await ops(),
+      r = await s
+        .opsDB()
+        .rpc("ma2_recharge_create", { p_client: ctx.client.id, p_amount: data.amount * 100 });
+    if (r.error)
+      throw new Error(
+        /l[ií]mite|referencias|Importe|recargas|centavos/i.test(r.error.message)
+          ? r.error.message
+          : "No se pudo generar la referencia",
+      );
+    return r.data as import("@/lib/recharges/settings").RechargeRequest;
+  });
+export const customerRechargeCancel = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.extend({ requestId: z.string().uuid() }).parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug),
+      s = await ops(),
+      r = await s
+        .opsDB()
+        .from("ma2_recharge_requests")
+        .update({ status: "cancelled" })
+        .eq("id", data.requestId)
+        .eq("client_id", ctx.client.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+    if (r.error || !r.data) throw new Error("La referencia cambió. Actualiza antes de continuar");
+    return { ok: true };
+  });
