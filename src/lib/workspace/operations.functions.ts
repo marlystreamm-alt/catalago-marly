@@ -14,11 +14,15 @@ export const opsLoad = createServerFn({ method: "POST" })
     const s = await gate(data.code);
     const [records, entries] = await Promise.all([s.readRecords(), s.walletEntries()]);
     return {
-      records: records.map((r) => {
-        const { portalHash, attachment, ...data } = r.data;
-        return { ...r, data };
-      }),
-      entries,
+      records: records
+        .filter((r) => !r.data.shopId || r.data.shopId === "main")
+        .map((r) => {
+          const { portalHash, attachment, ...data } = r.data;
+          return { ...r, data };
+        }),
+      entries: entries.filter((e) =>
+        records.some((r) => r.id === e.client_id && (!r.data.shopId || r.data.shopId === "main")),
+      ),
     };
   });
 export const opsGet = createServerFn({ method: "POST" })

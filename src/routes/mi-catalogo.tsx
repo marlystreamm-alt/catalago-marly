@@ -1,26 +1,62 @@
-import { BusinessAppearanceEditor } from '@/components/catalog/appearance-editor';
+import { CustomerManager } from "@/components/customer/customer-manager";
+import { BusinessAppearanceEditor } from "@/components/catalog/appearance-editor";
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 import { saveLibraryImage } from "@/lib/image-library";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ExternalLink, Loader2, LogOut, Plus, Trash2, Link2
-} from "lucide-react";
+import { ExternalLink, Loader2, LogOut, Plus, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { StockManagerDialog } from "@/components/catalog/stock-manager-dialog";
-import { ownerChangePassword, ownerDeleteCategory, ownerDeleteItem, ownerDeleteSpace, ownerLoad, ownerSaveCategory, ownerSaveItem, ownerSaveSpace, ownerSignOut } from "@/lib/menus/owner.functions";
+import {
+  ownerChangePassword,
+  ownerDeleteCategory,
+  ownerDeleteItem,
+  ownerDeleteSpace,
+  ownerLoad,
+  ownerSaveCategory,
+  ownerSaveItem,
+  ownerSaveSpace,
+  ownerSignOut,
+} from "@/lib/menus/owner.functions";
 import { clearOwnerToken, getOwnerToken } from "@/lib/menus/owner-session";
-import { businessStatus, daysUntilExpiry, type MenuCategory, type MenuItem, type MenuSpace, type OwnerData } from "@/lib/menus/types";
+import {
+  businessStatus,
+  daysUntilExpiry,
+  type MenuCategory,
+  type MenuItem,
+  type MenuSpace,
+  type OwnerData,
+} from "@/lib/menus/types";
 
-export const Route=createFileRoute("/mi-catalogo")({ssr:false,head:()=>({meta:[{title:"Mi espacio — MA² Connect"},{name:"robots",content:"noindex"}]}),component:OwnerPanel});
-const er=(e:unknown)=>e instanceof Error?e.message:"Ocurrió un error";
-const spaceLabel=(k:string)=>k==="menu"?"Menú":k==="directory"?"Agenda de negocio":k==="marketplace"?"Mercadito":"Catálogo";
-const shareCatalog = async (slug:string,name:string) => {
+export const Route = createFileRoute("/mi-catalogo")({
+  ssr: false,
+  head: () => ({
+    meta: [{ title: "Mi espacio — MA² Connect" }, { name: "robots", content: "noindex" }],
+  }),
+  component: OwnerPanel,
+});
+const er = (e: unknown) => (e instanceof Error ? e.message : "Ocurrió un error");
+const spaceLabel = (k: string) =>
+  k === "menu"
+    ? "Menú"
+    : k === "directory"
+      ? "Agenda de negocio"
+      : k === "marketplace"
+        ? "Mercadito"
+        : "Catálogo";
+const shareCatalog = async (slug: string, name: string) => {
   const url = `${window.location.origin}/${encodeURIComponent(slug)}`;
   try {
     if (navigator.share) {
@@ -38,39 +74,955 @@ const shareCatalog = async (slug:string,name:string) => {
   }
 };
 
-function DirectoryPriceLines({value,onChange}:{value:string;onChange:(value:string)=>void}){
- const lines=value.split("\n");
- const setLine=(index:number,next:string)=>onChange(lines.map((line,i)=>i===index?next:line).join("\n"));
- const removeLine=(index:number)=>onChange(lines.filter((_,i)=>i!==index).join("\n"));
- return <div className="grid gap-2 sm:col-span-2"><div className="flex items-center justify-between gap-2"><Label>Renglones de precio</Label><Button type="button" size="sm" variant="outline" onClick={()=>onChange(value?`${value}\n`:"\n")}><Plus className="mr-1 size-4"/>Agregar renglón</Button></div>{lines.map((line,index)=><div key={index} className="flex gap-2"><Input value={line} onChange={e=>setLine(index,e.target.value)} placeholder={index===0?"Ej. Renta por día — $500":"Otro precio o detalle"}/>{lines.length>1?<Button type="button" size="icon" variant="ghost" className="shrink-0 text-destructive" onClick={()=>removeLine(index)} aria-label="Eliminar renglón"><Trash2 className="size-4"/></Button>:null}</div>)}<p className="text-xs text-muted-foreground">Agrega todos los renglones que necesites. Se mostrarán separados en la tarjeta pública.</p></div>
+function DirectoryPriceLines({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const lines = value.split("\n");
+  const setLine = (index: number, next: string) =>
+    onChange(lines.map((line, i) => (i === index ? next : line)).join("\n"));
+  const removeLine = (index: number) => onChange(lines.filter((_, i) => i !== index).join("\n"));
+  return (
+    <div className="grid gap-2 sm:col-span-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label>Renglones de precio</Label>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onChange(value ? `${value}\n` : "\n")}
+        >
+          <Plus className="mr-1 size-4" />
+          Agregar renglón
+        </Button>
+      </div>
+      {lines.map((line, index) => (
+        <div key={index} className="flex gap-2">
+          <Input
+            value={line}
+            onChange={(e) => setLine(index, e.target.value)}
+            placeholder={index === 0 ? "Ej. Renta por día — $500" : "Otro precio o detalle"}
+          />
+          {lines.length > 1 ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="shrink-0 text-destructive"
+              onClick={() => removeLine(index)}
+              aria-label="Eliminar renglón"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">
+        Agrega todos los renglones que necesites. Se mostrarán separados en la tarjeta pública.
+      </p>
+    </div>
+  );
 }
 
-function SubcategoryCoverEditor({category,onChange,onSave}:{category:MenuCategory;onChange:(patch:Partial<MenuCategory>)=>void;onSave:(category:MenuCategory)=>void}){
- return <div className="mt-2 rounded-xl border bg-background p-3"><Label>Subportada de {category.name}</Label><p className="mb-2 text-xs text-muted-foreground">Aparece debajo del nombre de la subsección en el catálogo público.</p><ImageLibraryPicker current={category.imageUrl} onSelect={url=>{const next={...category,imageUrl:url};onChange({imageUrl:url});onSave(next)}}/>{category.imageUrl?<div className="mt-2 flex items-center gap-2"><img src={category.imageUrl} alt={`Subportada de ${category.name}`} className="h-20 w-32 rounded-xl border object-cover"/><Button type="button" size="sm" variant="ghost" className="text-destructive" onClick={()=>{const next={...category,imageUrl:""};onChange({imageUrl:""});onSave(next)}}>Quitar foto</Button></div>:null}</div>
+function SubcategoryCoverEditor({
+  category,
+  onChange,
+  onSave,
+}: {
+  category: MenuCategory;
+  onChange: (patch: Partial<MenuCategory>) => void;
+  onSave: (category: MenuCategory) => void;
+}) {
+  return (
+    <div className="mt-2 rounded-xl border bg-background p-3">
+      <Label>Subportada de {category.name}</Label>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Aparece debajo del nombre de la subsección en el catálogo público.
+      </p>
+      <ImageLibraryPicker
+        current={category.imageUrl}
+        onSelect={(url) => {
+          const next = { ...category, imageUrl: url };
+          onChange({ imageUrl: url });
+          onSave(next);
+        }}
+      />
+      {category.imageUrl ? (
+        <div className="mt-2 flex items-center gap-2">
+          <img
+            src={category.imageUrl}
+            alt={`Subportada de ${category.name}`}
+            className="h-20 w-32 rounded-xl border object-cover"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-destructive"
+            onClick={() => {
+              const next = { ...category, imageUrl: "" };
+              onChange({ imageUrl: "" });
+              onSave(next);
+            }}
+          >
+            Quitar foto
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-function OwnerPanel(){const nav=useNavigate();const [data,setData]=useState<OwnerData|null>(null),[busy,setBusy]=useState(true),[spaceId,setSpaceId]=useState(""),[newPass,setNewPass]=useState("");const token=getOwnerToken();const requestedCatalog=typeof window!=="undefined"?new URLSearchParams(window.location.search).get("catalogo")||"":"";
- const load=useCallback(async()=>{if(!token){void nav({to:"/"});return}setBusy(true);try{const d=await ownerLoad({data:{token}});setData(d);const requestedSpace=requestedCatalog?(d.spaces.find(s=>s.slug===requestedCatalog)||((d.business.slug===requestedCatalog)?d.spaces[0]:undefined)):undefined;setSpaceId(p=>requestedSpace?.id||(p&&d.spaces.some(s=>s.id===p)?p:d.spaces[0]?.id||""));}catch(e){toast.error(er(e));clearOwnerToken();void nav({to:"/"})}finally{setBusy(false)}},[token,nav,requestedCatalog]);useEffect(()=>{void load()},[load]);
- if(busy&&!data)return <main className="grid min-h-screen place-items-center"><Loader2 className="size-6 animate-spin"/></main>;if(!data||!token)return null;
- const status=businessStatus(data.business),days=daysUntilExpiry(data.business.expiresOn),requestedSpace=requestedCatalog?(data.spaces.find(s=>s.slug===requestedCatalog)||((data.business.slug===requestedCatalog)?data.spaces[0]:undefined)):undefined,visibleSpaces=requestedSpace?[requestedSpace]:data.spaces,space=visibleSpaces.find(s=>s.id===spaceId)||visibleSpaces[0];const cats=data.categories.filter(c=>c.spaceId===space?.id),items=data.items.filter(i=>i.spaceId===space?.id);const can=(k:keyof typeof data.features)=>Boolean(data.features[k]);
- async function saveSpace(s:MenuSpace){try{await ownerSaveSpace({data:{token,id:s.id,kind:s.kind,name:s.name,subtitle:s.subtitle,imageUrl:s.imageUrl,slug:s.slug,hidden:s.hidden,sortIndex:s.sortIndex,noticeEnabled:s.noticeEnabled,noticeTitle:s.noticeTitle,noticeMessage:s.noticeMessage}});await load();toast.success("Pestaña guardada")}catch(e){toast.error(er(e))}}
- async function addSpace(){const current=data;if(!current)return;if(current.spaces.length>=current.business.allowedSpaces)return toast.error(`Tu contratación permite ${current.business.allowedSpaces} pestaña(s).`);const kind=(window.prompt("Tipo: catálogo, menú, agenda o mercadito","catalog")||"catalog").toLowerCase();const k=kind.startsWith("men")?"menu":kind.startsWith("ag")||kind.startsWith("dir")?"directory":kind.startsWith("mer")?"marketplace":"catalog";const name=window.prompt("Nombre del negocio o espacio",k==="menu"?"Mi menú":k==="directory"?"Mi agenda de negocios":k==="marketplace"?"Mi mercadito":"Mi catálogo");if(!name)return;try{const s=await ownerSaveSpace({data:{token,kind:k,name,subtitle:"",imageUrl:"",slug:"",hidden:false,sortIndex:current.spaces.length,noticeEnabled:false,noticeTitle:"",noticeMessage:""}});await load();setSpaceId(s.id)}catch(e){toast.error(er(e))}}
- async function addCategory(parentId:string|null=null){if(!space||!can("edit_categories"))return toast.error("Esta función no está incluida en tu contratación");const name=window.prompt(parentId?"Nombre de la subsección":"Nombre de la sección principal");if(!name)return;try{await ownerSaveCategory({data:{token,spaceId:space.id,parentId,name,imageUrl:"",hidden:false,sortIndex:cats.length}});await load()}catch(e){toast.error(er(e))}}
- async function saveCat(c:MenuCategory){try{await ownerSaveCategory({data:{token,id:c.id,spaceId:c.spaceId!,parentId:c.parentId,name:c.name,imageUrl:c.imageUrl,hidden:c.hidden,sortIndex:c.sortIndex}});await load();toast.success(c.parentId?"Subcategoría guardada":"Sección guardada")}catch(e){toast.error(er(e))}}
- async function addItem(){if(!space||!can("add_items"))return toast.error("No tienes permiso para agregar tarjetas");const name=window.prompt("Nombre de la tarjeta");if(!name)return;try{await ownerSaveItem({data:{token,spaceId:space.id,categoryId:cats.find(c=>!c.parentId)?.id||null,name,description:"",price:0,priceText:"Consultar",imageUrl:"",whatsapp:"",whatsappMessage:"",available:true,condition:"new",sortIndex:items.length}});await load()}catch(e){toast.error(er(e))}}
- async function saveItem(it:MenuItem){try{await ownerSaveItem({data:{token,id:it.id,spaceId:it.spaceId!,categoryId:it.categoryId,name:it.name,description:it.description,price:space?.kind==="directory"?0:it.price,priceText:it.priceText,imageUrl:it.imageUrl,whatsapp:it.whatsapp,whatsappMessage:it.whatsappMessage,available:it.available,condition:it.condition||"new",sortIndex:it.sortIndex}});await load()}catch(e){toast.error(er(e))}}
- async function copyCardsToSubsection(categoryId:string){if(!space)return;const source=(data?.items??[]).slice(0,3),existing=new Set(items.filter(i=>i.categoryId===categoryId).map(i=>i.name.toLowerCase()));if(!source.length)return toast.error("Todavía no existen tarjetas para copiar");let created=0;try{for(const it of source){if(existing.has(it.name.toLowerCase()))continue;await ownerSaveItem({data:{token,spaceId:space.id,categoryId,name:it.name,description:it.description,price:space.kind==="directory"?0:it.price,priceText:it.priceText,imageUrl:it.imageUrl,whatsapp:it.whatsapp,whatsappMessage:it.whatsappMessage,available:it.available,condition:it.condition||"new",sortIndex:items.length+created}});created++}await load();toast.success(created?`${created} tarjetas agregadas a la subsección`:"Las tres tarjetas ya estaban en esta subsección")}catch(e){toast.error(er(e))}}
- const updateSpace=(patch:Partial<MenuSpace>)=>setData(d=>d?{...d,spaces:d.spaces.map(s=>s.id===space?.id?{...s,...patch}:s)}:d);const updateCat=(id:string,patch:Partial<MenuCategory>)=>setData(d=>d?{...d,categories:d.categories.map(c=>c.id===id?{...c,...patch}:c)}:d);const updateItem=(id:string,patch:Partial<MenuItem>)=>setData(d=>d?{...d,items:d.items.map(i=>i.id===id?{...i,...patch}:i)}:d);
- return <main className="min-h-screen bg-background px-3 py-4"><div className="mx-auto max-w-5xl space-y-4">
- <header className="flex items-center gap-2"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-primary">MA² CONNECT</p><h1 className="truncate text-xl font-bold">{data.business.name}</h1></div><Button variant="outline" size="sm" onClick={()=>{clearOwnerToken();setData(null);void ownerSignOut({data:{token}}).catch(()=>undefined);window.location.replace("/")}}><LogOut className="mr-1 size-4"/>Salir</Button></header>
- {(days!==null&&days<=7)||status==="prorroga"?<div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><b>{status==="prorroga"?"Tu servicio está en día de prórroga.":days===0?"Tu servicio vence hoy.":`Tu servicio vence en ${days} día(s).`}</b><p>Al terminar la prórroga se suspenderán el acceso y los enlaces públicos hasta que el administrador reactive tu servicio.</p></div>:null}
- {can("edit_business") ? <section className="rounded-3xl border bg-card p-4"><BusinessAppearanceEditor businessId={data.business.id} initial={data.business.appearance} ownerToken={token}/></section> : null}
- <section className="rounded-3xl border bg-card p-4"><h2 className="font-semibold">Mi contratación</h2><div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4"><div><span className="text-muted-foreground">Plan</span><p className="font-medium">{data.business.planName}</p></div><div><span className="text-muted-foreground">Pestañas</span><p className="font-medium">{visibleSpaces.length}{requestedSpace?" visible":" / "+data.business.allowedSpaces}</p></div><div><span className="text-muted-foreground">Vigencia</span><p className="font-medium">{data.business.expiresOn||"Sin fecha"}</p></div><div><span className="text-muted-foreground">Renovación</span><p className="font-medium">${data.business.renewalPrice.toFixed(2)}</p></div><div><span className="text-muted-foreground">Día de corte</span><p className="font-medium">{data.business.billingDay||"—"}</p></div><div><span className="text-muted-foreground">Prórroga</span><p className="font-medium">{data.business.graceDays} día</p></div><div><span className="text-muted-foreground">Estado</span><p className="font-medium capitalize">{status}</p></div><div><span className="text-muted-foreground">Módulos</span><p className="font-medium">{Object.entries(data.features).filter(([,v])=>v).length} activos</p></div></div></section>
- {data.mustChangePassword?<section className="rounded-2xl border border-primary/30 p-3"><p className="text-sm font-semibold">Cambia tu contraseña temporal</p><div className="mt-2 flex gap-2"><Input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="Nueva contraseña"/><Button onClick={async()=>{try{await ownerChangePassword({data:{token,password:newPass}});setNewPass("");await load();toast.success("Contraseña actualizada")}catch(e){toast.error(er(e))}}}>Guardar</Button></div></section>:null}
- <section className="rounded-3xl border bg-card p-4"><div className="flex flex-wrap items-center gap-2"><div className="mr-auto"><h2 className="font-semibold">Pestañas principales del catálogo</h2><p className="text-xs text-muted-foreground">Funcionan igual que Perfiles, Completas, IA y Trámites en el catálogo MA².</p></div><Button size="sm" onClick={()=>void addSpace()} disabled={!!requestedSpace||data.spaces.length>=data.business.allowedSpaces}><Plus className="mr-1 size-4"/>Agregar pestaña</Button></div><div className="mt-3 flex gap-2 overflow-x-auto pb-1">{visibleSpaces.map(s=><Button key={s.id} variant={s.id===space?.id?"default":"outline"} size="sm" onClick={()=>setSpaceId(s.id)}>{s.name}</Button>)}</div>
- {space?<div className="mt-4 grid gap-3 sm:grid-cols-2"><div><Label>Tipo</Label><Select value={space.kind} onValueChange={v=>updateSpace({kind:v as MenuSpace["kind"]})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="catalog">Catálogo</SelectItem><SelectItem value="menu">Menú</SelectItem><SelectItem value="directory">Agenda de negocio</SelectItem><SelectItem value="marketplace">Mercadito</SelectItem></SelectContent></Select></div><div><Label>Nombre</Label><Input value={space.name} onChange={e=>updateSpace({name:e.target.value})}/></div><div><Label>Subtítulo</Label><Input value={space.subtitle} onChange={e=>updateSpace({subtitle:e.target.value})}/></div><div><Label>Foto / portada del catálogo</Label><Input type="file" accept="image/*" onChange={async e=>{const f=e.target.files?.[0];if(!f)return;try{updateSpace({imageUrl:(await saveLibraryImage(f)).dataUrl})}catch(x){toast.error(er(x))}finally{e.currentTarget.value=""}}}/><ImageLibraryPicker current={space.imageUrl} onSelect={url=>{const next={...space,imageUrl:url};updateSpace({imageUrl:url});void saveSpace(next)}}/>{space.imageUrl?<img src={space.imageUrl} alt="Vista previa de la portada" className="mt-2 aspect-[16/7] w-full rounded-xl border object-cover"/>:null}</div><div className="flex items-center justify-between rounded-xl border p-3"><div><p className="text-sm font-medium">Visible públicamente</p><p className="text-xs text-muted-foreground">Ocultar conserva todo el contenido.</p></div><Switch checked={!space.hidden} onCheckedChange={v=>updateSpace({hidden:!v})}/></div>{can("notices")?<div className="flex items-center justify-between rounded-xl border p-3"><p className="text-sm font-medium">Aviso en esta pestaña</p><Switch checked={space.noticeEnabled} onCheckedChange={v=>updateSpace({noticeEnabled:v})}/></div>:null}{can("notices")&&space.noticeEnabled?<><div><Label>Título aviso</Label><Input value={space.noticeTitle} onChange={e=>updateSpace({noticeTitle:e.target.value})}/></div><div><Label>Mensaje aviso</Label><Input value={space.noticeMessage} onChange={e=>updateSpace({noticeMessage:e.target.value})}/></div></>:null}<div className="sm:col-span-2"><p className="mb-2 text-xs text-muted-foreground">Un solo enlace muestra todas las pestañas, secciones y subsecciones del catálogo.</p><div className="flex flex-wrap gap-2"><Button onClick={()=>void saveSpace(space)}>Guardar pestaña</Button><Button asChild variant="outline"><a href={`/${data.business.slug}`} target="_blank" rel="noreferrer"><ExternalLink className="mr-1 size-4"/>Ver catálogo público</a></Button><Button type="button" variant="outline" onClick={()=>void shareCatalog(data.business.slug,data.business.name)}><Link2 className="mr-1 size-4"/>Compartir catálogo</Button>{!requestedSpace&&data.spaces.length>1?<Button variant="ghost" className="text-destructive" onClick={async()=>{if(!confirm("¿Eliminar esta pestaña y su contenido?"))return;try{await ownerDeleteSpace({data:{token,id:space.id}});await load()}catch(e){toast.error(er(e))}}}><Trash2 className="mr-1 size-4"/>Eliminar</Button>:null}</div></div></div>:null}</section>
- {space&&can("edit_categories")?<section className="rounded-3xl border bg-card p-4"><div className="flex flex-wrap items-center gap-2"><div className="flex-1"><h2 className="font-semibold">Secciones y subsecciones de {space.name}</h2><p className="text-xs text-muted-foreground">Dentro de esta pestaña puedes crear títulos, subsecciones, agregar su subportada y colocar las tarjetas.</p></div><Button size="sm" variant="outline" onClick={()=>void addCategory(null)}><Plus className="mr-1 size-4"/>Sección</Button></div><div className="mt-3 space-y-3">{cats.filter(c=>!c.parentId).sort((a,b)=>a.sortIndex-b.sortIndex).map(c=><div key={c.id} className="rounded-2xl border p-3"><div className="flex flex-wrap gap-2"><Input className="min-w-44 flex-1" value={c.name} onChange={e=>updateCat(c.id,{name:e.target.value})} onBlur={()=>void saveCat({...c,name:(data?.categories.find(x=>x.id===c.id)?.name)||c.name})}/><Switch checked={!c.hidden} onCheckedChange={v=>{updateCat(c.id,{hidden:!v});void saveCat({...c,hidden:!v})}}/><Button size="sm" variant="outline" onClick={()=>void addCategory(c.id)}><Plus className="mr-1 size-4"/>Subsección</Button><Button size="icon" variant="ghost" className="text-destructive" onClick={async()=>{if(!confirm("¿Eliminar esta sección? Las tarjetas quedarán sin sección."))return;await ownerDeleteCategory({data:{token,id:c.id}});await load()}}><Trash2 className="size-4"/></Button></div><div className="mt-2 ml-4 space-y-2">{cats.filter(x=>x.parentId===c.id).map(sc=><div key={sc.id} className="rounded-xl bg-muted/40 p-2"><div className="flex flex-wrap gap-2"><Input className="min-w-44 flex-1" value={sc.name} onChange={e=>updateCat(sc.id,{name:e.target.value})} onBlur={()=>void saveCat({...sc,name:(data?.categories.find(x=>x.id===sc.id)?.name)||sc.name})}/><Switch checked={!sc.hidden} onCheckedChange={v=>{updateCat(sc.id,{hidden:!v});void saveCat({...sc,hidden:!v})}}/><Button size="sm" variant="outline" onClick={()=>void copyCardsToSubsection(sc.id)}>Agregar las 3 tarjetas</Button></div><SubcategoryCoverEditor category={sc} onChange={patch=>updateCat(sc.id,patch)} onSave={next=>void saveCat(next)}/></div>)}</div></div>)}</div></section>:null}
- <section className="rounded-3xl border bg-card p-4"><div className="flex items-center"><h2 className="flex-1 font-semibold">Tarjetas · {space?spaceLabel(space.kind):""}</h2><Button size="sm" variant="outline" onClick={()=>void addItem()} disabled={!can("add_items")}><Plus className="mr-1 size-4"/>Agregar</Button></div><div className="mt-3 grid gap-3">{items.map(it=><div key={it.id} className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2"><Input value={it.name} onChange={e=>updateItem(it.id,{name:e.target.value})} placeholder="Nombre"/><Textarea value={it.description} onChange={e=>updateItem(it.id,{description:e.target.value})} placeholder="Descripción"/>{space?.kind==="directory"?<DirectoryPriceLines value={it.priceText} onChange={value=>updateItem(it.id,{priceText:value})}/>:<><Input type="number" value={it.price} onChange={e=>updateItem(it.id,{price:Number(e.target.value)||0})} placeholder="Precio"/><Input value={it.priceText} onChange={e=>updateItem(it.id,{priceText:e.target.value})} placeholder="Texto de precio"/></>}<Input value={it.imageUrl} onChange={e=>updateItem(it.id,{imageUrl:e.target.value})} placeholder="URL imagen"/><ImageLibraryPicker current={it.imageUrl} onSelect={url=>{const next={...it,imageUrl:url};updateItem(it.id,{imageUrl:url});void saveItem(next)}}/><Select value={it.categoryId||"none"} onValueChange={v=>updateItem(it.id,{categoryId:v==="none"?null:v})}><SelectTrigger><SelectValue placeholder="Categoría"/></SelectTrigger><SelectContent><SelectItem value="none">Sin categoría</SelectItem>{cats.filter(c=>!c.hidden).map(c=><SelectItem key={c.id} value={c.id}>{c.parentId?"↳ ":""}{c.name}</SelectItem>)}</SelectContent></Select>{can("per_item_whatsapp")?<><Input value={it.whatsapp} onChange={e=>updateItem(it.id,{whatsapp:e.target.value})} placeholder="WhatsApp propio (opcional)"/><Input value={it.whatsappMessage} onChange={e=>updateItem(it.id,{whatsappMessage:e.target.value})} placeholder="Mensaje WhatsApp"/></>:null}{space?.kind==="marketplace"?<div className="grid gap-1"><Label>Estado</Label><Select value={it.condition||"new"} onValueChange={v=>updateItem(it.id,{condition:v as "new"|"used"})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="new">Nuevo</SelectItem><SelectItem value="used">Usado</SelectItem></SelectContent></Select></div>:null}<div className="flex items-center justify-between rounded-xl border p-2"><span className="text-sm">{space?.kind==="marketplace"?"Disponible":"Visible"}</span><Switch checked={it.available} onCheckedChange={v=>updateItem(it.id,{available:v})}/></div>{space?.kind==="marketplace"&&it.available?<Button size="sm" variant="outline" onClick={()=>{updateItem(it.id,{available:false});void saveItem({...it,available:false,condition:it.condition||"new"})}}>Marcar vendido</Button>:null}<div className="flex gap-2"><Button size="sm" onClick={()=>void saveItem(data.items.find(x=>x.id===it.id)||it)}>Guardar</Button>{can("delete_items")?<Button size="sm" variant="ghost" className="text-destructive" onClick={async()=>{if(!confirm("¿Eliminar tarjeta?"))return;await ownerDeleteItem({data:{token,id:it.id}});await load()}}><Trash2 className="size-4"/></Button>:null}</div></div>)}</div></section>
- {can("stock_manager")?<section className="rounded-3xl border bg-card p-4"><h2 className="mb-2 font-semibold">Módulos contratados</h2><StockManagerDialog ownerToken={token} ownerFeatures={data.features} whatsappTemplate={data.business.whatsappTemplate}/></section>:null}
- <p className="pb-8 text-center text-xs text-muted-foreground">Tu información está separada de los demás clientes de MA².</p>
- </div></main>}
+function OwnerPanel() {
+  const nav = useNavigate();
+  const [data, setData] = useState<OwnerData | null>(null),
+    [busy, setBusy] = useState(true),
+    [spaceId, setSpaceId] = useState(""),
+    [newPass, setNewPass] = useState("");
+  const token = getOwnerToken();
+  const requestedCatalog =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("catalogo") || ""
+      : "";
+  const load = useCallback(async () => {
+    if (!token) {
+      void nav({ to: "/" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const d = await ownerLoad({ data: { token } });
+      setData(d);
+      const requestedSpace = requestedCatalog
+        ? d.spaces.find((s) => s.slug === requestedCatalog) ||
+          (d.business.slug === requestedCatalog ? d.spaces[0] : undefined)
+        : undefined;
+      setSpaceId(
+        (p) =>
+          requestedSpace?.id || (p && d.spaces.some((s) => s.id === p) ? p : d.spaces[0]?.id || ""),
+      );
+    } catch (e) {
+      toast.error(er(e));
+      clearOwnerToken();
+      void nav({ to: "/" });
+    } finally {
+      setBusy(false);
+    }
+  }, [token, nav, requestedCatalog]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (busy && !data)
+    return (
+      <main className="grid min-h-screen place-items-center">
+        <Loader2 className="size-6 animate-spin" />
+      </main>
+    );
+  if (!data || !token) return null;
+  const status = businessStatus(data.business),
+    days = daysUntilExpiry(data.business.expiresOn),
+    requestedSpace = requestedCatalog
+      ? data.spaces.find((s) => s.slug === requestedCatalog) ||
+        (data.business.slug === requestedCatalog ? data.spaces[0] : undefined)
+      : undefined,
+    visibleSpaces = requestedSpace ? [requestedSpace] : data.spaces,
+    space = visibleSpaces.find((s) => s.id === spaceId) || visibleSpaces[0];
+  const cats = data.categories.filter((c) => c.spaceId === space?.id),
+    items = data.items.filter((i) => i.spaceId === space?.id);
+  const can = (k: keyof typeof data.features) => Boolean(data.features[k]);
+  async function saveSpace(s: MenuSpace) {
+    try {
+      await ownerSaveSpace({
+        data: {
+          token,
+          id: s.id,
+          kind: s.kind,
+          name: s.name,
+          subtitle: s.subtitle,
+          imageUrl: s.imageUrl,
+          slug: s.slug,
+          hidden: s.hidden,
+          sortIndex: s.sortIndex,
+          noticeEnabled: s.noticeEnabled,
+          noticeTitle: s.noticeTitle,
+          noticeMessage: s.noticeMessage,
+        },
+      });
+      await load();
+      toast.success("Pestaña guardada");
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function addSpace() {
+    const current = data;
+    if (!current) return;
+    if (current.spaces.length >= current.business.allowedSpaces)
+      return toast.error(`Tu contratación permite ${current.business.allowedSpaces} pestaña(s).`);
+    const kind = (
+      window.prompt("Tipo: catálogo, menú, agenda o mercadito", "catalog") || "catalog"
+    ).toLowerCase();
+    const k = kind.startsWith("men")
+      ? "menu"
+      : kind.startsWith("ag") || kind.startsWith("dir")
+        ? "directory"
+        : kind.startsWith("mer")
+          ? "marketplace"
+          : "catalog";
+    const name = window.prompt(
+      "Nombre del negocio o espacio",
+      k === "menu"
+        ? "Mi menú"
+        : k === "directory"
+          ? "Mi agenda de negocios"
+          : k === "marketplace"
+            ? "Mi mercadito"
+            : "Mi catálogo",
+    );
+    if (!name) return;
+    try {
+      const s = await ownerSaveSpace({
+        data: {
+          token,
+          kind: k,
+          name,
+          subtitle: "",
+          imageUrl: "",
+          slug: "",
+          hidden: false,
+          sortIndex: current.spaces.length,
+          noticeEnabled: false,
+          noticeTitle: "",
+          noticeMessage: "",
+        },
+      });
+      await load();
+      setSpaceId(s.id);
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function addCategory(parentId: string | null = null) {
+    if (!space || !can("edit_categories"))
+      return toast.error("Esta función no está incluida en tu contratación");
+    const name = window.prompt(
+      parentId ? "Nombre de la subsección" : "Nombre de la sección principal",
+    );
+    if (!name) return;
+    try {
+      await ownerSaveCategory({
+        data: {
+          token,
+          spaceId: space.id,
+          parentId,
+          name,
+          imageUrl: "",
+          hidden: false,
+          sortIndex: cats.length,
+        },
+      });
+      await load();
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function saveCat(c: MenuCategory) {
+    try {
+      await ownerSaveCategory({
+        data: {
+          token,
+          id: c.id,
+          spaceId: c.spaceId!,
+          parentId: c.parentId,
+          name: c.name,
+          imageUrl: c.imageUrl,
+          hidden: c.hidden,
+          sortIndex: c.sortIndex,
+        },
+      });
+      await load();
+      toast.success(c.parentId ? "Subcategoría guardada" : "Sección guardada");
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function addItem() {
+    if (!space || !can("add_items")) return toast.error("No tienes permiso para agregar tarjetas");
+    const name = window.prompt("Nombre de la tarjeta");
+    if (!name) return;
+    try {
+      await ownerSaveItem({
+        data: {
+          token,
+          spaceId: space.id,
+          categoryId: cats.find((c) => !c.parentId)?.id || null,
+          name,
+          description: "",
+          price: 0,
+          priceText: "Consultar",
+          imageUrl: "",
+          whatsapp: "",
+          whatsappMessage: "",
+          available: true,
+          condition: "new",
+          sortIndex: items.length,
+        },
+      });
+      await load();
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function saveItem(it: MenuItem) {
+    try {
+      await ownerSaveItem({
+        data: {
+          token,
+          id: it.id,
+          spaceId: it.spaceId!,
+          categoryId: it.categoryId,
+          name: it.name,
+          description: it.description,
+          price: space?.kind === "directory" ? 0 : it.price,
+          priceText: it.priceText,
+          imageUrl: it.imageUrl,
+          whatsapp: it.whatsapp,
+          whatsappMessage: it.whatsappMessage,
+          available: it.available,
+          condition: it.condition || "new",
+          sortIndex: it.sortIndex,
+        },
+      });
+      await load();
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  async function copyCardsToSubsection(categoryId: string) {
+    if (!space) return;
+    const source = (data?.items ?? []).slice(0, 3),
+      existing = new Set(
+        items.filter((i) => i.categoryId === categoryId).map((i) => i.name.toLowerCase()),
+      );
+    if (!source.length) return toast.error("Todavía no existen tarjetas para copiar");
+    let created = 0;
+    try {
+      for (const it of source) {
+        if (existing.has(it.name.toLowerCase())) continue;
+        await ownerSaveItem({
+          data: {
+            token,
+            spaceId: space.id,
+            categoryId,
+            name: it.name,
+            description: it.description,
+            price: space.kind === "directory" ? 0 : it.price,
+            priceText: it.priceText,
+            imageUrl: it.imageUrl,
+            whatsapp: it.whatsapp,
+            whatsappMessage: it.whatsappMessage,
+            available: it.available,
+            condition: it.condition || "new",
+            sortIndex: items.length + created,
+          },
+        });
+        created++;
+      }
+      await load();
+      toast.success(
+        created
+          ? `${created} tarjetas agregadas a la subsección`
+          : "Las tres tarjetas ya estaban en esta subsección",
+      );
+    } catch (e) {
+      toast.error(er(e));
+    }
+  }
+  const updateSpace = (patch: Partial<MenuSpace>) =>
+    setData((d) =>
+      d ? { ...d, spaces: d.spaces.map((s) => (s.id === space?.id ? { ...s, ...patch } : s)) } : d,
+    );
+  const updateCat = (id: string, patch: Partial<MenuCategory>) =>
+    setData((d) =>
+      d ? { ...d, categories: d.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)) } : d,
+    );
+  const updateItem = (id: string, patch: Partial<MenuItem>) =>
+    setData((d) =>
+      d ? { ...d, items: d.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) } : d,
+    );
+  return (
+    <main className="min-h-screen bg-background px-3 py-4">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <header className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-primary">MA² CONNECT</p>
+            <h1 className="truncate text-xl font-bold">{data.business.name}</h1>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              clearOwnerToken();
+              setData(null);
+              void ownerSignOut({ data: { token } }).catch(() => undefined);
+              window.location.replace("/");
+            }}
+          >
+            <LogOut className="mr-1 size-4" />
+            Salir
+          </Button>
+        </header>
+        {(days !== null && days <= 7) || status === "prorroga" ? (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>
+              {status === "prorroga"
+                ? "Tu servicio está en día de prórroga."
+                : days === 0
+                  ? "Tu servicio vence hoy."
+                  : `Tu servicio vence en ${days} día(s).`}
+            </b>
+            <p>
+              Al terminar la prórroga se suspenderán el acceso y los enlaces públicos hasta que el
+              administrador reactive tu servicio.
+            </p>
+          </div>
+        ) : null}
+        {can("edit_business") ? (
+          <section className="rounded-3xl border bg-card p-4">
+            <BusinessAppearanceEditor
+              businessId={data.business.id}
+              initial={data.business.appearance}
+              ownerToken={token}
+            />
+          </section>
+        ) : null}
+        <section className="rounded-3xl border bg-card p-4">
+          <h2 className="font-semibold">Mi contratación</h2>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+            <div>
+              <span className="text-muted-foreground">Plan</span>
+              <p className="font-medium">{data.business.planName}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Pestañas</span>
+              <p className="font-medium">
+                {visibleSpaces.length}
+                {requestedSpace ? " visible" : " / " + data.business.allowedSpaces}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Vigencia</span>
+              <p className="font-medium">{data.business.expiresOn || "Sin fecha"}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Renovación</span>
+              <p className="font-medium">${data.business.renewalPrice.toFixed(2)}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Día de corte</span>
+              <p className="font-medium">{data.business.billingDay || "—"}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Prórroga</span>
+              <p className="font-medium">{data.business.graceDays} día</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Estado</span>
+              <p className="font-medium capitalize">{status}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Módulos</span>
+              <p className="font-medium">
+                {Object.entries(data.features).filter(([, v]) => v).length} activos
+              </p>
+            </div>
+          </div>
+        </section>
+        {data.mustChangePassword ? (
+          <section className="rounded-2xl border border-primary/30 p-3">
+            <p className="text-sm font-semibold">Cambia tu contraseña temporal</p>
+            <div className="mt-2 flex gap-2">
+              <Input
+                type="password"
+                value={newPass}
+                onChange={(e) => setNewPass(e.target.value)}
+                placeholder="Nueva contraseña"
+              />
+              <Button
+                onClick={async () => {
+                  try {
+                    await ownerChangePassword({ data: { token, password: newPass } });
+                    setNewPass("");
+                    await load();
+                    toast.success("Contraseña actualizada");
+                  } catch (e) {
+                    toast.error(er(e));
+                  }
+                }}
+              >
+                Guardar
+              </Button>
+            </div>
+          </section>
+        ) : null}
+        <section className="rounded-3xl border bg-card p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="mr-auto">
+              <h2 className="font-semibold">Pestañas principales del catálogo</h2>
+              <p className="text-xs text-muted-foreground">
+                Funcionan igual que Perfiles, Completas, IA y Trámites en el catálogo MA².
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => void addSpace()}
+              disabled={!!requestedSpace || data.spaces.length >= data.business.allowedSpaces}
+            >
+              <Plus className="mr-1 size-4" />
+              Agregar pestaña
+            </Button>
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {visibleSpaces.map((s) => (
+              <Button
+                key={s.id}
+                variant={s.id === space?.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSpaceId(s.id)}
+              >
+                {s.name}
+              </Button>
+            ))}
+          </div>
+          {space ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>Tipo</Label>
+                <Select
+                  value={space.kind}
+                  onValueChange={(v) => updateSpace({ kind: v as MenuSpace["kind"] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="catalog">Catálogo</SelectItem>
+                    <SelectItem value="menu">Menú</SelectItem>
+                    <SelectItem value="directory">Agenda de negocio</SelectItem>
+                    <SelectItem value="marketplace">Mercadito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Nombre</Label>
+                <Input value={space.name} onChange={(e) => updateSpace({ name: e.target.value })} />
+              </div>
+              <div>
+                <Label>Subtítulo</Label>
+                <Input
+                  value={space.subtitle}
+                  onChange={(e) => updateSpace({ subtitle: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Foto / portada del catálogo</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    try {
+                      updateSpace({ imageUrl: (await saveLibraryImage(f)).dataUrl });
+                    } catch (x) {
+                      toast.error(er(x));
+                    } finally {
+                      e.currentTarget.value = "";
+                    }
+                  }}
+                />
+                <ImageLibraryPicker
+                  current={space.imageUrl}
+                  onSelect={(url) => {
+                    const next = { ...space, imageUrl: url };
+                    updateSpace({ imageUrl: url });
+                    void saveSpace(next);
+                  }}
+                />
+                {space.imageUrl ? (
+                  <img
+                    src={space.imageUrl}
+                    alt="Vista previa de la portada"
+                    className="mt-2 aspect-[16/7] w-full rounded-xl border object-cover"
+                  />
+                ) : null}
+              </div>
+              <div className="flex items-center justify-between rounded-xl border p-3">
+                <div>
+                  <p className="text-sm font-medium">Visible públicamente</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ocultar conserva todo el contenido.
+                  </p>
+                </div>
+                <Switch
+                  checked={!space.hidden}
+                  onCheckedChange={(v) => updateSpace({ hidden: !v })}
+                />
+              </div>
+              {can("notices") ? (
+                <div className="flex items-center justify-between rounded-xl border p-3">
+                  <p className="text-sm font-medium">Aviso en esta pestaña</p>
+                  <Switch
+                    checked={space.noticeEnabled}
+                    onCheckedChange={(v) => updateSpace({ noticeEnabled: v })}
+                  />
+                </div>
+              ) : null}
+              {can("notices") && space.noticeEnabled ? (
+                <>
+                  <div>
+                    <Label>Título aviso</Label>
+                    <Input
+                      value={space.noticeTitle}
+                      onChange={(e) => updateSpace({ noticeTitle: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Mensaje aviso</Label>
+                    <Input
+                      value={space.noticeMessage}
+                      onChange={(e) => updateSpace({ noticeMessage: e.target.value })}
+                    />
+                  </div>
+                </>
+              ) : null}
+              <div className="sm:col-span-2">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Un solo enlace muestra todas las pestañas, secciones y subsecciones del catálogo.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => void saveSpace(space)}>Guardar pestaña</Button>
+                  <Button asChild variant="outline">
+                    <a href={`/${data.business.slug}`} target="_blank" rel="noreferrer">
+                      <ExternalLink className="mr-1 size-4" />
+                      Ver catálogo público
+                    </a>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void shareCatalog(data.business.slug, data.business.name)}
+                  >
+                    <Link2 className="mr-1 size-4" />
+                    Compartir catálogo
+                  </Button>
+                  {!requestedSpace && data.spaces.length > 1 ? (
+                    <Button
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={async () => {
+                        if (!confirm("¿Eliminar esta pestaña y su contenido?")) return;
+                        try {
+                          await ownerDeleteSpace({ data: { token, id: space.id } });
+                          await load();
+                        } catch (e) {
+                          toast.error(er(e));
+                        }
+                      }}
+                    >
+                      <Trash2 className="mr-1 size-4" />
+                      Eliminar
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
+        {space && can("edit_categories") ? (
+          <section className="rounded-3xl border bg-card p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex-1">
+                <h2 className="font-semibold">Secciones y subsecciones de {space.name}</h2>
+                <p className="text-xs text-muted-foreground">
+                  Dentro de esta pestaña puedes crear títulos, subsecciones, agregar su subportada y
+                  colocar las tarjetas.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => void addCategory(null)}>
+                <Plus className="mr-1 size-4" />
+                Sección
+              </Button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {cats
+                .filter((c) => !c.parentId)
+                .sort((a, b) => a.sortIndex - b.sortIndex)
+                .map((c) => (
+                  <div key={c.id} className="rounded-2xl border p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Input
+                        className="min-w-44 flex-1"
+                        value={c.name}
+                        onChange={(e) => updateCat(c.id, { name: e.target.value })}
+                        onBlur={() =>
+                          void saveCat({
+                            ...c,
+                            name: data?.categories.find((x) => x.id === c.id)?.name || c.name,
+                          })
+                        }
+                      />
+                      <Switch
+                        checked={!c.hidden}
+                        onCheckedChange={(v) => {
+                          updateCat(c.id, { hidden: !v });
+                          void saveCat({ ...c, hidden: !v });
+                        }}
+                      />
+                      <Button size="sm" variant="outline" onClick={() => void addCategory(c.id)}>
+                        <Plus className="mr-1 size-4" />
+                        Subsección
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={async () => {
+                          if (
+                            !confirm("¿Eliminar esta sección? Las tarjetas quedarán sin sección.")
+                          )
+                            return;
+                          await ownerDeleteCategory({ data: { token, id: c.id } });
+                          await load();
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                    <div className="mt-2 ml-4 space-y-2">
+                      {cats
+                        .filter((x) => x.parentId === c.id)
+                        .map((sc) => (
+                          <div key={sc.id} className="rounded-xl bg-muted/40 p-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Input
+                                className="min-w-44 flex-1"
+                                value={sc.name}
+                                onChange={(e) => updateCat(sc.id, { name: e.target.value })}
+                                onBlur={() =>
+                                  void saveCat({
+                                    ...sc,
+                                    name:
+                                      data?.categories.find((x) => x.id === sc.id)?.name || sc.name,
+                                  })
+                                }
+                              />
+                              <Switch
+                                checked={!sc.hidden}
+                                onCheckedChange={(v) => {
+                                  updateCat(sc.id, { hidden: !v });
+                                  void saveCat({ ...sc, hidden: !v });
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void copyCardsToSubsection(sc.id)}
+                              >
+                                Agregar las 3 tarjetas
+                              </Button>
+                            </div>
+                            <SubcategoryCoverEditor
+                              category={sc}
+                              onChange={(patch) => updateCat(sc.id, patch)}
+                              onSave={(next) => void saveCat(next)}
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </section>
+        ) : null}
+        <section className="rounded-3xl border bg-card p-4">
+          <div className="flex items-center">
+            <h2 className="flex-1 font-semibold">
+              Tarjetas · {space ? spaceLabel(space.kind) : ""}
+            </h2>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void addItem()}
+              disabled={!can("add_items")}
+            >
+              <Plus className="mr-1 size-4" />
+              Agregar
+            </Button>
+          </div>
+          <div className="mt-3 grid gap-3">
+            {items.map((it) => (
+              <div key={it.id} className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2">
+                <Input
+                  value={it.name}
+                  onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                  placeholder="Nombre"
+                />
+                <Textarea
+                  value={it.description}
+                  onChange={(e) => updateItem(it.id, { description: e.target.value })}
+                  placeholder="Descripción"
+                />
+                {space?.kind === "directory" ? (
+                  <DirectoryPriceLines
+                    value={it.priceText}
+                    onChange={(value) => updateItem(it.id, { priceText: value })}
+                  />
+                ) : (
+                  <>
+                    <Input
+                      type="number"
+                      value={it.price}
+                      onChange={(e) => updateItem(it.id, { price: Number(e.target.value) || 0 })}
+                      placeholder="Precio"
+                    />
+                    <Input
+                      value={it.priceText}
+                      onChange={(e) => updateItem(it.id, { priceText: e.target.value })}
+                      placeholder="Texto de precio"
+                    />
+                  </>
+                )}
+                <Input
+                  value={it.imageUrl}
+                  onChange={(e) => updateItem(it.id, { imageUrl: e.target.value })}
+                  placeholder="URL imagen"
+                />
+                <ImageLibraryPicker
+                  current={it.imageUrl}
+                  onSelect={(url) => {
+                    const next = { ...it, imageUrl: url };
+                    updateItem(it.id, { imageUrl: url });
+                    void saveItem(next);
+                  }}
+                />
+                <Select
+                  value={it.categoryId || "none"}
+                  onValueChange={(v) => updateItem(it.id, { categoryId: v === "none" ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin categoría</SelectItem>
+                    {cats
+                      .filter((c) => !c.hidden)
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.parentId ? "↳ " : ""}
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {can("per_item_whatsapp") ? (
+                  <>
+                    <Input
+                      value={it.whatsapp}
+                      onChange={(e) => updateItem(it.id, { whatsapp: e.target.value })}
+                      placeholder="WhatsApp propio (opcional)"
+                    />
+                    <Input
+                      value={it.whatsappMessage}
+                      onChange={(e) => updateItem(it.id, { whatsappMessage: e.target.value })}
+                      placeholder="Mensaje WhatsApp"
+                    />
+                  </>
+                ) : null}
+                {space?.kind === "marketplace" ? (
+                  <div className="grid gap-1">
+                    <Label>Estado</Label>
+                    <Select
+                      value={it.condition || "new"}
+                      onValueChange={(v) => updateItem(it.id, { condition: v as "new" | "used" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">Nuevo</SelectItem>
+                        <SelectItem value="used">Usado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between rounded-xl border p-2">
+                  <span className="text-sm">
+                    {space?.kind === "marketplace" ? "Disponible" : "Visible"}
+                  </span>
+                  <Switch
+                    checked={it.available}
+                    onCheckedChange={(v) => updateItem(it.id, { available: v })}
+                  />
+                </div>
+                {space?.kind === "marketplace" && it.available ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      updateItem(it.id, { available: false });
+                      void saveItem({ ...it, available: false, condition: it.condition || "new" });
+                    }}
+                  >
+                    Marcar vendido
+                  </Button>
+                ) : null}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => void saveItem(data.items.find((x) => x.id === it.id) || it)}
+                  >
+                    Guardar
+                  </Button>
+                  {can("delete_items") ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      onClick={async () => {
+                        if (!confirm("¿Eliminar tarjeta?")) return;
+                        await ownerDeleteItem({ data: { token, id: it.id } });
+                        await load();
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        {can("stock_manager") ? (
+          <CustomerManager ownerToken={token} slug={data.business.slug} />
+        ) : null}
+        {can("stock_manager") ? (
+          <section className="rounded-3xl border bg-card p-4">
+            <h2 className="mb-2 font-semibold">Módulos contratados</h2>
+            <StockManagerDialog
+              ownerToken={token}
+              ownerFeatures={data.features}
+              whatsappTemplate={data.business.whatsappTemplate}
+            />
+          </section>
+        ) : null}
+        <p className="pb-8 text-center text-xs text-muted-foreground">
+          Tu información está separada de los demás clientes de MA².
+        </p>
+      </div>
+    </main>
+  );
+}

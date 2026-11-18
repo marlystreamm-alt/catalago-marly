@@ -40,16 +40,14 @@ export const customerSignUp = createServerFn({ method: "POST" })
     const payload = await (
       await import("@/lib/deliveries/deliveries.server")
     ).encryptPayload({ email: data.email, whatsapp: data.whatsapp, shopId: store.id || "main" });
-    const r = await s
-      .opsDB()
-      .rpc("ma2_customer_register", {
-        p_business: store.id,
-        p_email: data.email,
-        p_hash: await p.customerHash(data.password, salt),
-        p_salt: salt,
-        p_name: data.name,
-        p_payload: payload,
-      });
+    const r = await s.opsDB().rpc("ma2_customer_register", {
+      p_business: store.id,
+      p_email: data.email,
+      p_hash: await p.customerHash(data.password, salt),
+      p_salt: salt,
+      p_name: data.name,
+      p_payload: payload,
+    });
     if (r.error)
       throw new Error(
         "No se pudo crear la cuenta. Si ya te registraste en esta tienda, inicia sesión.",
@@ -199,20 +197,30 @@ export const customerBuy = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const ctx = await (await server()).customerContext(data.slug),
       s = await ops();
-    const r = await s
-      .opsDB()
-      .rpc("ma2_customer_buy", {
-        p_account: ctx.account.id,
-        p_stock: data.stockId,
-        p_price: data.priceCents,
-        p_request: data.requestId,
-      });
+    const r = await s.opsDB().rpc("ma2_customer_buy", {
+      p_account: ctx.account.id,
+      p_stock: data.stockId,
+      p_price: data.priceCents,
+      p_request: data.requestId,
+    });
     if (r.error)
       throw new Error(
         /insuficiente|disponible|precio|contraseña|sesión/i.test(r.error.message)
           ? r.error.message
           : "No se pudo completar. Revisa Mis compras antes de reintentar.",
       );
+    // The purchase is already committed. Contact metadata must not turn it into a failed sale.
+    try {
+      const contact = await s
+        .opsDB()
+        .from("stock_items")
+        .update({ client_whatsapp: ctx.client.data.whatsapp || "" })
+        .eq("id", data.stockId)
+        .eq("related_order_id", String(r.data));
+      if (contact.error) console.warn("Customer purchase contact metadata was not updated");
+    } catch {
+      console.warn("Customer purchase contact metadata was not updated");
+    }
     return { id: String(r.data) };
   });
 export const customerDelivery = createServerFn({ method: "POST" })
@@ -244,7 +252,10 @@ export const customerDelivery = createServerFn({ method: "POST" })
       for (const row of r.error ? [] : r.data || []) {
         try {
           const img = await cryptoLib.decryptPayload<{ image: string }>(row.image_cipher);
-          if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img.image))
+          if (
+            /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(img.image) &&
+            guides.reduce((n, g) => n + g.image.length, 0) + img.image.length < 2_500_000
+          )
             guides.push({ title: String(row.title), image: img.image });
         } catch {}
       }

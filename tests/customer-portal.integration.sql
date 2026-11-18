@@ -1,0 +1,56 @@
+begin;
+do $$
+declare marker text:='qa-'||gen_random_uuid()::text; today date:=(now() at time zone 'America/Monterrey')::date;
+ b1 uuid:=gen_random_uuid();b2 uuid:=gen_random_uuid();a1 uuid;a2 uuid;c1 uuid;c2 uuid;s1 uuid:=gen_random_uuid();s2 uuid:=gen_random_uuid();s3 uuid:=gen_random_uuid();req uuid:=gen_random_uuid();sale uuid:=gen_random_uuid();j jsonb;k jsonb;failed boolean;n bigint;balance bigint;before_count bigint;role_name text;tbl text;
+begin
+ insert into public.menu_businesses(id,name,slug,features,expires_on,grace_days) values(b1,marker,marker||'-1','{"stock_manager":true}',today+30,0),(b2,marker,marker||'-2','{"stock_manager":true}',today+30,0);
+ a1:=public.ma2_customer_register(b1,marker||'@example.invalid','hash','salt',marker,'cipher');a2:=public.ma2_customer_register(b2,marker||'@example.invalid','hash','salt',marker,'cipher');
+ select client_id into c1 from public.ma2_customer_accounts where id=a1;select client_id into c2 from public.ma2_customer_accounts where id=a2;if c1=c2 then raise exception 'Tenants share a client';end if;
+ select count(*) into before_count from public.ma2_ops_records where title=marker;
+ failed:=false;begin perform public.ma2_customer_register(b1,marker||'@example.invalid','hash','salt',marker,'cipher');exception when unique_violation then failed:=true;end;if not failed then raise exception 'Duplicate registration accepted';end if;
+ if (select count(*) from public.ma2_ops_records where title=marker)<>before_count then raise exception 'Duplicate registration orphaned a client';end if;
+ perform public.ma2_wallet_post(c1,10000,'recharge','Synthetic verification',gen_random_uuid());
+ insert into public.stock_items(id,business_id,platform,account_type,username,password_cipher,sale_price) values(s1,b1,marker,'Completa','fixture','cipher',50),(s2,b2,marker,'Completa','fixture','cipher',50),(s3,b1,marker,'Completa','fixture','cipher',100);
+ failed:=false;begin perform public.ma2_customer_buy(a1,s1,4999,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Wrong price accepted';end if;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s2,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Cross-tenant purchase accepted';end if;
+ failed:=false;begin perform public.ma2_customer_buy(a2,s2,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Unfunded purchase accepted';end if;
+ perform public.ma2_customer_buy(a1,s1,5000,req);perform public.ma2_customer_buy(a1,s1,5000,req);
+ if (select count(*) from public.ma2_wallet_entries where request_id=req)<>1 then raise exception 'Duplicate debit';end if;
+ if not exists(select 1 from public.ma2_customer_orders where id=req and client_id=c1 and business_id=b1 and detail->>'password_cipher'='cipher') then raise exception 'Missing private snapshot';end if;
+ if (select status from public.stock_items where id=s1)<>'assigned' then raise exception 'Stock not assigned';end if;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s1,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Stock sold twice';end if;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s1,5001,req);exception when others then failed:=true;end;if not failed then raise exception 'Changed replay accepted';end if;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,10000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Overdraft accepted';end if;
+ if (select status from public.stock_items where id=s3)<>'available' then raise exception 'Failed debit assigned stock';end if;
+ update public.stock_items set sale_price=50,password_cipher='' where id=s3;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Missing credentials sold';end if;
+ update public.stock_items set password_cipher='cipher',starts_on_sale=false,expires_on=today-1 where id=s3;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Expired credentials sold';end if;
+ update public.stock_items set starts_on_sale=true,expires_on=null where id=s3;
+ update public.ma2_customer_accounts set must_change=true where id=a1;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Temporary password bypass';end if;
+ update public.ma2_customer_accounts set must_change=false,active=false where id=a1;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Suspended account purchased';end if;
+ update public.ma2_customer_accounts set active=true where id=a1;
+ update public.menu_businesses set expires_on=today-1 where id=b1;
+ failed:=false;begin perform public.ma2_customer_buy(a1,s3,5000,gen_random_uuid());exception when others then failed:=true;end;if not failed then raise exception 'Expired shop purchased';end if;
+ failed:=false;begin perform public.ma2_customer_register(b1,marker||'-expired@example.invalid','h','s',marker,'cipher');exception when others then failed:=true;end;if not failed then raise exception 'Expired shop registered';end if;
+ if not public.ma2_customer_limit(marker,2,900) or not public.ma2_customer_limit(marker,2,900) or public.ma2_customer_limit(marker,2,900) then raise exception 'Rate limit threshold failed';end if;
+ update public.ma2_customer_limits set window_start=now()-interval '901 seconds' where key=marker;if not public.ma2_customer_limit(marker,2,900) then raise exception 'Rate limit reset failed';end if;
+ insert into public.notification_log(id,channel,kind,status,detail) values(sale,'ma2_sale','fixture','pending','cipher');
+ failed:=false;begin perform public.ma2_activate_shop(sale,marker,'Fixture','0000000000','Fixture',1,marker||'-shop',marker||'-shop','h','s','{"stock_manager":true}');exception when others then failed:=true;end;if not failed then raise exception 'Unpaid shop activated';end if;
+ update public.notification_log set status='paid' where id=sale;
+ j:=public.ma2_activate_shop(sale,marker,'Fixture','0000000000','Fixture',1,marker||'-shop',marker||'-shop','h','s','{"stock_manager":true}');k:=public.ma2_activate_shop(sale,marker,'Fixture','0000000000','Fixture',1,marker||'-shop',marker||'-shop','x','x','{"stock_manager":true}');
+ if j->>'created'<>'true' or k->>'created'<>'false' or j->>'businessId'<>k->>'businessId' then raise exception 'Activation duplicated';end if;
+ if not exists(select 1 from public.menu_businesses where id=(j->>'businessId')::uuid and access_temp and renewal_price=1 and expires_on=(today+interval '1 month')::date) then raise exception 'Monthly license mismatch';end if;
+ foreach role_name in array array['anon','authenticated'] loop
+ foreach tbl in array array['ma2_customer_accounts','ma2_customer_sessions','ma2_customer_limits','ma2_customer_orders','ma2_shop_licenses'] loop
+ if has_table_privilege(role_name,'public.'||tbl,'SELECT') or has_table_privilege(role_name,'public.'||tbl,'INSERT') or has_table_privilege(role_name,'public.'||tbl,'UPDATE') then raise exception 'Public access leak';end if;
+ if not exists(select 1 from pg_class c join pg_namespace ns on ns.oid=c.relnamespace where ns.nspname='public' and c.relname=tbl and c.relrowsecurity) then raise exception 'RLS missing';end if;
+ end loop;
+ if has_function_privilege(role_name,'public.ma2_customer_buy(uuid,uuid,bigint,uuid)','EXECUTE') or has_function_privilege(role_name,'public.ma2_customer_register(uuid,text,text,text,text,text)','EXECUTE') then raise exception 'RPC grant leak';end if;
+ end loop;
+ select sum(amount_cents) into balance from public.ma2_wallet_entries where client_id=c1;if balance<>5000 then raise exception 'Final balance mismatch';end if;
+end;$$;
+rollback;
+select 'Registration, tenant isolation, wallet purchases, replays, stock, expiry, monthly activation, limits and permissions verified; synthetic data rolled back.' as verification;

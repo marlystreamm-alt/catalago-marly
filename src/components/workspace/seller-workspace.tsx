@@ -1,3 +1,4 @@
+import { CustomerManager } from "@/components/customer/customer-manager";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -609,6 +610,13 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
         </div>
         {resource(tab === "main" ? "questions" : "faq")}
       </>
+    );
+  else if (section === "clients")
+    content = (
+      <div className="space-y-5">
+        <CustomerManager slug="ma2" records={records} />
+        {resource("clients")}
+      </div>
     );
   else if (section === "gallery")
     content = (

@@ -97,15 +97,13 @@ export const customerManageCredit = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const ctx = await context(data),
       a = await account(ctx, data.accountId);
-    const r = await ctx.s
-      .opsDB()
-      .rpc("ma2_wallet_post", {
-        p_client: a.client_id,
-        p_amount: Math.round(data.amount * 100),
-        p_kind: "recharge",
-        p_note: data.note,
-        p_request: data.requestId,
-      });
+    const r = await ctx.s.opsDB().rpc("ma2_wallet_post", {
+      p_client: a.client_id,
+      p_amount: Math.round(data.amount * 100),
+      p_kind: "recharge",
+      p_note: data.note,
+      p_request: data.requestId,
+    });
     if (r.error) throw new Error("No se pudo acreditar. Actualiza el saldo antes de reintentar");
     return { ok: true };
   });

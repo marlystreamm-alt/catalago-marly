@@ -1,4 +1,8 @@
-import {customerRechargeLoad,customerRechargeCreate,customerRechargeCancel} from '@/lib/customer/customer.functions';
+import {
+  customerRechargeLoad,
+  customerRechargeCreate,
+  customerRechargeCancel,
+} from "@/lib/customer/customer.functions";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,12 +18,12 @@ export function CustomerRecharge({
   id,
   token,
   onBalanceChange,
-shopSlug,
+  shopSlug,
 }: {
   id: string;
   token: string;
   onBalanceChange: () => Promise<void>;
-shopSlug?:string;
+  shopSlug?: string;
 }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof rechargePortalLoad>> | null>(null);
   const [amount, setAmount] = useState("");
@@ -27,7 +31,11 @@ shopSlug?:string;
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
-      setData(shopSlug?await customerRechargeLoad({data:{slug:shopSlug}}):await rechargePortalLoad({data:{id,token}}));
+      setData(
+        shopSlug
+          ? await customerRechargeLoad({ data: { slug: shopSlug } })
+          : await rechargePortalLoad({ data: { id, token } }),
+      );
       setError("");
     } catch {
       setError("No se pudieron cargar las recargas. Intenta actualizar.");
@@ -67,7 +75,11 @@ shopSlug?:string;
               e.preventDefault();
               setBusy(true);
               try {
-                if(shopSlug)await customerRechargeCreate({data:{slug:shopSlug,amount:Number(amount)}});else await rechargeCreate({data:{id,token,amount:Number(amount)}});
+                if (shopSlug)
+                  await customerRechargeCreate({
+                    data: { slug: shopSlug, amount: Number(amount) },
+                  });
+                else await rechargeCreate({ data: { id, token, amount: Number(amount) } });
                 setAmount("");
                 await load();
               } catch (e) {
@@ -162,7 +174,11 @@ shopSlug?:string;
                         return;
                       setBusy(true);
                       try {
-                        if(shopSlug)await customerRechargeCancel({data:{slug:shopSlug,requestId:r.id}});else await rechargeCancel({data:{id,token,requestId:r.id}});
+                        if (shopSlug)
+                          await customerRechargeCancel({
+                            data: { slug: shopSlug, requestId: r.id },
+                          });
+                        else await rechargeCancel({ data: { id, token, requestId: r.id } });
                         await load();
                       } catch (e) {
                         toast.error(e instanceof Error ? e.message : "No se pudo cancelar");
