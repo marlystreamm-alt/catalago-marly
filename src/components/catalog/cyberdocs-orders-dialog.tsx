@@ -78,7 +78,8 @@ import {
   type CyberDocsStockOption,
 } from "@/lib/cyberdocs/types";
 import type { DeliveryAttachment } from "@/lib/deliveries/types";
-import { getPrimaryFichaTemplate, renderDeliveryFicha, loadPanelPresets, type PanelPreset } from "@/lib/delivery-fichas";
+import { loadPanelPresets, type PanelPreset } from "@/lib/delivery-fichas";
+import { buildOrderDeliveryMessage, type DeliveryMessageKind } from "@/lib/cyberdocs/delivery-message";
 import { getSavedCode } from "@/lib/notify/client";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -163,10 +164,6 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   const [linkTemplate, setLinkTemplate] = useState("Hola {cliente} 😊 Te entrego tu servicio de {plataforma}.\n🔗 Documento: {link}\n⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía.");
   const [passwordTemplate, setPasswordTemplate] = useState("Hola {cliente} 😊\n🔐 Contraseña de tu documento protegido: {contraseña}\n🔗 El link de tu compra está disponible en la plataforma Cyberdoc.");
   const [combinedTemplate, setCombinedTemplate] = useState("Hola {cliente} 👋\nTe hago entrega de los datos correspondientes a tu compra de {plataforma}.\n🔗 Enlace: {link}\n🔐 Contraseña: {contraseña}");
-  const [lastLinkMessage, setLastLinkMessage] = useState("");
-  const [lastPasswordMessage, setLastPasswordMessage] = useState("");
-  const [lastCombinedMessage, setLastCombinedMessage] = useState("");
-  const [lastDeliveryLink, setLastDeliveryLink] = useState("");
   const [showFallback, setShowFallback] = useState(false);
   const [newBotUsername, setNewBotUsername] = useState("");
   const [newBotLabel, setNewBotLabel] = useState("");
@@ -176,11 +173,6 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   const [renewalWarningDays, setRenewalWarningDays] = useState("3");
   const [orderFilter, setOrderFilter] = useState<"all" | "pending" | "in_process" | "completed">("all");
   const code = getSavedCode();
-  const fillTemplate = useCallback((template: string, values: Record<string,string>) => template
-    .replaceAll("{cliente}", values.cliente || "")
-    .replaceAll("{plataforma}", values.plataforma || "")
-    .replaceAll("{link}", values.link || "")
-    .replaceAll("{contraseña}", values.contraseña || ""), []);
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("ma2_delivery_message_templates") || "{}");
@@ -262,10 +254,6 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   useEffect(() => {
     if (open && selectedId) void loadEvents(selectedId);
     else setEvents([]);
-    setLastLinkMessage("");
-    setLastPasswordMessage("");
-    setLastCombinedMessage("");
-    setLastDeliveryLink("");
   }, [open, selectedId, loadEvents]);
   useEffect(() => {
     setOrderWhatsApp(
@@ -311,40 +299,23 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
     }
   };
 
-  const deliveryMessages = async (result: { order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string }) => {
-    const deliveryId = result.order.protectedDeliveryId;
-    if (!deliveryId) return;
-    const absoluteLink = `${window.location.origin}/e/${deliveryId}?t=${encodeURIComponent(result.token)}`;
-    const linkMessage = fillTemplate(linkTemplate, { cliente: result.order.clientName || "", plataforma: result.order.serviceName || "", link: absoluteLink, contraseña: "" });
-    const passMessage = withPassword ? fillTemplate(passwordTemplate, { cliente: result.order.clientName || "", plataforma: result.order.serviceName || "", link: absoluteLink, contraseña: accessPassword }) : "";
-    setLastDeliveryLink(absoluteLink);
-    setLastLinkMessage(linkMessage);
-    setLastPasswordMessage(passMessage);
-    setLastCombinedMessage(withPassword ? fillTemplate(combinedTemplate, { cliente: result.order.clientName || "", plataforma: result.order.serviceName || "", link: absoluteLink, contraseña: accessPassword }) : "");
-    toast.success(withPassword ? "Entrega creada · mensajes listos para enviar" : "Entrega sin contraseña creada · mensaje de link listo");
+  const shareDeliveryMessage = async (kind: DeliveryMessageKind, whatsapp = false) => {
+    if (!selected) return;
+    try {
+      // Read the saved delivery every time, including when reopening a completed order.
+      const result = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } });
+      const message = buildOrderDeliveryMessage(
+        { link: linkTemplate, password: passwordTemplate, combined: combinedTemplate },
+        { client: selected.clientName || "", platform: selected.serviceName || "",
+          link: `${window.location.origin}/e/${result.id}?t=${encodeURIComponent(result.token)}`,
+          accessPassword: result.accessPassword },
+        kind,
+      );
+      if (!message) return toast.info("Este documento no tiene contraseña de protección");
+      if (whatsapp) await openWhatsApp(message);
+      else { await copyText(message); toast.success("Mensaje completo copiado"); }
+    } catch (error) { toast.error(errorText(error)); }
   };
-
-  const copyLinkMessage = async () => {
-    if (!lastLinkMessage) return toast.info("Primero crea una entrega");
-    await copyText(lastLinkMessage);
-    toast.success("Mensaje con link copiado");
-  };
-  const sendLinkWhatsApp = async () => {
-    if (!lastLinkMessage) return toast.info("Primero crea una entrega");
-    await openWhatsApp(lastLinkMessage);
-  };
-  const copyPasswordMessage = async () => {
-    if (!lastPasswordMessage) return toast.info("Esta entrega no tiene contraseña");
-    await copyText(lastPasswordMessage);
-    toast.success("Mensaje con contraseña copiado");
-  };
-  const sendPasswordWhatsApp = async () => {
-    if (!lastPasswordMessage) return toast.info("Esta entrega no tiene contraseña");
-    await openWhatsApp(lastPasswordMessage);
-  };
-
-  const copyCombinedMessage = async () => { if (!lastCombinedMessage) return toast.info("Esta entrega no tiene enlace + contraseña"); await copyText(lastCombinedMessage); toast.success("Enlace + contraseña copiados"); };
-  const sendCombinedWhatsApp = async () => { if (!lastCombinedMessage) return toast.info("Esta entrega no tiene enlace + contraseña"); await openWhatsApp(lastCombinedMessage); };
 
   const saveOrderWhatsApp = async () => {
     if (!selected) return;
@@ -412,7 +383,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
         notes: deliveryNotes, attachment: deliveryAttachment,
       }});
       replaceOrder(result.order);
-      await deliveryMessages(result);
+      toast.success("Entrega creada · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setStockItemId(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       await refresh();
     } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
@@ -435,9 +406,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
         maxViews: Number(maxViews) > 0 ? Number(maxViews) : null, notes: deliveryNotes, attachment: deliveryAttachment,
       }});
       replaceOrder(result.order);
-      await deliveryMessages(result);
-      const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: manualPlatform.trim(), username: manualUsername, password: manualPassword, profilePin: manualPin, link: manualType === "link" ? manualLink : "", panelUrl: manualType === "full" ? manualLink : "", panelUsername: manualPanelUsername, panelPassword: manualPanelPassword });
-      if (ficha) { await copyText(ficha); toast.success("Entrega realizada · ficha copiada"); }
+      toast.success("Entrega creada · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       setManualUsername(""); setManualPassword(""); setManualPin(""); setManualLink(""); setManualPanelUsername(""); setManualPanelPassword("");
       await refresh();
@@ -719,7 +688,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
               <Textarea rows={5} value={passwordTemplate} onChange={(e) => setPasswordTemplate(e.target.value)} placeholder="Usa {cliente} y {contraseña}" />
               <p className="text-[11px] text-muted-foreground">Variables: {'{cliente}'} · {'{contraseña}'}</p>
             </div>
-            <div className="grid gap-2 sm:col-span-2"><Label>Mensaje alternativo · LINK + CONTRASEÑA</Label><Textarea rows={5} value={combinedTemplate} onChange={(e) => setCombinedTemplate(e.target.value)} placeholder="Usa {cliente}, {plataforma}, {link} y {contraseña}" /><p className="text-[11px] text-muted-foreground">Variables: {'{cliente}'} · {'{plataforma}'} · {'{link}'} · {'{contraseña}'}</p></div><Button type="button" variant="outline" className="sm:col-span-2" onClick={saveMessageTemplates}>Guardar mensajes</Button>
+            <div className="grid gap-2 sm:col-span-2"><Label>Mensaje completo · LINK + CONTRASEÑA</Label><Textarea rows={5} value={combinedTemplate} onChange={(e) => setCombinedTemplate(e.target.value)} placeholder="Usa {cliente}, {plataforma}, {link} y {contraseña}" /><p className="text-[11px] text-muted-foreground">Variables: {'{cliente}'} · {'{plataforma}'} · {'{link}'} · {'{contraseña}'}</p></div><Button type="button" variant="outline" className="sm:col-span-2" onClick={saveMessageTemplates}>Guardar mensajes</Button>
           </div>
         </details>
 
@@ -1063,40 +1032,38 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                         </div>
                       ) : null}
 
-                      {selected.protectedDeliveryId ? (
+                      {selected.protectedDeliveryId || selected.status === "completed" ? (
                         <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
-                          <p className="text-sm font-semibold">Entrega vinculada a este pedido</p>
-                          <p className="text-xs">Un solo documento protegido. {selected.stockItemId ? "La cuenta de stock quedó asignada automáticamente." : "Entrega manual registrada."}</p>
+                          <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : "Entrega vinculada a este pedido"}</p>
+                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Documento protegido guardado para este pedido."}</p>
+                          {selected.protectedDeliveryId ? (
+                            <>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button size="sm" onClick={() => void shareDeliveryMessage("combined")}><Copy className="mr-1 size-4" />Copiar mensaje</Button>
+                                <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("combined", true)}><MessageCircle className="mr-1 size-4" />WhatsApp</Button>
+                              </div>
+                              <p className="mt-2 text-xs">Usa tu mensaje de LINK + CONTRASEÑA; si el documento no tiene contraseña, usa tu mensaje de LINK.</p>
+                              <details className="mt-3">
+                                <summary className="cursor-pointer text-xs font-semibold">Enlace, contraseña y mensajes por separado</summary>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => void copyDelivery()}><Link2 className="mr-1 size-4" />Copiar solo enlace</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void copyDocumentPassword(true)}><KeyRound className="mr-1 size-4" />Ver contraseña</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void copyDocumentPassword()}><Copy className="mr-1 size-4" />Copiar solo contraseña</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("link")}>Copiar mensaje LINK</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("password")}>Copiar mensaje CONTRASEÑA</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("link", true)}>WhatsApp LINK</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("password", true)}>WhatsApp CONTRASEÑA</Button>
+                                </div>
+                              </details>
+                            </>
+                          ) : null}
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" onClick={() => void copyDelivery()}><Link2 className="mr-1 size-4" />Copiar enlace</Button><Button size="sm" variant="outline" onClick={() => void copyDocumentPassword(true)}><KeyRound className="mr-1 size-4" />Ver contraseña</Button><Button size="sm" variant="outline" onClick={() => void copyDocumentPassword()}><Copy className="mr-1 size-4" />Copiar contraseña</Button>
                             {selected.stockItemId && !terminal(selected) ? <Button size="sm" variant="outline" onClick={() => void release()}><RotateCcw className="mr-1 size-4" />Liberar cuenta</Button> : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {lastLinkMessage ? (
-                        <div className="rounded-xl border bg-background p-3">
-                          <p className="mb-2 text-sm font-semibold">Mensajes de esta entrega</p>
-                          <div className="flex flex-wrap gap-2">
-                            <Button size="sm" variant="outline" onClick={() => void copyLinkMessage()}><Copy className="mr-1 size-4" />Copiar mensaje LINK</Button>
-                            <Button size="sm" variant="outline" onClick={() => void sendLinkWhatsApp()}><MessageCircle className="mr-1 size-4" />WhatsApp LINK</Button>
-                            {lastPasswordMessage ? <><Button size="sm" variant="outline" onClick={() => void copyPasswordMessage()}><Copy className="mr-1 size-4" />Copiar mensaje CONTRASEÑA</Button><Button size="sm" variant="outline" onClick={() => void sendPasswordWhatsApp()}><MessageCircle className="mr-1 size-4" />WhatsApp CONTRASEÑA</Button><Button size="sm" variant="outline" onClick={() => void copyCombinedMessage()}><Copy className="mr-1 size-4" />Copiar LINK + CONTRASEÑA</Button><Button size="sm" variant="outline" onClick={() => void sendCombinedWhatsApp()}><MessageCircle className="mr-1 size-4" />WhatsApp LINK + CONTRASEÑA</Button></> : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {terminal(selected) && selected.status === "completed" ? (
-                        <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
-                          <p className="text-sm font-semibold">Entrega finalizada</p>
-                          <p className="text-xs">Este pedido quedó en Entregadas. Puedes consultar y copiar lo necesario sin volver a procesarlo.</p>
-                          <div className="mt-2 grid gap-2">
-                            <div className="flex flex-wrap gap-2">
-                              {selected.protectedDeliveryId ? <><Button size="sm" variant="outline" onClick={() => void copyDelivery()}><Link2 className="mr-1 size-4" />Copiar link</Button><Button size="sm" variant="outline" onClick={() => void copyDocumentPassword(true)}><KeyRound className="mr-1 size-4" />Ver contraseña</Button><Button size="sm" variant="outline" onClick={() => void copyDocumentPassword()}><Copy className="mr-1 size-4" />Copiar contraseña</Button></> : null}
-                              {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); const link = `${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`; const text = `Hola ${selected.clientName || ""} 😊 Aquí tienes tu entrega: ${link}`; await openWhatsApp(text); } catch (e) { toast.error(errorText(e)); } }}><MessageCircle className="mr-1 size-4" />WhatsApp</Button> : null}
+                            {selected.status === "completed" ? <>
                               {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); window.open(`${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`, "_blank", "noopener,noreferrer"); } catch (e) { toast.error(errorText(e)); } }}><Link2 className="mr-1 size-4" />Abrir página</Button> : null}
                               <Button size="sm" variant="outline" onClick={() => toast.info(`Pedido ${selected.cyberdocsOrderId} · ${dateTime(selected.finalizedAt || selected.updatedAt)}`)}><Settings2 className="mr-1 size-4" />Configuración</Button>
                               <Button size="sm" variant="outline" onClick={async () => { const notes = window.prompt("Editar nota final:", selected.finalNotes || ""); if (notes === null) return; const pin = window.prompt("PIN para editar:", getSavedCode())?.trim(); if (!pin) return; try { replaceOrder(await cyberdocsEditFinalNotes({ data: { code: pin, orderId: selected.id, pin, notes } })); toast.success("Entrega actualizada"); } catch (e) { toast.error(errorText(e)); } }}><Pencil className="mr-1 size-4" />Editar</Button>
-                            </div>
+                            </> : null}
                           </div>
                         </div>
                       ) : null}
