@@ -37,12 +37,14 @@ import { cyberdocsListOrders } from "@/lib/cyberdocs/cyberdocs.functions";
 import type { CyberDocsOrder } from "@/lib/cyberdocs/types";
 import {
   stockAdminDelete,
+  stockAdminConvertProfiles,
   stockAdminDeliver,
   stockAdminHistory,
   stockAdminList,
   stockAdminSave,
   stockAdminProtectedLink,
   stockOwnerDelete,
+  stockOwnerConvertProfiles,
   stockOwnerDeliver,
   stockOwnerHistory,
   stockOwnerList,
@@ -147,6 +149,8 @@ export function StockManagerDialog({
 
   const [formOpen, setFormOpen] = useState(autoAdd);
   const [bulkMode, setBulkMode] = useState(false);
+  const [splitOnSave, setSplitOnSave] = useState(false);
+  const [profileCount, setProfileCount] = useState("5");
   const [bulkText, setBulkText] = useState("");
   const [form, setForm] = useState<StockItem>(blank());
   const [showPass, setShowPass] = useState(false);
@@ -242,10 +246,22 @@ export function StockManagerDialog({
     if (!form.platform.trim()) return toast.error("Escribe la plataforma");
     if (form.id && !can("stock_edit")) return toast.error("No tienes permiso para editar stock");
     if (!form.id && !can("stock_add")) return toast.error("No tienes permiso para agregar stock");
-    if (!window.confirm("¿Está seguro de guardar estos cambios?")) return;
+    const splitting = !bulkMode && form.stockKind === "complete" && form.status === "available" && splitOnSave;
+    const count = Number(profileCount);
+    if (splitting && (!can("stock_edit") || !can("stock_add"))) return toast.error("Necesitas permiso para agregar y editar stock");
+    if (splitting && (!Number.isInteger(count) || count < 1 || count > 10)) return toast.error("Indica entre 1 y 10 perfiles");
+    if (!window.confirm(splitting ? `¿Guardar esta cuenta y convertirla en ${count} perfiles?` : "¿Está seguro de guardar estos cambios?")) return;
     setBusy(true);
     try {
-      await persist({ ...form, stockKind: form.stockKind || "complete", accountType: form.stockKind === "profile" ? "Perfil" : "Completa" });
+      const saved = await persist({ ...form, stockKind: form.stockKind || "complete", accountType: form.stockKind === "profile" ? "Perfil" : "Completa" }, "");
+      // If conversion fails, keep the saved id so retrying cannot insert the complete again.
+      setForm(saved);
+      if (splitting) await splitAccount(saved.id, count);
+      setStockKindTab(splitting ? "profile" : saved.stockKind);
+      if (splitting || saved.status === "available") setStockTab("available");
+      setQ(""); setSplitOnSave(false);
+      await load();
+      toast.success(splitting ? `${count} perfiles creados` : "Registro guardado");
       setForm(blank());
       setFormOpen(false);
     } catch (e) {
@@ -269,6 +285,7 @@ export function StockManagerDialog({
         // En modo lote nunca reutilizar credenciales capturadas previamente en modo individual.
         await persist({ ...form, id: "", stockKind: form.stockKind, accountType: form.stockKind === "profile" ? "Perfil" : "Completa", parentStockId: null, username, password, profilePin, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "", renewalNotifiedAt: null }, "");
       }
+      setStockKindTab(form.stockKind); setStockTab("available"); setQ("");
       setBulkText("");
       setForm(blank());
       setFormOpen(false);
@@ -281,15 +298,26 @@ export function StockManagerDialog({
     }
   }
 
+  async function splitAccount(id: string, count: number) {
+    return ownerToken
+      ? stockOwnerConvertProfiles({ data: { token: ownerToken, id, count } })
+      : stockAdminConvertProfiles({ data: { code: getSavedCode(), id, count } });
+  }
+
   async function convertToProfiles(x: StockItem) {
-    if (x.stockKind === "profile" || x.status !== "available") return;
+    if (busy || x.stockKind === "profile" || x.status !== "available") return;
+    if (!can("stock_edit") || !can("stock_add")) return toast.error("Necesitas permiso para agregar y editar stock");
     const raw = window.prompt("¿Cuántos perfiles quieres sacar de esta cuenta completa?", "5");
-    if (raw === null) return; const count = Math.max(1, Math.min(10, Number(raw) || 0)); if (!count) return toast.error("Cantidad inválida");
+    if (raw === null) return;
+    const count = Number(raw);
+    if (!Number.isInteger(count) || count < 1 || count > 10) return toast.error("Indica entre 1 y 10 perfiles");
     if (!window.confirm(`Se crearán ${count} perfiles y la completa dejará de estar disponible. ¿Continuar?`)) return;
-    setBusy(true); try {
-      for (let i=1;i<=count;i++) await persist({ ...x, id:"", stockKind:"profile", parentStockId:x.id, accountType:"Perfil", profilePin:`Perfil ${i}`, status:"available", clientName:"", clientWhatsapp:"", deliveredOn:null, relatedOrderId:"", protectedDeliveryId:"", notes:`Perfil ${i} derivado de cuenta completa` }, "");
-      await persist({ ...x, status:"expired", notes:`${x.notes ? x.notes+"\n" : ""}Convertida a ${count} perfiles` }, ""); await load(); setToolsItem(null); setStockKindTab("profile"); toast.success(`${count} perfiles creados`);
-    } catch(e){ toast.error(err(e)); } finally { setBusy(false); }
+    setBusy(true);
+    try {
+      await splitAccount(x.id, count);
+      await load(); setToolsItem(null); setStockKindTab("profile"); setStockTab("available"); setQ("");
+      toast.success(`${count} perfiles creados`);
+    } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
 
   async function revertToComplete(x: StockItem) {
@@ -310,15 +338,24 @@ export function StockManagerDialog({
   async function remove(id: string) {
     if (!can("stock_delete")) return toast.error("No tienes permiso para eliminar stock");
     if (!confirm("¿Eliminar este registro de stock?")) return;
+    if (busy) return;
+    const deleted = items.find(x => x.id === id);
+    setBusy(true);
     try {
       const adminCode = getSavedCode();
       ownerToken ? await stockOwnerDelete({ data: { token: ownerToken, id } }) : await stockAdminDelete({ data: { code: adminCode, id } });
       setItems((p) => p.filter((x) => x.id !== id));
       setToolsItem(null);
-      toast.success("Registro eliminado");
+      setForm(blank()); setSplitOnSave(false);
+      toast.success("Registro eliminado. Puedes volver a agregarlo.", deleted && deleted.status === "available" && can("stock_add") ? {
+        action: { label: "Agregar de nuevo", onClick: () => {
+          setForm({ ...deleted, id: "", status: "available", clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", protectedDeliveryId: "", renewalStatus: "", renewalNotifiedAt: null });
+          setStockKindTab(deleted.stockKind); setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
+        } },
+      } : undefined);
     } catch (e) {
       toast.error(err(e));
-    }
+    } finally { setBusy(false); }
   }
 
   async function openHistory(item: StockItem) {
@@ -497,7 +534,7 @@ export function StockManagerDialog({
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
               <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Selecciona una subpestaña. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") ? <Button onClick={() => { setForm({...blank(),stockKind:stockKindTab}); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />{stockKindTab==="profile"?"Agregar perfiles":"Agregar completas"}</Button> : null}
+              {can("stock_add") ? <Button onClick={() => { setForm({...blank(),stockKind:stockKindTab,accountType:stockKindTab === "profile" ? "Perfil" : "Completa"}); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />{stockKindTab==="profile"?"Agregar perfiles":"Agregar completas"}</Button> : null}
             </div>
 
             <div className="flex flex-wrap gap-2"><Button size="sm" variant={stockKindTab === "complete" ? "default" : "outline"} onClick={() => setStockKindTab("complete")}>📺 Completas</Button><Button size="sm" variant={stockKindTab === "profile" ? "default" : "outline"} onClick={() => setStockKindTab("profile")}>👤 Perfiles</Button></div>
@@ -527,10 +564,10 @@ export function StockManagerDialog({
             </div>
           </div>
 
-        <Dialog open={formOpen} onOpenChange={(value) => { setFormOpen(value); if (!value) { setForm(blank()); setBulkMode(false); } }}>
+        <Dialog open={formOpen} onOpenChange={(value) => { setFormOpen(value); if (!value) { setForm(blank()); setBulkMode(false); setSplitOnSave(false); } }}>
           <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
             <DialogHeader><DialogTitle>{form.id ? "Editar cuenta" : "Agregar stock"}</DialogTitle><DialogDescription>{form.id ? "Edita todos los datos del registro." : "Aquí solo capturas datos del stock. Cliente y entrega se solicitan únicamente al vender."}</DialogDescription></DialogHeader>
-            {!form.id ? <div className="flex gap-2"><Button size="sm" variant={!bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(false); setBulkText(""); }}>Agregar individual</Button><Button size="sm" variant={bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(true); setForm((current) => ({ ...current, username: "", password: "", profilePin: "" })); }}>Agregar por lote</Button></div> : null}
+            {!form.id ? <div className="flex gap-2"><Button size="sm" variant={!bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(false); setBulkText(""); }}>Agregar individual</Button><Button size="sm" variant={bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(true); setSplitOnSave(false); setForm((current) => ({ ...current, username: "", password: "", profilePin: "" })); }}>Agregar por lote</Button></div> : null}
             <div ref={formRef} className="grid gap-3 sm:grid-cols-3">
               <div><Label>Plataforma</Label><Input value={form.platform} onChange={(e) => setForm({ ...form, platform: e.target.value })} /></div>
               <div><Label>Tipo de stock</Label><Select value={form.stockKind} disabled={Boolean(form.id)} onValueChange={v=>setForm({...form,stockKind:v as "complete"|"profile",accountType:v==="profile"?"Perfil":"Completa"})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="complete">Cuenta completa</SelectItem><SelectItem value="profile">Perfil individual</SelectItem></SelectContent></Select></div>
@@ -547,9 +584,15 @@ export function StockManagerDialog({
               <div className="sm:col-span-3 rounded-2xl border bg-muted/20 p-3 space-y-3"><Label>¿De cuánto tiempo es la cuenta?</Label><div className="flex flex-wrap gap-2">{[1,2,3,6,12].map(months=><Button key={months} type="button" size="sm" variant={(form.durationMonths||1)===months?"default":"outline"} onClick={()=>setForm({...form,durationMonths:months})}>{months===12?"1 año":`${months} ${months===1?"mes":"meses"}`}</Button>)}</div><label className="flex items-center justify-between gap-3 text-sm"><span>Contar la vigencia desde la venta</span><Switch checked={form.startsOnSale!==false} onCheckedChange={v=>setForm({...form,startsOnSale:v})}/></label><p className="text-xs text-muted-foreground">{form.startsOnSale!==false?"Al entregar, se propondrá el vencimiento automáticamente. Puedes ajustarlo antes de confirmar.":"Si no indicas un vencimiento base, se calcula desde la fecha de compra."}</p></div><div><Label>Vencimiento base</Label><Input type="date" value={form.expiresOn || ""} onChange={(e) => setForm({ ...form, expiresOn: e.target.value || null })} /></div>
               {form.id && form.status !== "available" ? <><div><Label>Cliente</Label><Input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} /></div><div><Label>WhatsApp</Label><Input value={form.clientWhatsapp} onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })} /></div><div><Label>Pedido relacionado</Label><Input value={form.relatedOrderId} onChange={(e) => setForm({ ...form, relatedOrderId: e.target.value })} /></div></> : null}
               <div className="sm:col-span-3"><Label>Notas privadas</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-              {bulkMode ? <div className="sm:col-span-3"><Label>Cuentas del lote</Label><Textarea rows={7} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={'correo1@ejemplo.com | contraseña1 | PIN1\ncorreo2@ejemplo.com | contraseña2 | PIN2'} /><p className="mt-1 text-[11px] text-muted-foreground">Una cuenta por renglón: correo/usuario | contraseña | PIN. Se evita duplicar correos/usuarios ya registrados.</p></div> : null}
+              {bulkMode ? <div className="sm:col-span-3"><Label>Cuentas del lote</Label><Textarea rows={7} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={'correo1@ejemplo.com | contraseña1 | PIN1\ncorreo2@ejemplo.com | contraseña2 | PIN2'} /><p className="mt-1 text-[11px] text-muted-foreground">Una cuenta por renglón: correo/usuario | contraseña | PIN. Las completas se revisan por plataforma y correo. Los perfiles pueden compartir correo.</p></div> : null}
             </div>
-            <div className="flex gap-2"><Button onClick={() => void (bulkMode ? saveBulk() : save())} disabled={busy}><Plus className="mr-1 size-4" />{form.id ? "Guardar cambios" : bulkMode ? "Agregar lote" : "Agregar cuenta"}</Button><Button variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button></div>
+            {!bulkMode && form.stockKind === "complete" && form.status === "available" && can("stock_add") && can("stock_edit") ? (
+              <div className="space-y-3 rounded-xl border p-3">
+                <label className="flex items-center justify-between gap-3 text-sm"><span>Guardar y convertir a perfiles</span><Switch checked={splitOnSave} onCheckedChange={setSplitOnSave} /></label>
+                {splitOnSave ? <div><Label>Cantidad de perfiles (1 a 10)</Label><Input type="number" min={1} max={10} step={1} value={profileCount} onChange={e => setProfileCount(e.target.value)} /><p className="mt-2 text-xs text-muted-foreground">Los perfiles conservarán el correo, contraseña, panel y vigencia. La completa quedará fuera de Disponibles.</p></div> : null}
+              </div>
+            ) : null}
+            <div className="flex gap-2"><Button onClick={() => void (bulkMode ? saveBulk() : save())} disabled={busy}><Plus className="mr-1 size-4" />{!bulkMode && form.stockKind === "complete" && splitOnSave ? "Guardar y convertir a perfiles" : form.id ? "Guardar cambios" : bulkMode ? "Agregar lote" : form.stockKind === "profile" ? "Agregar perfil" : "Agregar cuenta completa"}</Button><Button variant="outline" onClick={() => setFormOpen(false)}>Cancelar</Button></div>
           </DialogContent>
         </Dialog>
 
@@ -577,8 +620,8 @@ export function StockManagerDialog({
                 {can("stock_view_password") && toolsItem.panelPassword ? <Button size="sm" variant="outline" onClick={() => void copyValue("Contraseña del panel", toolsItem.panelPassword)}><Copy className="mr-1 size-3.5" />Clave panel</Button> : null}
                 {can("stock_view_password") ? <Button size="sm" variant="outline" onClick={() => void copyFullAccess(toolsItem)}><Copy className="mr-1 size-3.5" />Copiar credenciales</Button> : null}
                 {toolsItem.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={() => void copyProtectedLink(toolsItem)}><Copy className="mr-1 size-3.5" />Documento protegido</Button> : null}
-                {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
-                {can("stock_edit") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
+                {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
+                {can("stock_edit") && can("stock_add") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
                 {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>

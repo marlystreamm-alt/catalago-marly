@@ -1708,6 +1708,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      ma2_stock_convert_profiles: {
+        Args: { p_id: string; p_business: string | null; p_count: number };
+        Returns: number;
+      };
       unaccent_fallback: { Args: { txt: string }; Returns: string };
     };
     Enums: {

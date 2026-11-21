@@ -29,3 +29,10 @@ export async function listStockHistory(stockId:string,businessId:string|null){
  q=businessId?q.eq("business_id",businessId):q.is("business_id",null); const {data,error}=await q; if(error) throw new Error(error.message);
  return (data??[]).map((r:any)=>({id:String(r.id),action:String(r.action??""),detail:String(r.detail??""),createdAt:String(r.created_at??"")}));
 }
+
+export async function convertStockProfiles(id:string,businessId:string|null,count:number){
+ const db=await admin();
+ const {data,error}=await db.rpc("ma2_stock_convert_profiles",{p_id:id,p_business:businessId,p_count:count});
+ if(error)throw new Error(error.message);
+ return {count:Number(data)};
+}
