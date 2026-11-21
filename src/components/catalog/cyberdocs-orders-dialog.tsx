@@ -172,6 +172,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   const [deliveredOn, setDeliveredOn] = useState("");
   const [expiresOn, setExpiresOn] = useState("");
   const [renewalWarningDays, setRenewalWarningDays] = useState("3");
+  const [orderSearch, setOrderSearch] = useState("");
   const [orderFilter, setOrderFilter] = useState<"all" | "pending" | "in_process" | "completed">("all");
   const code = getSavedCode();
   useEffect(() => {
@@ -510,7 +511,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   };
 
   const finalizeSelected = async () => {
-    const orderIds = [...checkedIds];
+    const orderIds = selectedVisibleIds;
     if (!orderIds.length) return toast.info("Selecciona al menos un pedido pendiente");
     const pin = window.prompt("PIN para marcar los pedidos como entregados:", getSavedCode())?.trim();
     if (!pin) return;
@@ -655,11 +656,13 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   const pending = orders.filter((order) => !terminal(order)).length;
   const visibleOrders = useMemo(() => [...orders]
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter)), [orders, orderFilter]);
+    .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
+    .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch]);
   const selectableVisibleIds = useMemo(
     () => visibleOrders.filter((order) => !terminal(order)).map((order) => order.id),
     [visibleOrders],
   );
+  const selectedVisibleIds = selectableVisibleIds.filter(id => checkedIds.has(id));
   const allVisibleChecked = Boolean(
     selectableVisibleIds.length && selectableVisibleIds.every((id) => checkedIds.has(id)),
   );
@@ -827,6 +830,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
           </section>
         </details>
 
+        <Input type="search" aria-label="Buscar pedidos" placeholder="Buscar por folio, servicio o cliente" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
         <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
           <Button size="sm" variant="outline" className="shrink-0" onClick={() => { const target = orders.find(o => !terminal(o)); if (target) { setSelectedId(target.id); setDeliverySource("manual"); setManualPlatform(target.serviceName || ""); setManualType("full"); } else toast.info("No hay pedidos pendientes para entrega manual"); }}>Entrega manual</Button>
           {[
@@ -863,10 +867,10 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                 size="sm"
                 className="w-full sm:w-auto"
                 onClick={() => void finalizeSelected()}
-                disabled={busy || checkedIds.size === 0}
+                disabled={busy || selectedVisibleIds.length === 0}
               >
                 <PackageCheck className="mr-1 size-4" />
-                Marcar entregados ({checkedIds.size})
+                Marcar entregados ({selectedVisibleIds.length})
               </Button>
               {checkedIds.size ? (
                 <Button size="sm" variant="ghost" className="w-full sm:w-auto" onClick={() => setCheckedIds(new Set())} disabled={busy}>

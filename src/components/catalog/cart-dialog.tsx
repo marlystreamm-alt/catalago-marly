@@ -27,7 +27,7 @@ export function CartDialog() {
 
   useEffect(() => {
     const sync = () =>
-      setLines(readCart().filter((line) => !line.catalogId || line.catalogId === catalog.id));
+      setLines(readCart(catalog.id));
     sync();
     window.addEventListener("ma2-cart-change", sync);
     return () => window.removeEventListener("ma2-cart-change", sync);
@@ -39,7 +39,7 @@ export function CartDialog() {
     const next = lines
       .map((line) => (line.id === id ? { ...line, qty } : line))
       .filter((line) => line.qty > 0);
-    writeCart(next);
+    writeCart(next, catalog.id);
     setLines(next);
   };
 
@@ -83,7 +83,7 @@ export function CartDialog() {
     });
     setSending(false);
     if (saved) {
-      clearCart();
+      clearCart(catalog.id);
       setLines([]);
       toast.success("Pedido registrado. Se abrió WhatsApp para enviarlo.");
     } else {
@@ -184,7 +184,7 @@ export function CartDialog() {
                 variant="outline"
                 disabled={sending}
                 onClick={() => {
-                  clearCart();
+                  clearCart(catalog.id);
                   setLines([]);
                 }}
               >

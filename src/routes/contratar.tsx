@@ -15,7 +15,8 @@ import { salesCreateRequest, salesGetPublicConfig } from "@/lib/sales/sales.func
 import type { SalesPlan } from "@/lib/sales/types";
 export const Route = createFileRoute("/contratar")({ component: Contratar });
 function Contratar() {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [plans, setPlans] = useState<SalesPlan[]>([]);
   const [instructions, setInstructions] = useState("");
   const [name, setName] = useState("");
@@ -31,20 +32,25 @@ function Contratar() {
   const [error, setError] = useState("");
   useEffect(() => {
     salesGetPublicConfig().then((c) => {
-      setEnabled(c.enabled);
+      setEnabled(c.enabled && c.plans.length > 0);
       setPlans(c.plans);
       setInstructions(c.paymentInstructions);
       setPlan(c.plans[0]?.id ?? "");
+    }).catch(() => {
+      setError("No pudimos cargar los planes.");
+      setEnabled(false);
     });
   }, []);
+  if (enabled === null) return <main className="mx-auto max-w-lg p-6" role="status">Cargando planes…</main>;
   if (!enabled)
     return (
       <main className="mx-auto max-w-lg p-6">
         <div className="rounded-3xl border p-6 text-center">
-          <h1 className="font-bold">Contrataciones en preparación</h1>
+          <h1 className="font-bold">Contrata tu tienda</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            MA² todavía no ha activado las ventas públicas.
+            {error || "Consulta los planes disponibles y solicita tu tienda por WhatsApp."}
           </p>
+          <Button asChild className="mt-4"><a href="https://wa.me/528443852364?text=Hola%2C%20quiero%20contratar%20mi%20tienda">Consultar por WhatsApp</a></Button>
         </div>
       </main>
     );
@@ -132,7 +138,9 @@ function Contratar() {
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button
             className="w-full"
+            disabled={submitting || !name.trim() || !business.trim() || !wa.trim() || !plan}
             onClick={async () => {
+              setSubmitting(true);
               setError("");
               try {
                 const r = await salesCreateRequest({
@@ -152,10 +160,12 @@ function Contratar() {
                 setInstructions(r.paymentInstructions);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "No se pudo registrar");
+              } finally {
+                setSubmitting(false);
               }
             }}
           >
-            Generar referencia
+            {submitting ? "Generando referencia…" : "Generar referencia"}
           </Button>
         </div>
       </section>

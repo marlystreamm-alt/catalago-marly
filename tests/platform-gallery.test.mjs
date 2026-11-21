@@ -44,16 +44,19 @@ const linkedOrders=moduleURL(`
  export const listCyberDocsOrders=async()=>[globalThis.__linkedGallery.order];
  export const assignStockToOrder=async input=>{globalThis.__linkedGallery.assignments.push(input);Object.assign(globalThis.__linkedGallery.order,{stockItemId:input.stockItemId,protectedDeliveryId:'doc-1'});return {order:globalThis.__linkedGallery.order,token:'delivery-token'}};
  export const updateOrderRenewal=async()=>{};
- export const finalizeCyberDocsOrder=async()=>{globalThis.__linkedGallery.order.status='completed'};
+ export const retrySavedDeliveryCompletion=async()=>Object.assign(globalThis.__linkedGallery.order,{status:'completed'});
 `);
 const linkedDeliveries=moduleURL(`export const getDeliveryRow=async()=>({detail:JSON.stringify({status:'active',token:'delivery-token'})});export const decryptPayload=async s=>JSON.parse(s);`);
 const linkedSource=await readFile(new URL('../src/lib/stock/linked-delivery.server.ts',import.meta.url),'utf8');
+const completionSource=await readFile(new URL('../src/lib/cyberdocs/completion.ts',import.meta.url),'utf8');
+const completion=moduleURL(ts.transpileModule(completionSource,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText);
 const linkedCompiled=ts.transpileModule(linkedSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+ .replaceAll('"@/lib/cyberdocs/completion"',JSON.stringify(completion))
  .replaceAll('"@/integrations/supabase/client.server"',JSON.stringify(linkedDB)).replaceAll('"@/lib/cyberdocs/cyberdocs.server"',JSON.stringify(linkedOrders)).replaceAll('"@/lib/deliveries/deliveries.server"',JSON.stringify(linkedDeliveries));
 const linked=await import(moduleURL(linkedCompiled));
 test('stock delivery forwards gallery images to the Cyberdoc document and retry reuses its link',async()=>{
  globalThis.__linkedGallery={order:{id:'order-1',cyberdocsOrderId:'external-1',status:'new',stockItemId:null,protectedDeliveryId:null,clientName:'Fixture'},assignments:[]};
  const input={itemId:'stock-1',relatedOrderId:'order-1',accessPassword:'',expiresAt:'2099-01-01T00:00:00Z',maxViews:null,notes:'',stockExpiresOn:null,salePrice:80,attachment:null,images:[image]};
  const first=await linked.deliverLinkedOrder(input);const retry=await linked.deliverLinkedOrder(input);
- assert.deepEqual(globalThis.__linkedGallery.assignments[0].images,[image]);assert.equal(globalThis.__linkedGallery.assignments.length,1);assert.equal(first.token,retry.token);assert.equal(first.id,'doc-1');
+ assert.deepEqual(globalThis.__linkedGallery.assignments[0].images,[image]);assert.equal(globalThis.__linkedGallery.assignments.length,1);assert.equal(first.token,retry.token);assert.equal(first.id,'doc-1');assert.equal(retry.completionError,null);assert.equal(globalThis.__linkedGallery.order.status,'completed');
 });
