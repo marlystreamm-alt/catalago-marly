@@ -477,6 +477,7 @@ export function StockManagerDialog({
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
       };
       const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload } });
+      if ("completionError" in res && res.completionError) toast.warning(String(res.completionError));
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
       const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl || link, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
       if (ficha) { await copyText(ficha); toast.success("Entrega realizada · ficha copiada"); }

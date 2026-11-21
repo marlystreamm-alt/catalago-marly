@@ -55,6 +55,7 @@ import {
   cyberdocsEditFinalNotes,
   cyberdocsFinalize,
   cyberdocsFinalizeMany,
+  cyberdocsRetryDeliveryCompletion,
   cyberdocsGetDeliveryLink,
   cyberdocsIntegrationStatus,
   cyberdocsListEvents,
@@ -369,6 +370,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
   };
 
   const assign = async () => {
+    if (busy) return;
     if (!selected || !stockItemId) return toast.error("Selecciona una cuenta disponible");
     if (withPassword && (accessPassword.length < 4 || accessPassword !== confirmPassword))
       return toast.error("Revisa la contraseña del documento protegido");
@@ -383,13 +385,15 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
         notes: deliveryNotes, attachment: deliveryAttachment,
       }});
       replaceOrder(result.order);
-      toast.success("Entrega creada · ya puedes copiar tu mensaje");
+      if (result.completionError) toast.warning(result.completionError);
+      else toast.success("Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setStockItemId(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       await refresh();
     } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
   };
 
   const manualDeliver = async () => {
+    if (busy) return;
     if (!selected) return;
     if (!manualPlatform.trim()) return toast.error("Indica la plataforma");
     if (manualType === "link" && !manualLink.trim()) return toast.error("Agrega el link");
@@ -406,7 +410,8 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
         maxViews: Number(maxViews) > 0 ? Number(maxViews) : null, notes: deliveryNotes, attachment: deliveryAttachment,
       }});
       replaceOrder(result.order);
-      toast.success("Entrega creada · ya puedes copiar tu mensaje");
+      if (result.completionError) toast.warning(result.completionError);
+      else toast.success("Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       setManualUsername(""); setManualPassword(""); setManualPin(""); setManualLink(""); setManualPanelUsername(""); setManualPanelPassword("");
       await refresh();
@@ -468,6 +473,16 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
     }
   };
 
+  const retryCompletion = async () => {
+    if (!selected || busy) return;
+    setBusy(true);
+    try {
+      replaceOrder(await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: selected.id } }));
+      toast.success("Pedido finalizado con el documento guardado");
+      await refresh();
+    } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
+  };
+
   const finalize = async () => {
     if (!selected) return;
     const pin = window.prompt("PIN para finalizar el pedido:", getSavedCode())?.trim();
@@ -486,6 +501,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
         await cyberdocsFinalize({ data: { code: pin, orderId: selected.id, pin, confirm: true, notes } }),
       );
       toast.success("Pedido finalizado manualmente");
+      await refresh();
     } catch (error) {
       toast.error(errorText(error));
     } finally {
@@ -1035,7 +1051,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                       {selected.protectedDeliveryId || selected.status === "completed" ? (
                         <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
                           <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : "Entrega vinculada a este pedido"}</p>
-                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Documento protegido guardado para este pedido."}</p>
+                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Documento protegido guardado; el pedido sigue pendiente de cierre."}</p>
                           {selected.protectedDeliveryId ? (
                             <>
                               <div className="mt-3 flex flex-wrap gap-2">
@@ -1058,6 +1074,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                             </>
                           ) : null}
                           <div className="mt-2 flex flex-wrap gap-2">
+                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><RefreshCw className="mr-1 size-4" />Reintentar cierre</Button> : null}
                             {selected.stockItemId && !terminal(selected) ? <Button size="sm" variant="outline" onClick={() => void release()}><RotateCcw className="mr-1 size-4" />Liberar cuenta</Button> : null}
                             {selected.status === "completed" ? <>
                               {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); window.open(`${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`, "_blank", "noopener,noreferrer"); } catch (e) { toast.error(errorText(e)); } }}><Link2 className="mr-1 size-4" />Abrir página</Button> : null}

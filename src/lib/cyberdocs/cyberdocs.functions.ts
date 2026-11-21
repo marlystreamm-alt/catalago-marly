@@ -104,7 +104,7 @@ export const cyberdocsAssignStock = createServerFn({ method: "POST" })
       })
       .parse(value),
   )
-  .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string }> => {
+  .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string; completionError: string | null }> => {
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
     return server.assignStockToOrder(data);
@@ -130,7 +130,7 @@ export const cyberdocsManualDelivery = createServerFn({ method: "POST" })
       attachment: z.object({ name: z.string().min(1).max(240), type: z.string().max(160).default("application/octet-stream"), dataUrl: z.string().max(8_000_000) }).nullable().default(null),
     }).parse(value),
   )
-  .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string }> => {
+  .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string; completionError: string | null }> => {
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
     return server.createManualDeliveryForOrder(data);
@@ -160,6 +160,14 @@ export const cyberdocsFinalize = createServerFn({ method: "POST" })
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
     return server.finalizeCyberDocsOrder(data.orderId, data.notes, "Administradora", data.pin);
+  });
+
+export const cyberdocsRetryDeliveryCompletion = createServerFn({ method: "POST" })
+  .validator((value: unknown) => orderInput.parse(value))
+  .handler(async ({ data }): Promise<CyberDocsOrder> => {
+    await authorize(data.code);
+    const server = await import("./cyberdocs.server");
+    return server.retrySavedDeliveryCompletion(data.orderId);
   });
 
 export const cyberdocsFinalizeMany = createServerFn({ method: "POST" })

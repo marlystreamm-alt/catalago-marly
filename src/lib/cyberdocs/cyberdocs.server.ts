@@ -1,3 +1,4 @@
+import { completeSavedDelivery } from "./completion";
 import type { ProtectedDeliveryPrivate } from "@/lib/deliveries/types";
 import type {
   CyberDocsIntegrationStatus,
@@ -445,9 +446,15 @@ export async function assignStockToOrder(input: {
   attachment: { name: string; type: string; dataUrl: string } | null;
   actor?: string;
   images?: string[];
+  stockExpiresOn?: string | null;
+  salePrice?: number;
 }) {
   const actor = input.actor || "Administradora";
   const order = await getCyberDocsOrder(input.orderId);
+  if (order.protectedDeliveryId) {
+    if (order.stockItemId !== input.stockItemId) throw new Error("Este pedido ya tiene otra entrega");
+    return savedDeliveryResult(order, actor);
+  }
   ensureEditable(order);
   if (order.stockItemId)
     throw new Error("Este pedido ya tiene stock asignado; libéralo antes de cambiarlo");
@@ -503,82 +510,11 @@ export async function assignStockToOrder(input: {
     await deliveryServer.saveDeliveryRow(insertedDelivery.id, deliveryDraft);
   }
 
-  const snapshot = {
-    status: item.status,
-    client_name: item.clientName,
-    client_whatsapp: item.clientWhatsapp,
-    delivered_on: item.deliveredOn,
-    related_order_id: item.relatedOrderId,
-    protected_delivery_id: item.protectedDeliveryId || null,
-  };
-  const db = await database();
-  const { data: reserved, error: reserveError } = await db
-    .from("stock_items")
-    .update({
-      status: "assigned",
-      client_name: order.clientName,
-      client_whatsapp: order.whatsapp || (order.contactLabel === "WhatsApp" ? order.contactValue : ""),
-      delivered_on: now.slice(0, 10),
-      related_order_id: order.cyberdocsOrderId,
-      protected_delivery_id: insertedDelivery?.id ?? null,
-      updated_at: now,
-    })
-    .eq("id", item.id)
-    .eq("status", "available")
-    .select("id")
-    .maybeSingle();
-  if (reserveError || !reserved) {
-    if (insertedDelivery) await revokeDelivery(
-      insertedDelivery.id,
-      "Asignación cancelada porque el stock dejó de estar disponible",
-    );
-    throw new Error(
-      reserveError?.message || "La cuenta dejó de estar disponible durante la asignación",
-    );
-  }
+  if (!insertedDelivery) throw new Error("No se guardó el documento protegido");
+  const linked = await linkSavedDelivery(order.id, insertedDelivery.id, item.id, actor,
+    `Stock asignado al pedido y documento protegido creado`, input.stockExpiresOn ?? null, input.salePrice ?? null);
+  return savedDeliveryResult(linked, actor);
 
-  const { data, error } = await db
-    .from("cyberdocs_orders")
-    .update({
-      status: "in_process",
-      assign_from_stock: true,
-      stock_item_id: item.id,
-      stock_snapshot_before: snapshot,
-      protected_delivery_id: insertedDelivery?.id ?? null,
-      protected_enabled: true,
-      assigned_at: now,
-      assigned_by: actor,
-    })
-    .eq("id", order.id)
-    .select("*")
-    .single();
-  if (error || !data) {
-    await db
-      .from("stock_items")
-      .update({ ...snapshot, updated_at: new Date().toISOString() })
-      .eq("id", item.id);
-    if (insertedDelivery) await revokeDelivery(
-      insertedDelivery.id,
-      "Asignación revertida por un error al guardar el pedido",
-    );
-    throw new Error(error?.message || "No se pudo terminar la asignación");
-  }
-  await stockServer.logStockHistory(
-    item.id,
-    null,
-    "asignado_cyberdocs",
-    `Asignación manual al pedido ${order.cyberdocsOrderId}`,
-  );
-  await recordOrderEvent(
-    order.id,
-    "stock_assigned",
-    actor,
-    insertedDelivery ? `Stock asignado al pedido y documento protegido ${insertedDelivery.id} creado ${input.withPassword ? "con contraseña" : "sin contraseña"}` : "Stock asignado al pedido",
-  );
-  const deliveryLink = insertedDelivery ? `/e/${insertedDelivery.id}?t=${encodeURIComponent(token)}` : "";
-  const platformMessage = [`Hola ${order.clientName || ""} 😊 Te entrego ${item.platform || order.serviceName}.`, `Documento: ${deliveryLink}`, "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía."].filter(Boolean).join("\n");
-  const passwordMessage = input.withPassword ? `Hola ${order.clientName || ""} 😊\nContraseña de tu documento protegido: ${input.accessPassword.trim()}` : "";
-  return { order: rowToCyberDocsOrder(data as Row), token, platformMessage, passwordMessage };
 }
 
 export async function createManualDeliveryForOrder(input: {
@@ -601,9 +537,12 @@ export async function createManualDeliveryForOrder(input: {
 }) {
   const actor = input.actor || "Administradora";
   const order = await getCyberDocsOrder(input.orderId);
+  if (order.protectedDeliveryId) {
+    if (order.stockItemId) throw new Error("Este pedido ya tiene una cuenta de stock asignada");
+    return savedDeliveryResult(order, actor);
+  }
   ensureEditable(order);
   if (order.stockItemId) throw new Error("Este pedido ya tiene una cuenta de stock asignada");
-  if (order.protectedDeliveryId) throw new Error("Este pedido ya tiene un documento protegido");
   if (input.withPassword && input.accessPassword.trim().length < 4)
     throw new Error("La contraseña del documento protegido debe tener al menos 4 caracteres");
   if (new Date(input.expiresAt).getTime() <= Date.now()) throw new Error("La vigencia del documento debe ser futura");
@@ -638,21 +577,10 @@ export async function createManualDeliveryForOrder(input: {
   draft.id = inserted.id; draft.createdAt = inserted.createdAt;
   await deliveryServer.saveDeliveryRow(inserted.id, draft);
 
-  const db = await database();
-  const { data, error } = await db.from("cyberdocs_orders").update({
-    status: "in_process", assign_from_stock: false, stock_item_id: null,
-    protected_delivery_id: inserted.id, protected_enabled: true,
-    assigned_at: now, assigned_by: actor,
-  }).eq("id", order.id).select("*").single();
-  if (error || !data) {
-    await revokeDelivery(inserted.id, "Entrega manual revertida por error al guardar el pedido");
-    throw new Error(error?.message || "No se pudo guardar la entrega manual");
-  }
-  await recordOrderEvent(order.id, "manual_delivery", actor, `Entrega manual ${input.deliveryType} creada ${input.withPassword ? "con contraseña" : "sin contraseña"}`);
-  const deliveryLink = `/e/${inserted.id}?t=${encodeURIComponent(token)}`;
-  const platformMessage = [`Hola ${order.clientName || ""} 😊 Te entrego ${input.platform.trim() || order.serviceName}.`, `Documento: ${deliveryLink}`, "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía."].join("\n");
-  const passwordMessage = input.withPassword ? `Hola ${order.clientName || ""} 😊\nContraseña de tu documento protegido: ${input.accessPassword.trim()}` : "";
-  return { order: rowToCyberDocsOrder(data as Row), token, platformMessage, passwordMessage };
+  const linked = await linkSavedDelivery(order.id, inserted.id, null, actor,
+    `Entrega manual ${input.deliveryType} creada ${input.withPassword ? "con contraseña" : "sin contraseña"}`);
+  return savedDeliveryResult(linked, actor);
+
 }
 
 export async function releaseStockAssignment(
@@ -719,98 +647,75 @@ export async function finalizeCyberDocsOrder(
   notes: string,
   actor = "Administradora",
   pin?: string,
+  deliveryId: string | null = null,
+  action = "manually_completed",
 ) {
   if (pin) await authorize(pin);
-  const order = await getCyberDocsOrder(orderId);
-  ensureEditable(order);
-  const now = new Date().toISOString();
   const db = await database();
-  const { data, error } = await db
-    .from("cyberdocs_orders")
-    .update({
-      status: "completed",
-      delivered_on: order.deliveredOn || now.slice(0, 10),
-      finalized_at: now,
-      finalized_by: actor,
-      final_notes: notes.trim(),
-    })
-    .eq("id", order.id)
-    .select("*")
-    .single();
-  if (error || !data) throw new Error(error?.message || "No se pudo finalizar el pedido");
-  await markNotificationAttended(order.notificationOrderId);
-  await recordOrderEvent(
-    order.id,
-    "manually_completed",
-    actor,
-    notes.trim() || "Proceso finalizado con confirmación manual",
-  );
-  return rowToCyberDocsOrder(data as Row);
+  const { data, error } = await db.rpc("ma2_finalize_cyberdocs_order", {
+    p_order: orderId, p_notes: notes, p_actor: actor, p_delivery: deliveryId, p_action: action,
+  });
+  if (error || !data?.order) throw new Error(error?.message || "No se pudo finalizar el pedido");
+  return rowToCyberDocsOrder(data.order as Row);
 }
 
 export async function finalizeCyberDocsOrders(
-  orderIds: string[],
-  notes: string,
-  actor = "Administradora",
-  pin?: string,
+  orderIds: string[], notes: string, actor = "Administradora", pin?: string,
 ) {
   if (pin) await authorize(pin);
-  const uniqueIds = [...new Set(orderIds)].slice(0, 250);
+  const uniqueIds = [...new Set(orderIds)].slice(0, 250).sort();
   if (!uniqueIds.length) throw new Error("Selecciona al menos un pedido");
-
-  const db = await database();
-  const { data: existing, error: existingError } = await db
-    .from("cyberdocs_orders")
-    .select("id,status,notification_order_id")
-    .in("id", uniqueIds);
-  if (existingError) throw new Error(existingError.message);
-
-  const editableRows = (existing || []).filter((row: Row) =>
-    !["completed", "rejected", "cancelled"].includes(str(row["status"])),
-  );
-  const editableIds = editableRows.map((row: Row) => str(row["id"])).filter(Boolean);
-  if (!editableIds.length) throw new Error("Los pedidos seleccionados ya estaban cerrados");
-
-  const now = new Date().toISOString();
-  const detail = notes.trim() || "Proceso finalizado con confirmación manual múltiple";
-  const { data, error } = await db
-    .from("cyberdocs_orders")
-    .update({
-      status: "completed",
-      delivered_on: now.slice(0, 10),
-      finalized_at: now,
-      finalized_by: actor,
-      final_notes: notes.trim(),
-    })
-    .in("id", editableIds)
-    .select("*");
-  if (error || !data) throw new Error(error?.message || "No se pudieron finalizar los pedidos");
-
-  const notificationIds = editableRows
-    .map((row: Row) => nullable(row["notification_order_id"]))
-    .filter((id: string | null): id is string => Boolean(id));
-  if (notificationIds.length) {
-    const { error: notificationError } = await db
-      .from("orders")
-      .update({ status: "atendido", attended_at: now })
-      .in("id", notificationIds);
-    if (notificationError) throw new Error(notificationError.message);
+  const orders: CyberDocsOrder[] = [];
+  let skipped = 0;
+  for (const id of uniqueIds) {
+    const existing = await getCyberDocsOrder(id);
+    if (["completed", "rejected", "cancelled"].includes(existing.status)) { skipped++; continue; }
+    orders.push(await finalizeCyberDocsOrder(id, notes || "Proceso finalizado con confirmación manual múltiple",
+      actor, undefined, null, "manually_completed_bulk"));
   }
+  return { orders, skipped };
+}
 
-  const { error: historyError } = await db.from("cyberdocs_order_events").insert(
-    editableIds.map((orderId: string) => ({
-      order_id: orderId,
-      action: "manually_completed_bulk",
-      actor: actor.slice(0, 120),
-      detail: detail.slice(0, 2000),
-    })),
-  );
-  if (historyError) throw new Error(historyError.message);
+/** A saved association is the only authority: never match by customer or platform. */
+export async function retrySavedDeliveryCompletion(orderId: string, actor = "Administradora") {
+  const saved = await getProtectedDeliveryTokenForOrder(orderId);
+  if (saved.status !== "active") throw new Error("El documento del pedido no está activo");
+  return finalizeCyberDocsOrder(orderId, "Documento protegido guardado desde la entrega", actor,
+    undefined, saved.id, "delivery_completed");
+}
 
-  return {
-    orders: (data as Row[]).map((row) => rowToCyberDocsOrder(row)),
-    skipped: uniqueIds.length - editableIds.length,
+async function savedDeliveryResult(order: CyberDocsOrder, actor: string) {
+  // Verify that the saved encrypted document can actually be read before closing.
+  const saved = await getProtectedDeliveryTokenForOrder(order.id);
+  if (saved.status !== "active") throw new Error("El documento del pedido no está activo");
+  const completion = await completeSavedDelivery(order, () => retrySavedDeliveryCompletion(order.id, actor));
+  const deliveryLink = `/e/${saved.id}?t=${encodeURIComponent(saved.token)}`;
+  return { ...completion, token: saved.token,
+    platformMessage: [`Hola ${order.clientName || ""} 😊 Te entrego ${order.serviceName}.`, `Documento: ${deliveryLink}`,
+      "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía."].join("\n"),
+    passwordMessage: saved.accessPassword ? `Hola ${order.clientName || ""} 😊\nContraseña de tu documento protegido: ${saved.accessPassword}` : "",
   };
+}
+
+async function linkSavedDelivery(orderId: string, deliveryId: string, stockId: string | null,
+  actor: string, detail: string, expires: string | null = null, price: number | null = null) {
+  const db = await database();
+  const { data, error } = await db.rpc("ma2_link_cyberdocs_delivery", {
+    p_order: orderId, p_delivery: deliveryId, p_stock: stockId, p_actor: actor, p_detail: detail,
+    p_expires: expires, p_price: price,
+  });
+  if (error || !data) {
+    // A lost RPC response may hide a committed association; never revoke its document.
+    const current = await getCyberDocsOrder(orderId);
+    if (current.protectedDeliveryId === deliveryId) return current;
+    await revokeDelivery(deliveryId, "Entrega no vinculada al pedido");
+    throw new Error(error?.message || "No se pudo vincular la entrega");
+  }
+  const linked = rowToCyberDocsOrder(data as Row);
+  if (linked.protectedDeliveryId !== deliveryId) {
+    await revokeDelivery(deliveryId, "Documento duplicado descartado; se conservó la entrega original");
+  }
+  return linked;
 }
 
 export async function updateOrderRenewal(input: {

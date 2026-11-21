@@ -15,13 +15,12 @@ export interface LinkedStockDelivery {
 
 /** Reuse Cyberdoc's assignment path so orders and stock share one document. */
 export async function deliverLinkedOrder(input: LinkedStockDelivery) {
-  const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
   const orders = await import("@/lib/cyberdocs/cyberdocs.server");
   const deliveries = await import("@/lib/deliveries/deliveries.server");
   const reference = input.relatedOrderId.trim();
   // Resolve against the authorized administrator's orders, never a client catalog.
   const order = (await orders.listCyberDocsOrders()).find(
-    (row) => row.id === reference || row.cyberdocsOrderId === reference,
+    (row) => row.id === reference,
   );
   if (!order) throw new Error("No se encontró el pedido de Cyberdoc seleccionado");
   if (["rejected", "cancelled"].includes(order.status)) {
@@ -33,6 +32,7 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
 
   let deliveryId = order.protectedDeliveryId;
   let token = "";
+  let completionError: string | null = null;
   if (deliveryId) {
     if (order.stockItemId !== input.itemId) {
       throw new Error("El pedido ya tiene una entrega manual; revísala desde Cyberdoc");
@@ -54,28 +54,24 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
       maxViews: input.maxViews,
       notes: input.notes,
       attachment: input.attachment,
-      images: input.images,
+      ...(input.images ? { images: input.images } : {}),
+      stockExpiresOn: input.stockExpiresOn,
+      salePrice: input.salePrice,
     });
     deliveryId = assigned.order.protectedDeliveryId;
     token = assigned.token;
+    completionError = assigned.completionError;
   }
   if (!deliveryId) throw new Error("No se pudo enlazar el documento al pedido");
 
-  if (order.status !== "completed") {
-    await orders.updateOrderRenewal({
-      orderId: order.id,
-      deliveredOn: order.deliveredOn || new Date().toISOString().slice(0, 10),
-      expiresOn: input.stockExpiresOn || "",
-      warningDays: order.renewalWarningDays || 3,
-    });
-    const { error } = await db.from("stock_items")
-      .update({ sale_price: input.salePrice, updated_at: new Date().toISOString() })
-      .eq("id", input.itemId).is("business_id", null);
-    if (error) throw new Error(error.message);
-    await orders.finalizeCyberDocsOrder(order.id, input.notes || "Entregado desde el gestor de stock");
+  if (order.protectedDeliveryId && order.status !== "completed") {
+    const { completeSavedDelivery } = await import("@/lib/cyberdocs/completion");
+    const result = await completeSavedDelivery(order, () => orders.retrySavedDeliveryCompletion(order.id));
+    completionError = result.completionError;
   }
   return {
     id: deliveryId,
+    completionError,
     token,
     client: order.clientName,
     whatsapp: order.whatsapp || (order.contactLabel === "WhatsApp" ? order.contactValue : ""),
