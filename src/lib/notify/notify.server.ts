@@ -6,6 +6,8 @@ import { ApplicationServerKeys, generatePushHTTPRequest, setWebCrypto } from "we
 import {
   DEFAULT_ALEXA_EVENTS,
   DEFAULT_SETTINGS,
+  EMPTY_ALEXA_PROFILE,
+  type AlexaProfiles,
   type AlexaEventKey,
   type AlexaMethod,
   type AlexaProvider,
@@ -46,6 +48,21 @@ export function rowToSettings(row: Row | null): NotifySettings {
       ? (s("alexa_provider", "voicemonkey") as AlexaProvider)
       : "voicemonkey",
     alexaToken: s("alexa_token", ""),
+    alexaProfiles: (() => {
+      const raw = row.alexa_profiles;
+      const profiles: AlexaProfiles = {};
+      if (raw && typeof raw === "object") {
+        for (const provider of ["voicemonkey", "virtualbuttons", "webhook", "custom"] as const) {
+          const profile = (raw as Record<string, unknown>)[provider];
+          if (profile && typeof profile === "object") {
+            const p = profile as Record<string, unknown>;
+            const str = (key: keyof typeof EMPTY_ALEXA_PROFILE) => typeof p[key] === "string" ? String(p[key]) : EMPTY_ALEXA_PROFILE[key];
+            profiles[provider] = { token: str("token"), device: str("device"), webhookUrl: str("webhookUrl"), webhookSecret: str("webhookSecret"), method: p.method === "GET" ? "GET" : "POST", bodyTemplate: str("bodyTemplate") };
+          }
+        }
+      }
+      return profiles;
+    })(),
     alexaDevice: s("alexa_device", ""),
     alexaAppDevice: s("alexa_app_device", ""),
     alexaWebhookUrl: s("alexa_webhook_url", ""),

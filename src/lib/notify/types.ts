@@ -2,6 +2,19 @@
 
 export type AlexaProvider = "voicemonkey" | "virtualbuttons" | "webhook" | "custom";
 export type AlexaMethod = "POST" | "GET";
+export type AlexaProfile = {
+  token: string;
+  device: string;
+  webhookUrl: string;
+  webhookSecret: string;
+  method: AlexaMethod;
+  bodyTemplate: string;
+};
+export const EMPTY_ALEXA_PROFILE: AlexaProfile = {
+  token: "", device: "", webhookUrl: "", webhookSecret: "", method: "POST",
+  bodyTemplate: '{"message":"{message}","event":"{event}","source":"MA2"}',
+};
+export type AlexaProfiles = Partial<Record<AlexaProvider, AlexaProfile>>;
 export type WhatsappProvider = "twilio" | "whapi" | "greenapi";
 export type AlexaEventKey =
   | "order_new"
@@ -44,6 +57,7 @@ export interface NotifySettings {
   whatsappNumber: string;
   whatsappProvider: WhatsappProvider;
   alexaProvider: AlexaProvider;
+  alexaProfiles: AlexaProfiles;
   /** Token de Voice Monkey o access code de Virtual Buttons. */
   alexaToken: string;
   /** ID de Speaker de Voice Monkey o número de botón de Virtual Buttons. */
@@ -128,6 +142,7 @@ export const DEFAULT_SETTINGS: NotifySettings = {
   whatsappNumber: "",
   whatsappProvider: "twilio",
   alexaProvider: "voicemonkey",
+  alexaProfiles: {},
   alexaToken: "",
   alexaDevice: "",
   alexaAppDevice: "",

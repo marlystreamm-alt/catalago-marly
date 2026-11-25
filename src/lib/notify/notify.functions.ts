@@ -92,14 +92,7 @@ export const notifySaveSettings = createServerFn({ method: "POST" })
         email: s.email,
         whatsapp_number: s.whatsappNumber,
         whatsapp_provider: s.whatsappProvider,
-        alexa_provider: s.alexaProvider,
-        alexa_token: s.alexaToken,
-        alexa_device: s.alexaDevice,
         alexa_app_device: s.alexaAppDevice,
-        alexa_webhook_url: s.alexaWebhookUrl,
-        alexa_webhook_secret: s.alexaWebhookSecret,
-        alexa_method: s.alexaMethod,
-        alexa_body_template: s.alexaBodyTemplate,
         alexa_events: s.alexaEvents,
         alexa_order_new_message: s.alexaOrderNewMessage,
         alexa_order_reminder_message: s.alexaOrderReminderMessage,
@@ -337,12 +330,22 @@ export const notifyVerifyAlexa = createServerFn({ method: "POST" })
         method: z.enum(["POST", "GET"]).default("POST"),
         bodyTemplate: z.string().max(6000).default('{"message":"{message}","event":"{event}","source":"MA2"}'),
         save: z.boolean().default(true),
+        storeOnly: z.boolean().default(false),
       })
       .parse(d),
   )
   .handler(async ({ data }): Promise<{ ok: boolean; message: string }> => {
-    const { requireAdminCode, sendAlexaText, admin, logEvent } = await import("./notify.server");
+    const { requireAdminCode, sendAlexaText, admin, logEvent, loadSettings } = await import("./notify.server");
     await requireAdminCode(data.code);
+    const current = await loadSettings();
+    const profile = { token: data.token, device: data.device, webhookUrl: data.webhookUrl, webhookSecret: data.webhookSecret, method: data.method, bodyTemplate: data.bodyTemplate };
+    const profiles = { ...current.alexaProfiles, [data.provider]: profile };
+    if (data.storeOnly) {
+      if (data.provider === current.alexaProvider) return { ok: false, message: "Para cambiar el método activo, prueba y guarda la integración." };
+      const db = await admin();
+      const { error } = await db.from("notification_settings").update({ alexa_profiles: profiles }).eq("id", 1);
+      return error ? { ok: false, message: "No se pudo guardar el método" } : { ok: true, message: "Método guardado sin cambiar la integración activa" };
+    }
     const result = await sendAlexaText(
       "Prueba de MA². Si escuchas esto, los avisos ya están conectados con Alexa.",
       {
@@ -370,6 +373,8 @@ export const notifyVerifyAlexa = createServerFn({ method: "POST" })
         .update({
           channel_alexa: true,
           alexa_provider: data.provider,
+          alexa_profiles: profiles,
+          ...(data.provider !== "voicemonkey" ? { channel_alexa_app: false } : {}),
           alexa_token: data.token.trim(),
           alexa_device: data.device.trim(),
           alexa_webhook_url: data.webhookUrl.trim(),

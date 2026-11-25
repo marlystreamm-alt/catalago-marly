@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { notifyVerifyAlexa } from "@/lib/notify/notify.functions";
 import {
   ALEXA_EVENT_TEXT,
+  EMPTY_ALEXA_PROFILE,
   type AlexaEventKey,
   type AlexaMethod,
   type AlexaProvider,
@@ -34,7 +35,7 @@ const PROVIDERS: { value: AlexaProvider; label: string; hint: string }[] = [
   },
   {
     value: "custom",
-    label: "Integración personalizada",
+    label: "Integración personalizada (Hapicom)",
     hint: "Deja MA² listo para una futura skill o API propia sin rediseñar Notificaciones.",
   },
 ];
@@ -54,7 +55,7 @@ export function AlexaSetup({
 }) {
   const [provider, setProvider] = useState<AlexaProvider>(settings.alexaProvider);
   const [token, setToken] = useState(settings.alexaToken);
-  const [device, setDevice] = useState(settings.alexaDevice || "1");
+  const [device, setDevice] = useState(settings.alexaDevice);
   const [webhookUrl, setWebhookUrl] = useState(settings.alexaWebhookUrl);
   const [webhookSecret, setWebhookSecret] = useState(settings.alexaWebhookSecret);
   const [method, setMethod] = useState<AlexaMethod>(settings.alexaMethod);
@@ -76,7 +77,7 @@ export function AlexaSetup({
     return /^https:\/\//i.test(webhookUrl.trim());
   }, [busy, provider, token, device, webhookUrl]);
 
-  const validar = async () => {
+  const validar = async (storeOnly = false) => {
     setBusy(true);
     setResult(null);
     try {
@@ -91,12 +92,21 @@ export function AlexaSetup({
           method,
           bodyTemplate,
           save: true,
+          storeOnly,
         },
       });
       setResult(r);
       if (r.ok) {
+        const alexaProfiles = { ...settings.alexaProfiles, [provider]: { token: token.trim(), device: device.trim(), webhookUrl: webhookUrl.trim(), webhookSecret, method, bodyTemplate } };
+        if (storeOnly) {
+          onSaved({ ...settings, alexaProfiles });
+          return;
+        }
+        if (provider !== "voicemonkey") setAppEnabled(false);
         onSaved({
           ...settings,
+          alexaProfiles,
+          channelAlexaApp: provider === "voicemonkey" && appEnabled,
           channelAlexa: true,
           alexaProvider: provider,
           alexaToken: token.trim(),
@@ -136,8 +146,17 @@ export function AlexaSetup({
         <Label className="text-xs">Método de Alexa</Label>
         <Select
           value={provider}
+          disabled={busy}
           onValueChange={(value) => {
-            setProvider(value as AlexaProvider);
+            const next = value as AlexaProvider;
+            const saved = next === settings.alexaProvider ? { token: settings.alexaToken, device: settings.alexaDevice, webhookUrl: settings.alexaWebhookUrl, webhookSecret: settings.alexaWebhookSecret, method: settings.alexaMethod, bodyTemplate: settings.alexaBodyTemplate } : settings.alexaProfiles[next] ?? { ...EMPTY_ALEXA_PROFILE, device: next === "virtualbuttons" ? "1" : "" };
+            setProvider(next);
+            setToken(saved.token);
+            setDevice(saved.device);
+            setWebhookUrl(saved.webhookUrl);
+            setWebhookSecret(saved.webhookSecret);
+            setMethod(saved.method);
+            setBodyTemplate(saved.bodyTemplate);
             setResult(null);
           }}
         >
@@ -147,12 +166,13 @@ export function AlexaSetup({
           <SelectContent>
             {PROVIDERS.map((item) => (
               <SelectItem key={item.value} value={item.value}>
-                {item.label}
+                {item.label}{settings.alexaProfiles[item.value] ? " · Guardado" : ""}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <p className="text-[11px] text-muted-foreground">{providerInfo.hint}</p>
+        <p className="text-xs text-muted-foreground">Activo: {PROVIDERS.find((p) => p.value === settings.alexaProvider)?.label}. Cada método conserva sus propios datos.</p>
       </div>
 
       {provider === "voicemonkey" ? (
@@ -279,6 +299,7 @@ export function AlexaSetup({
         {busy ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
         {busy ? "Probando Alexa…" : "Probar Alexa y guardar método"}
       </Button>
+      {provider !== settings.alexaProvider && <Button variant="outline" className="w-full rounded-xl" disabled={!puede} onClick={() => void validar(true)}>Guardar este método sin activarlo</Button>}
 
       {result ? (
         <div className={`flex items-start gap-2 rounded-xl p-2.5 text-xs ${result.ok ? "bg-primary/10 text-foreground" : "bg-destructive/10 font-medium text-destructive"}`}>
@@ -287,7 +308,7 @@ export function AlexaSetup({
         </div>
       ) : null}
 
-      <div className="space-y-2 border-t pt-3">
+      {settings.alexaProvider === "voicemonkey" && <div className="space-y-2 border-t pt-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-xs font-medium">
@@ -328,7 +349,7 @@ export function AlexaSetup({
             </p>
           </div>
         ) : null}
-      </div>
+      </div>}
 
       <div className="space-y-2 border-t pt-3">
         <p className="text-xs font-medium">Qué eventos puede anunciar Alexa</p>

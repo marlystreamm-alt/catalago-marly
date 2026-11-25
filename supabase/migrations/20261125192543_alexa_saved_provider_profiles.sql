@@ -1,0 +1,2 @@
+alter table public.notification_settings add column if not exists alexa_profiles jsonb not null default '{}'::jsonb;
+update public.notification_settings set alexa_profiles = alexa_profiles || jsonb_build_object(alexa_provider, jsonb_build_object('token',alexa_token,'device',alexa_device,'webhookUrl',alexa_webhook_url,'webhookSecret',alexa_webhook_secret,'method',alexa_method,'bodyTemplate',alexa_body_template)) where not (alexa_profiles ? alexa_provider);

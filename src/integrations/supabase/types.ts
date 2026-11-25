@@ -1139,6 +1139,7 @@ export type Database = {
       };
       notification_settings: {
         Row: {
+          alexa_profiles: Json;
           admin_code_hash: string;
           admin_code_salt: string;
           admin_must_change: boolean;
@@ -1181,6 +1182,7 @@ export type Database = {
           whatsapp_provider: string;
         };
         Insert: {
+          alexa_profiles?: Json;
           admin_code_hash?: string;
           admin_code_salt?: string;
           admin_must_change?: boolean;
@@ -1223,6 +1225,7 @@ export type Database = {
           whatsapp_provider?: string;
         };
         Update: {
+          alexa_profiles?: Json;
           admin_code_hash?: string;
           admin_code_salt?: string;
           admin_must_change?: boolean;
