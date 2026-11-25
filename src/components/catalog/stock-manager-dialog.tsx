@@ -617,8 +617,6 @@ export function StockManagerDialog({
                 {toolsItem.cost || toolsItem.salePrice ? <p><b>Ganancia:</b> ${(toolsItem.salePrice - toolsItem.cost).toFixed(2)}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                {toolsItem.username ? <Button size="sm" variant="outline" onClick={() => void copyValue("Usuario/correo", toolsItem.username)}><Copy className="mr-1 size-3.5" />Correo</Button> : null}
-                {can("stock_view_password") && toolsItem.password ? <Button size="sm" variant="outline" onClick={() => void copyValue("Contraseña", toolsItem.password)}><Copy className="mr-1 size-3.5" />Contraseña</Button> : null}
                 {toolsItem.profilePin ? <Button size="sm" variant="outline" onClick={() => void copyValue("PIN", toolsItem.profilePin)}><Copy className="mr-1 size-3.5" />PIN</Button> : null}
                 {toolsItem.panelUrl ? <Button size="sm" variant="outline" onClick={() => void copyValue("Link del panel", toolsItem.panelUrl)}><Copy className="mr-1 size-3.5" />Panel</Button> : null}
                 {toolsItem.panelUsername ? <Button size="sm" variant="outline" onClick={() => void copyValue("Usuario del panel", toolsItem.panelUsername)}><Copy className="mr-1 size-3.5" />Usuario panel</Button> : null}
