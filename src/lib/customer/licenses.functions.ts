@@ -69,7 +69,7 @@ export const activateMonthlyShop = createServerFn({ method: "POST" })
       stock_assign: true,
       stock_view_password: true,
       stock_export: true,
-      protected_deliveries: true,
+      protected_deliveries: false,
       notices: true,
     };
     const saved = await db.rpc("ma2_activate_shop", {
