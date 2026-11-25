@@ -119,6 +119,7 @@ export function normalizeState(raw: unknown): AppState {
           active: sv.active !== false,
           favorite: sv.favorite === true,
           priceText: opt(sv.priceText),
+          pricingMonths: Number.isInteger(sv.pricingMonths) && Number(sv.pricingMonths)>0 ? Number(sv.pricingMonths) : undefined,
           icon: opt(sv.icon),
           plan: opt(sv.plan),
           users: opt(sv.users),

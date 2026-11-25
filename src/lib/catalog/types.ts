@@ -16,6 +16,7 @@ export interface Category {
 }
 
 export interface Service {
+  pricingMonths?: number;
   onRequest?: "link" | "email" | "both";
   id: string;
   name: string;
