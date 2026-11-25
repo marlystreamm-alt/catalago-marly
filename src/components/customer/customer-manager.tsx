@@ -11,25 +11,23 @@ import {
   customerManageCredit,
   customerManageReset,
   customerManageReply,
-  customerManageInvite,
   customerManageActive,
 } from "@/lib/customer/manage.functions";
 const err = (e: unknown) => (e instanceof Error ? e.message : "No se pudo completar");
 export function CustomerManager({
   ownerToken,
   slug,
-  records = [],
+  onAssign,
 }: {
   ownerToken?: string;
   slug: string;
   records?: OpsRecord[];
+  onAssign?: (id: string) => void;
 }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof customerManageLoad>> | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [temporary, setTemporary] = useState(""),
-    [client, setClient] = useState(""),
-    [email, setEmail] = useState("");
+    [temporary, setTemporary] = useState("");
   const requests = useRef(new Map<string, string>());
   const auth = useCallback(
     () => (ownerToken ? { ownerToken } : { code: getSavedCode() }),
@@ -96,64 +94,6 @@ export function CustomerManager({
           <p className="text-xs">Se pedirá cambiar esta contraseña al entrar.</p>
         </div>
       ) : null}
-      {!ownerToken && records.length ? (
-        <details className="rounded-xl border p-3">
-          <summary className="cursor-pointer font-semibold text-sm">
-            Habilitar acceso a un cliente que ya tiene saldo
-          </summary>
-          <form
-            className="space-y-3 mt-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void action(async () => {
-                const r = await customerManageInvite({
-                  data: { ...auth(), clientId: client, email },
-                });
-                setTemporary(r.password);
-                setClient("");
-                setEmail("");
-              });
-            }}
-          >
-            <label className="seller-field">
-              <span>Cliente existente</span>
-              <select
-                className="buyer-select"
-                required
-                value={client}
-                onChange={(e) => setClient(e.target.value)}
-              >
-                <option value="">Selecciona</option>
-                {records
-                  .filter(
-                    (r) =>
-                      r.module === "clients" &&
-                      r.status === "active" &&
-                      (!r.data.shopId || r.data.shopId === "main") &&
-                      !data?.accounts.some((a) => a.client_id === r.id),
-                  )
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label className="seller-field">
-              <span>Correo para ingresar</span>
-              <Input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <Button size="sm" disabled={busy}>
-              Crear acceso conservando saldo
-            </Button>
-          </form>
-        </details>
-      ) : null}
       <Button variant="outline" size="sm" disabled={busy} onClick={() => void load()}>
         Actualizar clientes
       </Button>
@@ -211,6 +151,7 @@ export function CustomerManager({
               </Button>
             </form>
             <div className="flex flex-wrap gap-2">
+              {onAssign && a.client_id ? <Button size="sm" disabled={!a.active || busy} onClick={() => onAssign(a.client_id)}>Asignar cuenta</Button> : null}
               <Button
                 size="sm"
                 variant="outline"
