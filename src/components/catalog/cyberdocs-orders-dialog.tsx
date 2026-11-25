@@ -504,7 +504,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
 
   const retryCompletion = async () => {
     if (!selected || busy) return;
-    if (selected.sourceKey === "web_catalog" && !confirm("¿Confirmas que ya entregaste los datos al cliente? Se guardará la fecha y se cerrará el aviso.")) return;
+    if (!confirm("¿Confirmas que ya entregaste los datos al cliente? Se guardará la fecha y se cerrará el aviso.")) return;
     setBusy(true);
     try {
       replaceOrder(await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: selected.id } }));
@@ -1090,7 +1090,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
 
                       {selected.protectedDeliveryId || selected.status === "completed" ? (
                         <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
-                          <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : selected.sourceKey === "web_catalog" ? "Entrega preparada · pendiente de enviar" : "Entrega vinculada a este pedido"}</p>
+                          <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : "Entrega preparada · pendiente de enviar"}</p>
                           <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Copia el mensaje o los datos y confirma cuando hayas realizado la entrega."}</p>
                           {selected.protectedDeliveryId ? (
                             <>
@@ -1115,7 +1115,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
                             </>
                           ) : null}
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><CheckCircle2 className="mr-1 size-4" />{selected.sourceKey === "web_catalog" ? "Confirmar entrega" : "Reintentar cierre"}</Button> : null}
+                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><CheckCircle2 className="mr-1 size-4" />Confirmar entrega</Button> : null}
                             {selected.stockItemId && !terminal(selected) ? <Button size="sm" variant="outline" onClick={() => void release()}><RotateCcw className="mr-1 size-4" />Liberar cuenta</Button> : null}
                             {selected.status === "completed" ? <>
                               {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); window.open(`${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`, "_blank", "noopener,noreferrer"); } catch (e) { toast.error(errorText(e)); } }}><Link2 className="mr-1 size-4" />Abrir página</Button> : null}

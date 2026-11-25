@@ -307,6 +307,19 @@ export async function ingestCyberDocsOrder(
     .from("cyberdocs_webhook_events")
     .update({ status: "processed", order_id: order.id, processed_at: new Date().toISOString() })
     .eq("id", webhookId);
+  if (input.source !== "manual_fallback") {
+    try {
+      const { recognizeOrderProduct } = await import("@/lib/stock/master-products");
+      if (recognizeOrderProduct(order.serviceName)) {
+        const stock = await (await import("@/lib/stock/stock.server")).listStock(null);
+        const item = (await import("@/lib/customer/order-stock-match")).matchOrderStock(order.serviceName,stock,businessToday());
+        if (item) {
+          const delivery = await import("@/lib/deliveries/deliveries.server");
+          await assignStockToOrder({orderId:order.id,stockItemId:item.id,withPassword:true,accessPassword:delivery.randomToken().slice(0,12),expiresAt:new Date(Date.now()+7*86400000).toISOString(),maxViews:null,notes:"",attachment:null,actor:"Asignación automática",prepareOnly:true});
+        } else await recordOrderEvent(order.id,"stock_pending","system","Sin stock maestro compatible; requiere revisión");
+      } else await recordOrderEvent(order.id,"stock_pending","system","Modalidad no reconocida; requiere revisión");
+    } catch { await recordOrderEvent(order.id,"stock_pending","system","No se completó la preparación automática; revisa el pedido"); }
+  }
   await updateIntegrationState({ last_order_at: new Date().toISOString() });
   return { ok: true, orderId: order.id };
 }
@@ -457,12 +470,13 @@ export async function assignStockToOrder(input: {
   images?: string[];
   stockExpiresOn?: string | null;
   salePrice?: number;
+  prepareOnly?: boolean;
 }) {
   const actor = input.actor || "Administradora";
   const order = await getCyberDocsOrder(input.orderId);
   if (order.protectedDeliveryId) {
     if (order.stockItemId !== input.stockItemId) throw new Error("Este pedido ya tiene otra entrega");
-    return savedDeliveryResult(order, actor);
+    return savedDeliveryResult(order, actor, input.prepareOnly);
   }
   ensureEditable(order);
   if (order.stockItemId)
@@ -522,7 +536,7 @@ export async function assignStockToOrder(input: {
   if (!insertedDelivery) throw new Error("No se guardó el documento protegido");
   const linked = await linkSavedDelivery(order.id, insertedDelivery.id, item.id, actor,
     `Stock asignado al pedido y documento protegido creado`, input.stockExpiresOn ?? order.expiresOn ?? item.expiresOn ?? expiresAfterMonths(businessToday(), item.durationMonths || 1), input.salePrice ?? null);
-  return savedDeliveryResult(linked, actor);
+  return savedDeliveryResult(linked, actor, input.prepareOnly);
 
 }
 
@@ -724,13 +738,13 @@ export async function retrySavedDeliveryCompletion(orderId: string, actor = "Adm
     undefined, saved.id, "delivery_completed");
 }
 
-async function savedDeliveryResult(order: CyberDocsOrder, actor: string) {
+async function savedDeliveryResult(order: CyberDocsOrder, actor: string, prepareOnly=false) {
   // Verify that the saved encrypted document can actually be read before closing.
   const saved = await getProtectedDeliveryTokenForOrder(order.id);
   if (saved.status !== "active") throw new Error("El documento del pedido no está activo");
   // Web/catalog orders are paid and reserved, but the administrator still sends
   // the prepared credentials. Keep the alert pending until she confirms delivery.
-  const completion = order.sourceKey === "web_catalog"
+  const completion = prepareOnly || order.sourceKey === "web_catalog"
     ? { order, completionError: null }
     : await completeSavedDelivery(order, () => retrySavedDeliveryCompletion(order.id, actor));
   const deliveryLink = `/e/${saved.id}?t=${encodeURIComponent(saved.token)}`;

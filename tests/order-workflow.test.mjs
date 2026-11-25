@@ -84,7 +84,22 @@ test("phone normalization and concurrent order contact registration prevent dupl
     assert.equal(globalThis.__remember.rows.size,1);
   } finally { if (old === undefined) delete process.env.MA2_SESSION_SECRET; else process.env.MA2_SESSION_SECRET = old; }
 });
-const { matchOrderStock } = await import(await compile("src/lib/customer/order-stock-match.ts"));
+const masterURL = await compile("src/lib/stock/master-products.ts");
+const { recognizeOrderProduct,masterProduct }=await import(masterURL);
+const { matchOrderStock } = await import(await compile("src/lib/customer/order-stock-match.ts",{"@/lib/stock/master-products":masterURL}));
+test("master catalog distinguishes Disney standard versus premium and profile versus complete",()=>{
+ assert.equal(recognizeOrderProduct("👤 DISNEY+ ESTÁNDAR PERFIL"),"DIS-STD-PER");
+ assert.equal(recognizeOrderProduct("DISNEY PREMIUM CUENTA COMPLETA"),"DIS-PRE-COM");
+ assert.equal(recognizeOrderProduct("Disney perfil"),null);
+ assert.equal(masterProduct("Disney Premium perfil","complete"),null);
+ const base={businessId:null,status:"available",accountType:"Perfil",stockKind:"profile",username:"fixture",password:"fixture",expiresOn:null,parentStockId:null,createdAt:"2026-01-01"};
+ const stock=[{...base,id:"standard",platform:"Disney Estándar"},{...base,id:"premium",platform:"Disney Premium"},{...base,id:"complete",platform:"Disney Estándar",stockKind:"complete",accountType:"Completa"}];
+ assert.equal(matchOrderStock("Disney+ estándar perfil",stock,"2026-01-01").id,"standard");
+ assert.equal(matchOrderStock("Disney premium perfil",stock,"2026-01-01").id,"premium");
+ assert.equal(matchOrderStock("Disney perfil",stock,"2026-01-01"),null);
+ assert.equal(matchOrderStock("Disney estándar perfil",[{...stock[0],expiresOn:"2026-01-01"}],"2026-01-01"),null);
+ assert.equal(matchOrderStock("Disney estándar perfil",[stock[0],{...stock[0],id:"annual",durationMonths:12}],"2026-01-01"),null);
+});
 test("automatic assignment picks the oldest matching available account but never guesses between types", () => {
   const base = { businessId:null,status:"available",platform:"Fixture",accountType:"Completa",stockKind:"complete",username:"fixture@example.invalid",password:"fixture",expiresOn:null,parentStockId:null,createdAt:"2026-01-01" };
   const first = {...base,id:"first"}, later = {...base,id:"later",createdAt:"2026-02-01"};
