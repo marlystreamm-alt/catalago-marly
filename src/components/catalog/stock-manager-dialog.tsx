@@ -58,7 +58,7 @@ import { getPrimaryFichaTemplate, renderDeliveryFicha } from "@/lib/delivery-fic
 
 type FeatureMap = Record<string, boolean>;
 type HistoryRow = { id: string; action: string; detail: string; createdAt: string };
-type StockTab = "available" | "sold" | "expiring" | "expired";
+type StockTab = "all" | "available" | "sold" | "expiring" | "expired";
 
 
 const blank = (): StockItem => ({
@@ -123,7 +123,7 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 
 export function StockManagerDialog({
   embedded = false,
-  initialTab = "available",
+  initialTab = "all",
   autoAdd = false,
   ownerToken,
   ownerFeatures,
@@ -163,7 +163,7 @@ export function StockManagerDialog({
   const [history, setHistory] = useState<HistoryRow[]>([]);
 
   const [deliver, setDeliver] = useState<StockItem | null>(null);
-  const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string} | null>(null);
+  const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string; ficha:string} | null>(null);
   const [deliverClient, setDeliverClient] = useState("");
   const [registeredClients, setRegisteredClients] = useState<{id:string; name:string; whatsapp:string}[]>([]);
   const [clientChoice, setClientChoice] = useState("manual");
@@ -492,12 +492,12 @@ export function StockManagerDialog({
       const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload } });
       if ("completionError" in res && res.completionError) toast.warning(String(res.completionError));
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
-      const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl || link, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
+      const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
       if (ficha) { toast.success("Ficha de entrega preparada"); }
       const platformText = (message || whatsappTemplate)
         .replaceAll("{cliente}", deliverClient || "cliente").replaceAll("{plataforma}", deliver.platform)
         .replaceAll("{usuario}", deliver.username).replaceAll("{vigencia}", `${days} día(s)`).replaceAll("{link}", link);
-      setDeliveryResult({ link, text: platformText, phone: deliverWhatsapp.replace(/\D/g, ""), item: deliver, password: protect ? accessPassword : "" });
+      setDeliveryResult({ link, text: platformText, phone: deliverWhatsapp.replace(/\D/g, ""), item: deliver, password: protect ? accessPassword : "", ficha: ficha || "" });
       toast.success("Entrega registrada");
       setDeliver(null); setAccessPassword(""); setConfirmPassword(""); setDeliverSalePrice(""); setDeliverOrderRef(""); setDeliveryAttachment(null); setProtect(true);
       await load();
@@ -516,6 +516,7 @@ export function StockManagerDialog({
   };
 
   const countTab = (tab: StockTab) => {
+    if (tab === "all") return items.length;
     if (tab === "available") return items.filter((x) => x.status === "available").length;
     if (tab === "sold") return soldItems.length;
     if (tab === "expiring") return renewalItems.filter((x) => (daysUntil(x.expiresOn) ?? -1) >= 0).length;
@@ -542,6 +543,7 @@ export function StockManagerDialog({
 
             <div className="flex flex-wrap gap-2">
               {([
+                ["all", "Todos"],
                 ["available", "Disponibles"],
                 ["sold", "Vendidas"],
                 ["expiring", "Por vencer"],
@@ -675,6 +677,7 @@ export function StockManagerDialog({
             <DialogHeader><DialogTitle>Entrega registrada</DialogTitle><DialogDescription>Elige cómo compartir el servicio con tu cliente.</DialogDescription></DialogHeader>
             {deliveryResult ? <div className="grid gap-2">
               {can("stock_view_password") ? <Button onClick={() => void copyFullAccess(deliveryResult.item)}><Copy className="mr-1 size-4" />Copiar credenciales</Button> : null}
+              {can("stock_view_password") && deliveryResult.ficha ? <Button variant="outline" onClick={() => void copyValue("Ficha de entrega", deliveryResult.ficha)}>Copiar ficha de entrega</Button> : null}
               <Button variant="outline" onClick={() => void copyValue("Enlace de entrega", deliveryResult.link)}>🔗 Copiar enlace de entrega</Button>
               <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent(deliveryResult.text), "_blank", "noopener,noreferrer")}><MessageCircle className="mr-1 size-4" />Compartir por WhatsApp</Button>
               {deliveryResult.password ? <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent("Contraseña del documento protegido: " + deliveryResult.password), "_blank", "noopener,noreferrer")}>Enviar contraseña del documento por WhatsApp</Button> : null}
