@@ -162,6 +162,7 @@ export function StockManagerDialog({
   const [history, setHistory] = useState<HistoryRow[]>([]);
 
   const [deliver, setDeliver] = useState<StockItem | null>(null);
+  const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string} | null>(null);
   const [deliverClient, setDeliverClient] = useState("");
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
@@ -480,23 +481,12 @@ export function StockManagerDialog({
       if ("completionError" in res && res.completionError) toast.warning(String(res.completionError));
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
       const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl || link, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
-      if (ficha) { await copyText(ficha); toast.success("Entrega realizada · ficha copiada"); }
+      if (ficha) { toast.success("Ficha de entrega preparada"); }
       const platformText = (message || whatsappTemplate)
         .replaceAll("{cliente}", deliverClient || "cliente").replaceAll("{plataforma}", deliver.platform)
         .replaceAll("{usuario}", deliver.username).replaceAll("{vigencia}", `${days} día(s)`).replaceAll("{link}", link);
-      if (protect) {
-        await copyText(platformText);
-        toast.success("Mensaje con enlace copiado · ahora envía la contraseña por WhatsApp");
-        const passwordText = `Hola ${deliverClient || ""} 😊\nContraseña de tu documento protegido: ${accessPassword}`;
-        const digits = deliverWhatsapp.replace(/\D/g, "");
-        if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(passwordText)}`, "_blank", "noopener,noreferrer");
-        else await copyText(passwordText);
-      } else {
-        const digits = deliverWhatsapp.replace(/\D/g, "");
-        if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(platformText)}`, "_blank", "noopener,noreferrer");
-        else await copyText(platformText);
-        toast.success("Documento sin contraseña listo · un solo enlace");
-      }
+      setDeliveryResult({ link, text: platformText, phone: deliverWhatsapp.replace(/\D/g, ""), item: deliver, password: protect ? accessPassword : "" });
+      toast.success("Entrega registrada");
       setDeliver(null); setAccessPassword(""); setConfirmPassword(""); setDeliverSalePrice(""); setDeliverOrderRef(""); setDeliveryAttachment(null); setProtect(true);
       await load();
     } catch (e) { toast.error(err(e)); } finally { setBusy(false); }
@@ -663,6 +653,19 @@ export function StockManagerDialog({
               </div>
               <div className="flex gap-2"><Button onClick={() => void send()} disabled={busy}><MessageCircle className="mr-1 size-4" />Entregar</Button><Button variant="outline" onClick={() => setDeliver(null)}>Cancelar</Button></div>
             </> : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(deliveryResult)} onOpenChange={value => { if (!value) setDeliveryResult(null); }}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader><DialogTitle>Entrega registrada</DialogTitle><DialogDescription>Elige cómo compartir el servicio con tu cliente.</DialogDescription></DialogHeader>
+            {deliveryResult ? <div className="grid gap-2">
+              {can("stock_view_password") ? <Button onClick={() => void copyFullAccess(deliveryResult.item)}><Copy className="mr-1 size-4" />Copiar credenciales</Button> : null}
+              <Button variant="outline" onClick={() => void copyValue("Enlace de entrega", deliveryResult.link)}>🔗 Copiar enlace de entrega</Button>
+              <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent(deliveryResult.text), "_blank", "noopener,noreferrer")}><MessageCircle className="mr-1 size-4" />Compartir por WhatsApp</Button>
+              {deliveryResult.password ? <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent("Contraseña del documento protegido: " + deliveryResult.password), "_blank", "noopener,noreferrer")}>Enviar contraseña del documento por WhatsApp</Button> : null}
+              <Button variant="ghost" onClick={() => setDeliveryResult(null)}>Cerrar</Button>
+            </div> : null}
           </DialogContent>
         </Dialog>
 
