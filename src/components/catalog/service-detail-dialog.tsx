@@ -2,6 +2,7 @@ import { copyText } from "@/lib/browser/clipboard";
 import { ArrowLeft, Link2, MessageCircle, ShoppingCart, Star } from "lucide-react";
 import { toast } from "sonner";
 import { reportOrder } from "@/lib/notify/client";
+import { OnRequestDialog } from "./on-request-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,7 +55,7 @@ export function ServiceDetailDialog({
     ["Categoría", category?.name ?? "—"],
     ["Subsección", subsection?.name ?? "—"],
     ...serviceFacts(service, catalog).map((f) => [f.label, f.value.trim()] as [string, string]),
-    ["Estado", service.active ? "Disponible" : "No disponible"],
+    ["Estado", service.active ? service.onRequest ? "Por encargo" : "Disponible" : "No disponible"],
   ];
 
   return (
@@ -125,7 +126,8 @@ export function ServiceDetailDialog({
         ) : null}
 
         <DialogFooter className="flex-col gap-2 sm:flex-row">
-          {!(catalog.spaceType === "directory" || catalog.spaceType === "provider") ? (
+          {service.onRequest ? <OnRequestDialog service={service} catalog={catalog}/> : null}
+          {!service.onRequest && !(catalog.spaceType === "directory" || catalog.spaceType === "provider") ? (
             <Button
               variant="outline"
               onClick={() => {
@@ -149,7 +151,7 @@ export function ServiceDetailDialog({
             <Link2 className="size-4" />
             Copiar enlace
           </Button>
-          {prefs.showWhatsapp && (!isClient || can("usarWhatsapp")) ? (
+          {!service.onRequest && prefs.showWhatsapp && (!isClient || can("usarWhatsapp")) ? (
             online ? (
               <Button asChild size="lg" className="flex-1 rounded-full shadow-sm">
                 <a

@@ -32,6 +32,7 @@ import { resolveServiceMedia } from "@/lib/catalog/platforms";
 import { ConfirmButton } from "./confirm-button";
 import { addToCart } from "@/lib/catalog/cart";
 import { DirectoryMenuRequestDialog } from "./directory-menu-request-dialog";
+import { OnRequestDialog } from "./on-request-dialog";
 
 export function ServiceCard({
   service,
@@ -92,11 +93,13 @@ export function ServiceCard({
         </div>
         <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-4">
           <h3 className="break-words text-[15px] font-bold leading-tight text-card-foreground sm:text-lg">{service.name}</h3>
+          {service.onRequest ? <Badge className="mt-1 w-fit" variant="secondary">Por encargo</Badge> : null}
           <p className="mt-2 text-xl font-bold tracking-tight text-primary sm:text-2xl">
             {displayPrice(service)}
           </p>
           <div className="mt-auto grid grid-cols-1 gap-2 pt-3">
-            {!isDirectory ? (
+            {service.onRequest ? <OnRequestDialog service={service} catalog={catalog}/> : null}
+            {!isDirectory && !service.onRequest ? (
               <Button
                 type="button"
                 size="lg"
@@ -111,7 +114,7 @@ export function ServiceCard({
                 Agregar al carrito
               </Button>
             ) : null}
-            {allowWhatsapp &&
+            {!service.onRequest && allowWhatsapp &&
             (catalog.whatsappNumber || (service.personalWhatsappEnabled && service.whatsapp)) ? (
               <Button asChild size="lg" className="h-auto min-h-11 min-w-0 gap-1 whitespace-normal rounded-full px-2 py-2 text-xs leading-tight sm:text-sm">
                 <a
@@ -226,6 +229,7 @@ export function ServiceCard({
           </p>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {service.onRequest ? <Badge variant="secondary">Por encargo</Badge> : null}
             {category ? (
               <Badge variant="secondary" className="rounded-full font-medium">
                 {category.name}
@@ -262,7 +266,7 @@ export function ServiceCard({
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {!(catalog.spaceType === "directory" || catalog.spaceType === "provider") ? (
+        {service.onRequest ? null : !(catalog.spaceType === "directory" || catalog.spaceType === "provider") ? (
           <Button
             type="button"
             size="lg"
@@ -304,7 +308,8 @@ export function ServiceCard({
             {!isAdmin ? <DirectoryMenuRequestDialog catalog={catalog} service={service} /> : null}
           </>
         )}
-        {allowWhatsapp &&
+        {service.onRequest && !isAdmin ? <OnRequestDialog service={service} catalog={catalog}/> : null}
+        {!service.onRequest && allowWhatsapp &&
         (catalog.whatsappNumber ||
           ((catalog.spaceType === "directory" || catalog.spaceType === "provider") &&
             service.personalWhatsappEnabled &&

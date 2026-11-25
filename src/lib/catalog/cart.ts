@@ -29,6 +29,7 @@ export function writeCart(lines: CartLine[], catalogId = "clientes") {
   window.dispatchEvent(new Event("ma2-cart-change"));
 }
 export function addToCart(service: Service, catalogId = "clientes") {
+  if (service.onRequest) return;
   const lines = readCart(catalogId);
   const i = lines.findIndex((x) => x.id === service.id);
   if (i >= 0)

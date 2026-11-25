@@ -124,6 +124,7 @@ export function normalizeState(raw: unknown): AppState {
           users: opt(sv.users),
           vigencia: opt(sv.vigencia),
           requirements: opt(sv.requirements),
+          onRequest: sv.onRequest === "link" || sv.onRequest === "email" || sv.onRequest === "both" ? sv.onRequest : undefined,
           whatsapp: opt(sv.whatsapp),
           personalWhatsappEnabled: sv.personalWhatsappEnabled === true,
           whatsappMessage: opt(sv.whatsappMessage),

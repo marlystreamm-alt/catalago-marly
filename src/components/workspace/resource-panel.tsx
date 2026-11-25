@@ -245,12 +245,12 @@ export function ResourcePanel({
                 </div>
               ) : null}
               {def.fields
-                .filter((f) => r.data[f.key] && f.key !== "clientId")
+                .filter((f) => r.data[f.key] && f.key !== "clientId" && !(module === "requests" && f.key === "platform" && r.data[f.key].trim().toLowerCase() === r.title.trim().toLowerCase()))
                 .slice(0, 5)
                 .map((f) => (
                   <div className="mt-2" key={f.key}>
                     <small className="text-muted-foreground">{f.label}</small>
-                    <p className="whitespace-pre-wrap break-words text-sm">{r.data[f.key]}</p>
+                    {module === "requests" && f.key === "deliveryUrl" ? <div><Button type="button" size="sm" variant="outline" onClick={async()=>{await copyText(r.data[f.key]);toast.success("Enlace copiado");}}>Copiar enlace de entrega</Button></div> : <p className="whitespace-pre-wrap break-words text-sm">{r.data[f.key]}</p>}
                   </div>
                 ))}
               {module === "referrals" ? (

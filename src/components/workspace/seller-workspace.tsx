@@ -1,5 +1,6 @@
 import { CustomerManager } from "@/components/customer/customer-manager";
 import { WebOrders } from "@/components/customer/web-orders";
+import { OnRequestInventory } from "@/components/catalog/on-request-inventory";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -558,7 +559,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       />
     ) : null;
   else if (section === "inventory")
-    content = <StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />;
+    content = <div className="space-y-4"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Stock disponible</button><button className={tab==="on-request"?"active":""} onClick={()=>setTab("on-request")}>Por encargo</button></div>{tab==="on-request"?<OnRequestInventory/>:<StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />}</div>;
   else if (section === "expiry") content = <StockInsights />;
   else if (section === "sales") content = <StockInsights sales />;
   else if (section === "wallet")
@@ -594,7 +595,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
     content = (
       <>
         <div className="seller-tabs">
-          <button className={tab === "main" ? "active" : ""} onClick={() => setTab("main")}>
+          <button className={tab === "main" ? "active" : ""} onClick={() => {setSelectedOrderId(null);setTab("main");}}>
             CyberDocs y entregas
           </button>
           <button className={tab === "web" ? "active" : ""} onClick={() => setTab("web")}>Página web</button>
@@ -602,7 +603,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
             Por encargo
           </button>
         </div>
-        {tab === "main" ? <CyberDocsOrdersDialog key={selectedOrderId || "all"} embedded initialSelectedId={selectedOrderId} /> : tab === "web" ? <WebOrders onOpenOrder={id => { setSelectedOrderId(id); setTab("main"); }} /> : resource("requests")}
+        {tab === "main" ? <CyberDocsOrdersDialog key={selectedOrderId || "all"} embedded initialSelectedId={selectedOrderId} /> : tab === "web" ? <WebOrders key="web" onOpenOrder={id => { setSelectedOrderId(id); setTab("main"); }} /> : <div className="space-y-4"><WebOrders key="encargo" onRequestOnly onOpenOrder={id => {setSelectedOrderId(id);setTab("main");}}/><details className="seller-card"><summary className="cursor-pointer font-semibold">Historial de encargos manuales</summary><div className="mt-3">{resource("requests")}</div></details></div>}
       </>
     );
   else if (section === "questions")
@@ -681,7 +682,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
           ))}
         </div>
         {tab === "main" ? (
-          resource("config")
+          <div className="space-y-3"><section className="seller-card space-y-2"><h3 className="font-bold">Contacto y mensajes del catálogo</h3><p className="text-xs text-muted-foreground">Edita el WhatsApp y las plantillas utilizadas en los pedidos.</p><Button onClick={()=>setSettings(true)}>Editar contacto y mensajes</Button></section><details className="seller-card"><summary className="cursor-pointer font-semibold">Configuración adicional</summary><div className="mt-3">{resource("config")}</div></details></div>
         ) : tab === "notifications" ? (
           <NotificationsDialog embedded />
         ) : (

@@ -232,23 +232,24 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
         cyberdocsIntegrationStatus({ data: { code } }),
         cyberdocsListStock({ data: { code } }),
       ]);
-      setOrders(nextOrders);
+      const relevantOrders=embedded ? nextOrders.filter(o=>initialSelectedId ? o.id===initialSelectedId : o.sourceKey!=="web_catalog") : nextOrders;
+      setOrders(relevantOrders);
       setCheckedIds((current) =>
         new Set([...current].filter((id) => nextOrders.some((order) => order.id === id && !terminal(order)))),
       );
       setStatus(nextStatus);
       setStock(nextStock);
       setSelectedId((current) =>
-        current && nextOrders.some((order) => order.id === current)
+        current && relevantOrders.some((order) => order.id === current)
           ? current
-          : nextOrders[0]?.id || null,
+          : null,
       );
     } catch (error) {
       toast.error(errorText(error));
     } finally {
       setBusy(false);
     }
-  }, [code]);
+  }, [code,embedded,initialSelectedId]);
 
   const checkAlexa = useCallback(async () => {
     try { setAlexaStatus(await cyberdocsAlexaStatus({ data: { code } })); }
@@ -1004,7 +1005,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
                             <Button type="button" variant={deliverySource === "stock" ? "default" : "outline"} onClick={() => { setDeliverySource("stock"); setStockItemId(""); setWithPassword(true); generateDocumentPassword(); }} disabled={busy}>
                               <PackageCheck className="mr-1 size-4" />Cuentas disponibles
                             </Button>
-                            <Button type="button" variant={deliverySource === "manual" ? "default" : "outline"} onClick={() => { setDeliverySource("manual"); setManualPlatform(selected.serviceName || ""); setWithPassword(true); generateDocumentPassword(); }} disabled={busy}>
+                            <Button type="button" variant={deliverySource === "manual" ? "default" : "outline"} onClick={() => { setDeliverySource("manual"); setManualPlatform(selected.serviceName || ""); setManualType(selected.sourceLabel === "Por encargo" ? "link" : "full"); setWithPassword(true); generateDocumentPassword(); }} disabled={busy}>
                               Entrega manual
                             </Button>
                           </div>

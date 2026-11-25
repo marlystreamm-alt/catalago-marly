@@ -22,6 +22,11 @@ test("purchase IDs are stable and separated across notifications, documents, and
 });
 const { parseCyberDocsMessage } = await import(await compile("src/lib/cyberdocs/parser.ts"));
 const { extraOrderDetails } = await import(await compile("src/lib/cyberdocs/order-details.ts"));
+const { isOnRequestMessage, requestEmail } = await import(await compile("src/lib/catalog/on-request.ts"));
+test("on-request orders are classified separately and retain the customer activation email",()=>{
+ const message="Modalidad: Por encargo\nServicio: Fixture\nCorreo del cliente: buyer@example.invalid\nWhatsApp del cliente: 8441234567";
+ assert.equal(isOnRequestMessage(message),true);assert.equal(requestEmail(message),"buyer@example.invalid");assert.equal(isOnRequestMessage("Hola, me interesa por encargo"),false);assert.equal(requestEmail("sin correo"),"");
+});
 test("expanded order cards keep additional details without repeating standard data", () => {
   assert.deepEqual(extraOrderDetails({id:"fixture",cliente:"Cliente",servicio:"Producto","contacto_(whatsapp)":"phone",fecha:"today",correo:"example.invalid",notas:"Detalle",Notas:"Repetido"}), [["correo","example.invalid"],["notas","Detalle"]]);
 });

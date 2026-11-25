@@ -75,6 +75,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
   const [loadError, setLoadError] = useState("");
   const [settings, setSettings] = useState<NotifySettings>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<CloudOrder[]>([]);
+  const [noticeView,setNoticeView]=useState<"pending"|"all">("pending");
   const [devices, setDevices] = useState<NotifyDevice[]>([]);
   const [log, setLog] = useState<NotifyLogEntry[]>([]);
   const [logFilter, setLogFilter] = useState("todos");
@@ -259,7 +260,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                 Ajustes
               </TabsTrigger>
               <TabsTrigger value="pedidos" className="text-xs">
-                Pedidos {pendientes ? `(${pendientes})` : ""}
+                Avisos {pendientes ? `(${pendientes})` : ""}
               </TabsTrigger>
               <TabsTrigger value="dispositivos" className="text-xs">
                 Equipos
@@ -272,7 +273,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
             <TabsContent value="config" className="space-y-4 pt-3">
               <Row
                 label="Avisos activados"
-                hint="Apaga esto para dejar de registrar y avisar pedidos."
+                hint="Apaga los avisos sin impedir que se guarden los pedidos."
                 checked={settings.enabled}
                 onChange={(v) => void save({ ...settings, enabled: v })}
               />
@@ -509,12 +510,14 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
               >
                 <RefreshCw className="size-4" /> Actualizar
               </Button>
-              {!orders.length && (
+              <p className="text-xs text-muted-foreground">Aquí solo se administran las notificaciones; las entregas se gestionan en Pedidos y los vencimientos en Por vencer.</p>
+              <div className="flex flex-wrap gap-2"><Button size="sm" variant={noticeView==="pending"?"default":"outline"} onClick={()=>setNoticeView("pending")}>Pendientes</Button><Button size="sm" variant={noticeView==="all"?"default":"outline"} onClick={()=>setNoticeView("all")}>Historial completo</Button></div>
+              {!orders.filter(o=>noticeView==="all"||o.status==="nuevo").length && (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Todavía no hay pedidos registrados.
+                  No hay avisos en esta vista.
                 </p>
               )}
-              {orders.map((o) => (
+              {orders.filter(o=>noticeView==="all"||o.status==="nuevo").map((o) => (
                 <div key={o.id} className="rounded-2xl border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -524,8 +527,9 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                           : o.serviceName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {o.catalogName} · {money(o.total)} · {when(o.createdAt)}
+                        {o.catalogId.startsWith("renewal-")?"Renovación":o.catalogName} · {when(o.createdAt)}
                       </p>
+                      {o.catalogId.startsWith("renewal-") && o.message ? <p className="text-xs break-words">{o.message}</p> : null}
                     </div>
                     <Badge variant={o.status === "nuevo" ? "default" : "secondary"}>
                       {o.status === "nuevo" ? "Pendiente" : "Atendido"}

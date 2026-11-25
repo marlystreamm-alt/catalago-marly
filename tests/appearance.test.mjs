@@ -43,3 +43,7 @@ test('main catalog appearance survives JSON reload and stays separate per catalo
  const state=createSeedState();state.catalogs.clientes.appearance={...theme.DEFAULT_APPEARANCE,cardOpacity:35,season:'halloween',coverImage:'https://example.test/cover.png'};
  const reloaded=normalizeState(JSON.parse(JSON.stringify(state)));assert.deepEqual(reloaded.catalogs.clientes.appearance,state.catalogs.clientes.appearance);assert.equal(reloaded.catalogs.revendedores.appearance.season,'normal');
 });
+test('on-request products retain their delivery modality after catalog synchronization',()=>{
+ const state=createSeedState();state.catalogs.clientes.services[0].onRequest='both';state.catalogs.clientes.services[1].onRequest='invalid';
+ const reloaded=normalizeState(JSON.parse(JSON.stringify(state)));assert.equal(reloaded.catalogs.clientes.services[0].onRequest,'both');assert.equal(reloaded.catalogs.clientes.services[1].onRequest,undefined);
+});

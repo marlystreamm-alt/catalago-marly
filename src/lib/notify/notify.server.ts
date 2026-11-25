@@ -275,9 +275,11 @@ async function createCyberDocsRenewalAlerts(settings: NotifySettings) {
     const serviceName = String(row["service_name"] ?? "Servicio");
     const clientName = String(row["client_name"] ?? "Cliente");
     const orderId = String(row["id"]);
-    const { data: notification, error: insertError } = await db
+    const { purchaseRecordId } = await import("@/lib/customer/purchase-identity.server");
+    const { data: insertedNotification, error: insertError } = await db
       .from("orders")
-      .insert({
+      .upsert({
+        id: purchaseRecordId("cyberdocs-renewal",orderId,expiresOn),
         catalog_id: `renewal-${orderId}-${expiresOn}`,
         catalog_name: "Renovaciones",
         service_name: `Renovación próxima: ${serviceName}`,
@@ -286,13 +288,15 @@ async function createCyberDocsRenewalAlerts(settings: NotifySettings) {
         message: `${clientName} vence ${days === 0 ? "hoy" : `en ${days} día(s)`}. Ofrece la renovación por WhatsApp.`,
         link: "/?cyberdocs=1",
         recipient: "",
-      })
+      }, {onConflict:"id",ignoreDuplicates:true})
       .select("*")
-      .single();
-    if (insertError || !notification) {
+      .maybeSingle();
+    if (insertError) {
       console.error("No se creó el aviso de renovación:", insertError?.message);
       continue;
     }
+    const notification = insertedNotification || (await db.from("orders").select("*").eq("id",purchaseRecordId("cyberdocs-renewal",orderId,expiresOn)).maybeSingle()).data;
+    if (!notification) continue;
 
     const { error: updateError } = await db
       .from("cyberdocs_orders")
@@ -306,6 +310,7 @@ async function createCyberDocsRenewalAlerts(settings: NotifySettings) {
       console.error("No se enlazó el aviso de renovación:", updateError.message);
       continue;
     }
+    if (!insertedNotification) continue;
     await db.from("cyberdocs_order_events").insert({
       order_id: orderId,
       action: "renewal_alert_created",
