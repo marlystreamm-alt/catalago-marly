@@ -52,6 +52,7 @@ export const activateMonthlyShop = createServerFn({ method: "POST" })
         "-" +
         data.saleId.slice(0, 8);
     const { DEFAULT_FEATURES } = await import("@/lib/menus/types");
+    const isPro = sale.planId === "pro";
     const features = {
       ...DEFAULT_FEATURES,
       edit_prices: true,
@@ -87,6 +88,10 @@ export const activateMonthlyShop = createServerFn({ method: "POST" })
     });
     if (saved.error)
       throw new Error("No se pudo activar. Revisa si ya aparece en Negocios antes de reintentar");
+    if (isPro) {
+      const enabled = await db.from("menu_businesses").update({ multi_admin: true }).eq("id", saved.data.businessId);
+      if (enabled.error) throw new Error("Tienda creada; falta habilitar el equipo PRO");
+    }
     return {
       slug,
       username: slug,
