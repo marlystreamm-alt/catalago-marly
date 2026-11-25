@@ -8,22 +8,11 @@ const SALE_CHANNEL = "ma2_sale";
 const DEMO_CHANNEL = "ma2_demo";
 const DEFAULT: SalesConfig = {
   enabled: false,
-  demoMinutes: 20,
+  demoMinutes: 60,
   paymentInstructions: "",
   plans: [
-    { id: "basico", name: "Básico", monthly: 39, description: "Funciones esenciales para empezar" },
-    {
-      id: "negocio",
-      name: "Negocio",
-      monthly: 69,
-      description: "La opción recomendada para administrar y vender",
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      monthly: 99,
-      description: "Más herramientas para negocios con mayor movimiento",
-    },
+    { id: "business", name: "MA² Business", monthly: 110, description: "Tienda, stock, clientes, recargas manuales y Alexa." },
+    { id: "pro", name: "MA² Business PRO", monthly: 160, description: "Incluye recargas automáticas y ayudantes con permisos." },
   ],
   updatedAt: new Date(0).toISOString(),
 };
