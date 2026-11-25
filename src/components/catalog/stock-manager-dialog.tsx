@@ -125,6 +125,7 @@ export function StockManagerDialog({
   embedded = false,
   initialTab = "all",
   autoAdd = false,
+  initialClient,
   ownerToken,
   ownerFeatures,
   whatsappTemplate = "Hola {cliente}, aquí tienes tu entrega: {link}",
@@ -132,6 +133,7 @@ export function StockManagerDialog({
   embedded?: boolean;
   initialTab?: StockTab;
   autoAdd?: boolean;
+  initialClient?: {id:string;name:string;whatsapp:string};
   ownerToken?: string;
   ownerFeatures?: FeatureMap;
   whatsappTemplate?: string;
@@ -172,10 +174,10 @@ export function StockManagerDialog({
   useEffect(() => {
     if (!deliveryOpen || !admin) return;
     let active = true;
-    setClientChoice("manual"); setClientLoadError(false); setRegisteredClients([]);
+    setClientChoice(initialClient?.id || "manual"); setClientLoadError(false); setRegisteredClients(initialClient ? [initialClient] : []);
     void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || ""}))); }).catch(() => { if (active) setClientLoadError(true); });
     return () => { active = false; };
-  }, [deliveryOpen, admin, code]);
+  }, [deliveryOpen, admin, code, initialClient]);
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
@@ -527,6 +529,7 @@ export function StockManagerDialog({
     <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>} className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Gestor</DialogTitle>
+          {initialClient ? <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name} · Selecciona una cuenta disponible y abre Entrega manual.</p> : null}
           <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
         </DialogHeader>
 
@@ -625,7 +628,7 @@ export function StockManagerDialog({
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && can("stock_add") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(initialClient?.name || ""); setDeliverWhatsapp(initialClient?.whatsapp || ""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
