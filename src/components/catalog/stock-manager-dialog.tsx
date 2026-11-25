@@ -484,7 +484,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       const payload = {
-        itemId: deliver.id, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
+        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
         stockExpiresOn: deliverStockExpires || null, salePrice: Number(deliverSalePrice) || 0,
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
