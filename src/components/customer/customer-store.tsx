@@ -124,7 +124,12 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
   }, [slug]);
   useEffect(() => {
     if (data && !data.mustChange && (tab === "tienda" || tab === "inicio")) void loadProducts();
-  }, [Boolean(data), data?.mustChange, tab, loadProducts]);
+  }, [Boolean(data), data?.mustChange, data?.priceTier, tab, loadProducts]);
+  useEffect(()=>{
+    if(!data)return;
+    const refresh=()=>{void load();if(tab==="tienda"||tab==="inicio")void loadProducts();};
+    window.addEventListener("focus",refresh);return ()=>window.removeEventListener("focus",refresh);
+  },[Boolean(data),tab,load,loadProducts]);
   const support = `https://wa.me/${phoneNumber(shop?.whatsapp || "")}?text=${encodeURIComponent(`Hola, necesito ayuda con mi cuenta de ${shop?.name || "la tienda"}.`)}`;
   const action = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -233,12 +238,12 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
             <span className="buyer-logo">MA²</span>
           )}
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{data ? "MI CUENTA" : "BIENVENIDO"}</p>
+            <p className="text-xs text-muted-foreground">{data ? data.priceTier === "reseller" ? "MI CUENTA · REVENDEDOR" : "MI CUENTA" : "BIENVENIDO"}</p>
             <h1 className="font-bold truncate">{shop.name}</h1>
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={mainStoreLink()}>Catálogo</a></Button>}
+          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={data.priceTier==="reseller"?"/?cat=revendedores":mainStoreLink()}>Catálogo</a></Button>}
           {data ? (
             <>
               <button
@@ -532,7 +537,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
             {tab === "tienda" ? (
               <>
                 <p className="mb-4 text-sm text-muted-foreground">
-                  Precios y disponibilidad comprobados al comprar. Recibe tus accesos aquí mismo.
+                  {data.priceTier === "reseller" ? "Estás viendo las tarifas de revendedor. Solo aparecen productos con precio de revendedor configurado." : "Precios para cliente normal."} Disponibilidad y precio comprobados al comprar. Recibe tus accesos aquí mismo.
                 </p>
                 <Input
                   aria-label="Buscar producto"
@@ -574,7 +579,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
                   </p>
                 ) : null}
                 <Button variant="outline" className="mt-5" asChild>
-                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
+                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : data.priceTier==="reseller"?"/?cat=revendedores":mainStoreLink()}>
                     Catálogo y pedidos por WhatsApp
                   </a>
                 </Button>

@@ -27,7 +27,7 @@ export const customerManageLoad = createServerFn({ method: "POST" })
     let q = ctx.s
       .opsDB()
       .from("ma2_customer_accounts")
-      .select("id,client_id,email,active,must_change")
+      .select("id,client_id,email,active,must_change,price_tier")
       .order("created_at", { ascending: false })
       .limit(200);
     q = ctx.business ? q.eq("business_id", ctx.business) : q.is("business_id", null);
@@ -61,6 +61,7 @@ export const customerManageLoad = createServerFn({ method: "POST" })
         active: boolean;
         must_change: boolean;
         balance: number;
+        price_tier: "retail" | "reseller";
       }[],
       requests: records
         .filter(
@@ -79,6 +80,12 @@ export const customerManageLoad = createServerFn({ method: "POST" })
         })),
     };
   });
+export const customerManageTier = createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({accountId:z.string().uuid(),tier:z.enum(["retail","reseller"])}).parse(v)).handler(async({data})=>{
+  const ctx=await context(data);if(ctx.business||data.ownerToken) throw new Error("Solo MA² puede administrar estas tarifas");
+  const a=await account(ctx,data.accountId);
+  const r=await ctx.s.opsDB().from("ma2_customer_accounts").update({price_tier:data.tier}).eq("id",a.id).is("business_id",null).select("id").maybeSingle();
+  if(r.error||!r.data) throw new Error("No se pudo actualizar la categoría");return {ok:true};
+});
 export const customerManageCredit = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     auth

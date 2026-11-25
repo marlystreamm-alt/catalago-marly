@@ -103,6 +103,7 @@ export const customerLoad = createServerFn({ method: "POST" })
       shop: ctx.shop,
       name: ctx.client.title,
       email: String(ctx.account.email),
+      priceTier: !ctx.shop.id && ctx.account.price_tier === "reseller" ? "reseller" as const : "retail" as const,
       mustChange: Boolean(ctx.account.must_change),
       ...s.totals(entries),
       entries: entries.slice(0, 100),
@@ -147,12 +148,11 @@ export const customerProducts = createServerFn({ method: "POST" })
         "id,platform,account_type,stock_kind,sale_price,duration_months,expires_on,starts_on_sale",
       )
       .eq("status", "available")
-      .gt("sale_price", 0)
       .neq("username", "")
       .neq("password_cipher", "")
       .order("created_at", { ascending: true })
       .limit(1000);
-    q = ctx.shop.id ? q.eq("business_id", ctx.shop.id) : q.is("business_id", null);
+    q = ctx.shop.id ? q.eq("business_id", ctx.shop.id).gt("sale_price",0) : q.is("business_id", null);
     const r = await q;
     if (r.error) throw new Error("No se pudo cargar la tienda");
     let children = s
@@ -167,19 +167,26 @@ export const customerProducts = createServerFn({ method: "POST" })
     if (cr.error) throw new Error("No se pudo comprobar el stock");
     const parents = new Set((cr.data || []).map((v: any) => v.parent_stock_id)),
       today = (await import("@/lib/stock/duration")).businessToday();
-    return (r.data || [])
+    const eligible=(r.data || [])
       .filter(
         (v: any) =>
           !parents.has(v.id) &&
           v.account_type !== "split_parent" &&
           (!v.expires_on || v.expires_on >= today),
-      )
+      );
+    const priceMap=new Map<string,number>();
+    if(!ctx.shop.id&&eligible.length) {
+      const prices=await s.opsDB().rpc("ma2_customer_prices",{p_account:ctx.account.id,p_stock_ids:eligible.map((v:any)=>v.id)});
+      if(prices.error) throw new Error("No se pudo comprobar tu tarifa");
+      for(const v of prices.data||[]) if(Number(v.price_cents)>0) priceMap.set(String(v.stock_id), Number(v.price_cents));
+    }
+    return eligible.filter((v:any)=>ctx.shop.id||priceMap.has(String(v.id)))
       .map((v: any) => ({
         id: String(v.id),
         name: String(v.platform),
         type: String(v.account_type),
         kind: String(v.stock_kind),
-        priceCents: Math.round(Number(v.sale_price) * 100),
+        priceCents: ctx.shop.id ? Math.round(Number(v.sale_price) * 100) : priceMap.get(String(v.id))!,
         months: Number(v.duration_months),
         expiresOn: v.starts_on_sale ? null : (v.expires_on as string | null),
       }));

@@ -30,7 +30,7 @@ const ctx = url(
   `export const customerContext=async slug=>{if(!globalThis.__customer.allowed)throw new Error('Denied');return globalThis.__customer.context;};export const customerRecords=async()=>globalThis.__customer.records;export const customerShop=async()=>globalThis.__customer.context.shop;export const customerThrottle=async()=>{};export const customerOwner=async token=>{if(token!=='owner_valid')throw new Error('Unauthorized owner');return{business:{id:globalThis.__customer.context.shop.id}}};export const customerLogoutSession=async()=>{};`,
 );
 const ops = url(
-  `export const opsDB=()=>({from:table=>{const calls=globalThis.__customer.calls;calls.push({table});const q={select:()=>q,eq:(key,value)=>{calls.push({key,value});return q;},is:(key,value)=>{calls.push({key,value});return q;},not:()=>q,neq:()=>q,gt:()=>q,order:()=>q,limit:()=>q,update:value=>{calls.push({update:value});return q;},in:()=>q,maybeSingle:async()=>({data:globalThis.__customer.single,error:null}),single:async()=>({data:globalThis.__customer.single,error:null}),then:(resolve,reject)=>Promise.resolve({data:table==='stock_items'?globalThis.__customer.stock:[],error:null}).then(resolve,reject)};return q;},rpc:async(name,data)=>{globalThis.__customer.calls.push({name,data});return{data:'request-id',error:null}}});export const walletEntries=async()=>[];export const readRecords=async()=>globalThis.__customer.records;export const readRecord=async()=>globalThis.__customer.record;export const totals=()=>({balance:0,debt:0});export const createRecord=async(module,title,status,data)=>{globalThis.__customer.calls.push({module,title,status,data})};`,
+  `export const opsDB=()=>({from:table=>{const calls=globalThis.__customer.calls;calls.push({table});const q={select:()=>q,eq:(key,value)=>{calls.push({key,value});return q;},is:(key,value)=>{calls.push({key,value});return q;},not:()=>q,neq:()=>q,gt:()=>q,order:()=>q,limit:()=>q,update:value=>{calls.push({update:value});return q;},in:()=>q,maybeSingle:async()=>({data:globalThis.__customer.single,error:null}),single:async()=>({data:globalThis.__customer.single,error:null}),then:(resolve,reject)=>Promise.resolve({data:table==='stock_items'?globalThis.__customer.stock:[],error:null}).then(resolve,reject)};return q;},rpc:async(name,data)=>{globalThis.__customer.calls.push({name,data});if(name==='ma2_customer_prices')return{data:globalThis.__customer.stock.map(v=>({stock_id:v.id,price_cents:globalThis.__customer.context.account.price_tier==='reseller'?v.reseller_cents:Math.round(v.sale_price*100)})),error:null};return{data:'request-id',error:null}}});export const walletEntries=async()=>[];export const readRecords=async()=>globalThis.__customer.records;export const readRecord=async()=>globalThis.__customer.record;export const totals=()=>({balance:0,debt:0});export const createRecord=async(module,title,status,data)=>{globalThis.__customer.calls.push({module,title,status,data})};`,
 );
 const decrypt = url(`export const decryptPayload=async()=>({password:'fixture-password'});`);
 const date = url(`export const businessToday=()=>new Date().toISOString().slice(0,10);`);
@@ -112,6 +112,15 @@ test("purchase derives identity from session and passes exact integer cents and 
     api.customerBuy({ data: { slug: "ma2", stockId, requestId, priceCents: 15.2 } }),
   );
 });
+test("only the MA² administrator can assign reseller pricing",async()=>{
+ const s=fixture(),accountId=crypto.randomUUID();s.single={id:accountId};
+ await assert.rejects(manage.customerManageTier({data:{code:"bad",accountId,tier:"reseller"}}),/Unauthorized/);
+ s.context.shop.id=crypto.randomUUID();
+ await assert.rejects(manage.customerManageTier({data:{ownerToken:"owner_valid",accountId,tier:"reseller"}}),/Solo MA²/);
+ await manage.customerManageTier({data:{code:"ma2s_valid",accountId,tier:"reseller"}});
+ assert.ok(s.calls.some(c=>c.update?.price_tier==="reseller"));
+ assert.ok(s.calls.some(c=>c.key==="business_id"&&c.value===null));
+});
 test("store listings scope inventory and never serialize passwords, supplier panels or costs", async () => {
   const s = fixture(),
     id = crypto.randomUUID();
@@ -136,6 +145,12 @@ test("store listings scope inventory and never serialize passwords, supplier pan
   assert.equal(list[0].priceCents, 1500);
   assert.equal(JSON.stringify(list).includes("SECRET"), false);
   assert.ok(s.calls.some((c) => c.key === "business_id" && c.value === null));
+  s.context.account.price_tier="reseller";
+  s.stock[0].reseller_cents=900;
+  const reseller=await api.customerProducts({data:{slug:"ma2"}});
+  assert.equal(reseller[0].priceCents,900);
+  delete s.stock[0].reseller_cents;
+  assert.deepEqual(await api.customerProducts({data:{slug:"ma2"}}),[]);
 });
 test("delivery requests recheck client ownership and expiry before decrypting snapshot", async () => {
   const s = fixture(),

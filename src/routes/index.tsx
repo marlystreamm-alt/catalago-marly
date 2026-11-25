@@ -541,7 +541,7 @@ function CatalogPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
-                {catalog.id === "clientes" && <Button asChild size="sm" variant="outline"><a href={mainStoreLink("inicio")}>Mi cuenta</a></Button>}
+                {["clientes","revendedores"].includes(catalog.id) && <Button asChild size="sm" variant="outline"><a href={mainStoreLink("inicio")}>Mi cuenta</a></Button>}
                 <Button asChild size="sm" variant="ghost">
                   <a href="/plataforma">Quiero mi propia tienda</a>
                 </Button>

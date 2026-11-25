@@ -8,7 +8,10 @@ export const catalogSyncLoad = createServerFn({ method: "GET" }).handler(async (
   const db = supabaseAdmin as any;
   const { data, error } = await db.from("catalog_app_state").select("state,updated_at").eq("id", 1).maybeSingle();
   if (error) throw new Error(error.message);
-  return { state: (data?.state as AppState | undefined) ?? null, updatedAt: data?.updated_at ?? null };
+  const state=(data?.state as AppState | undefined) ?? null;
+  if(!state) return {state:null,updatedAt:data?.updated_at??null};
+  const {savedPrices,overlayPrices}=await import("@/lib/customer/pricing.server");
+  return { state: overlayPrices(state,await savedPrices()), updatedAt: data?.updated_at ?? null };
 });
 
 export const catalogSyncSave = createServerFn({ method: "POST" })

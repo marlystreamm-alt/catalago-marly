@@ -13,6 +13,7 @@ import {
   customerManageReset,
   customerManageReply,
   customerManageActive,
+  customerManageTier,
 } from "@/lib/customer/manage.functions";
 const err = (e: unknown) => (e instanceof Error ? e.message : "No se pudo completar");
 export function CustomerManager({
@@ -112,6 +113,7 @@ export function CustomerManager({
               {a.active ? "Activo" : "Suspendido"}
               {a.must_change ? " · Cambio de contraseña pendiente" : ""}
             </p>
+            {!ownerToken && slug === "ma2" && <label className="seller-field"><span>Tipo de cliente y tarifa</span><select className="buyer-select" disabled={busy} value={a.price_tier || "retail"} onChange={e=>{const tier=e.target.value as "retail"|"reseller";if(!confirm(`¿Cambiar a ${tier==="reseller"?"Revendedor":"Cliente normal"}? Se aplicará en sus próximas compras.`))return;void action(async()=>{await customerManageTier({data:{...auth(),accountId:a.id,tier}});toast.success("Categoría actualizada");});}}><option value="retail">Cliente normal</option><option value="reseller">Revendedor</option></select></label>}
             <form
               className="grid gap-2"
               onSubmit={(e) => {

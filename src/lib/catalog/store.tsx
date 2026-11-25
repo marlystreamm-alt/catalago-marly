@@ -36,6 +36,7 @@ import { createEmptyCatalog, createSeedState } from "./seed";
 import { loadState, normalizeState, saveState } from "./storage";
 import { catalogSyncLoad, catalogSyncSave } from "./sync.functions";
 import { clearCode, getSavedCode, saveCode } from "@/lib/notify/client";
+import { catalogPriceVariant } from "@/lib/customer/pricing";
 
 import {
   CATALOG_IDS,
@@ -165,6 +166,7 @@ interface StoreValue {
   updateCatalog: (patch: Partial<Omit<Catalog, "id" | "log">>) => void;
   toggleCatalogHidden: (id: CatalogId) => void;
   saveService: (service: Omit<Service, "id"> & { id?: string }) => void;
+  applyCentralPrice: (key: string, retailCents:number|null,resellerCents:number|null) => void;
   /** Guarda de una sola vez toda la lista de servicios del catálogo activo. */
   replaceServices: (services: Service[], summary?: string) => void;
   duplicateService: (id: string) => void;
@@ -774,6 +776,17 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           );
           toast.success(nowHidden ? "Catálogo oculto" : "Catálogo visible");
         }),
+      applyCentralPrice: (key,retailCents,resellerCents) => guard(()=>{
+        setState(prev=>{
+          const catalogs={...prev.catalogs};
+          for(const [id,cents] of [["clientes",retailCents],["revendedores",resellerCents]] as const) {
+            const c=catalogs[id];if(!c||cents==null)continue;
+            const matches=c.services.filter(s=>catalogPriceVariant(s).key===key);if(matches.length!==1)continue;
+            const match=matches[0];catalogs[id]={...c,services:c.services.map(s=>s.id===match.id?{...s,price:cents/100,priceText:undefined}:s)};
+          }
+          return {...prev,catalogs};
+        });
+      }),
       saveService: (incoming) =>
         gp([
           "editNombre",
