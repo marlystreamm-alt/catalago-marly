@@ -1,3 +1,4 @@
+import { opsLoad } from "@/lib/workspace/operations.functions";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
@@ -164,6 +165,17 @@ export function StockManagerDialog({
   const [deliver, setDeliver] = useState<StockItem | null>(null);
   const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string} | null>(null);
   const [deliverClient, setDeliverClient] = useState("");
+  const [registeredClients, setRegisteredClients] = useState<{id:string; name:string; whatsapp:string}[]>([]);
+  const [clientChoice, setClientChoice] = useState("manual");
+  const [clientLoadError, setClientLoadError] = useState(false);
+  const deliveryOpen = Boolean(deliver);
+  useEffect(() => {
+    if (!deliveryOpen || !admin) return;
+    let active = true;
+    setClientChoice("manual"); setClientLoadError(false); setRegisteredClients([]);
+    void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || ""}))); }).catch(() => { if (active) setClientLoadError(true); });
+    return () => { active = false; };
+  }, [deliveryOpen, admin, code]);
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
@@ -625,13 +637,15 @@ export function StockManagerDialog({
             {deliver ? <>
               <DialogHeader><DialogTitle>Entregar · {deliver.platform}</DialogTitle><DialogDescription>Los datos de cliente se capturan aquí, nunca al agregar stock.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => setDeliverClient(e.target.value)} /></div>
-                <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => setDeliverWhatsapp(e.target.value)} /></div>
+                {admin ? <div className="sm:col-span-2"><Label>Cliente registrado (opcional)</Label><Select value={clientChoice} disabled={Boolean(deliverOrderRef)} onValueChange={value => { setClientChoice(value); const client = registeredClients.find(c => c.id === value); if (client) { setDeliverClient(client.name); setDeliverWhatsapp(client.whatsapp); } }}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="manual">Capturar cliente manualmente</SelectItem>{registeredClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.whatsapp}</SelectItem>)}</SelectContent></Select>{clientLoadError ? <p className="text-xs text-muted-foreground">No se pudo cargar el registro. Puedes capturar los datos manualmente.</p> : null}</div> : null}
+                <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverClient(e.target.value); }} /></div>
+                <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverWhatsapp(e.target.value); }} /></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
                 <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} /></div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
                   <Select value={deliverOrderRef || "manual"} onValueChange={(value) => {
                     const selected = cyberdocOrders.find((order) => order.id === value);
+                    setClientChoice("manual");
                     setDeliverOrderRef(selected?.id || "");
                     setDeliverClient(selected?.clientName || "");
                     setDeliverWhatsapp(selected ? selected.whatsapp || (selected.contactLabel === "WhatsApp" ? selected.contactValue : "") : "");
