@@ -30,6 +30,8 @@ import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
 import { copyText } from "@/lib/browser/clipboard";
+import { mainStoreLink, type MainStoreView } from "@/lib/catalog/links";
+import { groupProducts } from "@/lib/customer/group-products";
 import { money, phoneNumber, STATUS } from "@/lib/workspace/model";
 import {
   customerShopInfo,
@@ -57,10 +59,10 @@ const tabs = [
   ["movimientos", "Movimientos", History],
   ["cuenta", "Mi cuenta", User],
 ] as const;
-export function CustomerStore({ slug }: { slug: string }) {
+export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" }: { slug: string; initialView?: MainStoreView; initialQuery?: string }) {
   const [shop, setShop] = useState<Awaited<ReturnType<typeof customerShopInfo>> | null>(null),
     [data, setData] = useState<View | null>(null),
-    [tab, setTab] = useState("inicio"),
+    [tab, setTab] = useState<string>(initialView),
     [menu, setMenu] = useState(false),
     [mode, setMode] = useState("login"),
     [busy, setBusy] = useState(false),
@@ -75,7 +77,7 @@ export function CustomerStore({ slug }: { slug: string }) {
     [currentPassword, setCurrentPassword] = useState("");
   const [products, setProducts] = useState<Product[]>([]),
     [productsError, setProductsError] = useState(""),
-    [query, setQuery] = useState(""),
+    [query, setQuery] = useState(initialQuery),
     [kind, setKind] = useState("all"),
     [ledger, setLedger] = useState("all");
   const [delivery, setDelivery] = useState<Awaited<ReturnType<typeof customerDelivery>> | null>(
@@ -160,9 +162,9 @@ export function CustomerStore({ slug }: { slug: string }) {
       toast.success("Compra confirmada. Tu entrega está en Mis compras.");
     });
   };
-  const productGrid = (list: Product[]) => (
+  const productGrid = (list: Product[], limit?: number) => (
     <div className="buyer-product-grid">
-      {list.map((p) => (
+      {groupProducts(list).slice(0, limit).map(({product: p, count}) => (
         <article key={p.id} className="buyer-product">
           <div className={`buyer-product-cover ${p.kind === "profile" ? "violet" : "aqua"}`}>
             <span className="buyer-pill">
@@ -176,7 +178,7 @@ export function CustomerStore({ slug }: { slug: string }) {
             </p>
             <div className="flex items-center justify-between gap-2">
               <strong className="text-xl text-primary">{money(p.priceCents / 100)}</strong>
-              <span className="text-xs font-semibold text-emerald-700">● Disponible</span>
+              <span className="text-xs font-semibold text-emerald-700">● {count} disponible{count === 1 ? "" : "s"}</span>
             </div>
             <Button
               className="w-full"
@@ -236,6 +238,7 @@ export function CustomerStore({ slug }: { slug: string }) {
           </div>
         </div>
         <div className="flex gap-2 items-center">
+          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={mainStoreLink()}>Catálogo</a></Button>}
           {data ? (
             <>
               <button
@@ -268,7 +271,7 @@ export function CustomerStore({ slug }: { slug: string }) {
             </>
           ) : (
             <Button variant="ghost" size="sm" asChild>
-              <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : "/?cat=clientes"}>
+              <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
                 Ver catálogo
               </a>
             </Button>
@@ -517,7 +520,7 @@ export function CustomerStore({ slug }: { slug: string }) {
                 {productsError ? (
                   <p role="alert">{productsError}</p>
                 ) : products.length ? (
-                  productGrid(products.slice(0, 4))
+                  productGrid(products, 4)
                 ) : (
                   <p className="seller-card text-muted-foreground">
                     Todavía no hay productos listos para compra con saldo. Consulta el catálogo o
@@ -571,7 +574,7 @@ export function CustomerStore({ slug }: { slug: string }) {
                   </p>
                 ) : null}
                 <Button variant="outline" className="mt-5" asChild>
-                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : "/?cat=clientes"}>
+                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
                     Catálogo y pedidos por WhatsApp
                   </a>
                 </Button>

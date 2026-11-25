@@ -1,5 +1,6 @@
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { SellerWorkspace } from "@/components/workspace/seller-workspace";
+import { CustomerStore } from "@/components/customer/customer-store";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { copyText } from "@/lib/browser/clipboard";
@@ -41,7 +42,7 @@ import { InlineLoader, ServiceListSkeleton } from "@/components/catalog/service-
 import { HistoryDialog } from "@/components/catalog/history-dialog";
 import { OrderQueueProvider } from "@/lib/catalog/order-queue";
 import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/catalog/export";
-import { buildCatalogLink } from "@/lib/catalog/links";
+import { buildCatalogLink, mainStoreLink, MAIN_STORE_VIEWS } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
 
@@ -63,6 +64,7 @@ import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/
 /** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
 const searchSchema = z.object({
   cat: fallback(z.string(), "").default(""),
+  vista: fallback(z.enum([...MAIN_STORE_VIEWS, ""]), "").default(""),
   q: fallback(z.string(), "").default(""),
   categoria: fallback(z.string(), "").default(""),
   // Los valores llegan como número (1/0) desde la URL, por eso se convierten a texto.
@@ -92,14 +94,14 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
-  component: () => (
-    <CatalogProvider>
-      <OrderQueueProvider>
-        <CatalogPage />
-      </OrderQueueProvider>
-    </CatalogProvider>
-  ),
+  component: MainPage,
 });
+
+function MainPage() {
+  const search = Route.useSearch();
+  if (search.cat === "clientes" && search.vista) return <CustomerStore key={search.vista + search.q} slug="ma2" initialView={search.vista} initialQuery={search.q} />;
+  return <CatalogProvider><OrderQueueProvider><CatalogPage /></OrderQueueProvider></CatalogProvider>;
+}
 
 const ALL = ALL_CATEGORIES;
 
@@ -493,7 +495,7 @@ function CatalogPage() {
     setFormOpen(true);
   };
 
-  if (isAdmin && homeView) return <SellerWorkspace onCatalog={() => setHomeView(false)} />;
+  if (isAdmin && homeView) return <SellerWorkspace onCatalog={(id) => { if (id) setCatalogId(id); setHomeView(false); }} />;
 
   return (
     <main
@@ -539,9 +541,7 @@ function CatalogPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 [&_button]:rounded-xl">
-                <Button asChild size="sm" variant="outline">
-                  <a href="/tienda/ma2">Mi cuenta · Tienda</a>
-                </Button>
+                {catalog.id === "clientes" && <Button asChild size="sm" variant="outline"><a href={mainStoreLink("inicio")}>Mi cuenta</a></Button>}
                 <Button asChild size="sm" variant="ghost">
                   <a href="/plataforma">Quiero mi propia tienda</a>
                 </Button>
@@ -626,6 +626,16 @@ function CatalogPage() {
             </nav>
           ) : null}
         </header>
+
+        {!isAdmin && catalog.id === "clientes" && <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-4 space-y-3" aria-label="Mi tienda web">
+          <div><h2 className="font-bold">Mi tienda web</h2><p className="text-sm text-muted-foreground">Consulta los precios aquí, compra con tu saldo o solicita productos por encargo.</p></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Button asChild><a href={mainStoreLink("tienda")}>Comprar con saldo</a></Button>
+            <Button asChild variant="outline"><a href={mainStoreLink("saldo")}>Recargar saldo</a></Button>
+            <Button asChild variant="outline"><a href={mainStoreLink("compras")}>Mis compras</a></Button>
+            <Button asChild variant="outline"><a href={mainStoreLink("cuenta")}>Mi cuenta</a></Button>
+          </div>
+        </section>}
 
         {!isAdmin ? <StoreNotices /> : null}
         {isAdmin && homeView ? <AdminDashboard /> : null}

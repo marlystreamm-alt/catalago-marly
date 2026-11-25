@@ -1,5 +1,14 @@
 import type { CatalogId } from "./types";
 
+export const MAIN_STORE_VIEWS = ["inicio", "tienda", "saldo", "compras", "cuenta"] as const;
+export type MainStoreView = (typeof MAIN_STORE_VIEWS)[number];
+export function mainStoreLink(view?: MainStoreView, query?: string) {
+  const params = new URLSearchParams({ cat: "clientes" });
+  if (view) params.set("vista", view);
+  if (query?.trim()) params.set("q", query.trim());
+  return `/?${params.toString()}`;
+}
+
 export interface ShareFilters {
   q?: string;
   categoria?: string;

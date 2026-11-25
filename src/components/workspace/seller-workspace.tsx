@@ -33,7 +33,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { buildCatalogLink } from "@/lib/catalog/links";
+import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { adminDashboard } from "@/lib/stock/dashboard.functions";
@@ -57,6 +57,8 @@ import { AppearanceEditor } from "@/components/catalog/appearance-editor";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
+  ["shop", "🛒", "Mi tienda web"],
+  ["ownCatalogs", "📚", "Mis catálogos"],
   ["reports", "🛠️", "Reportes"],
   ["questions", "💬", "Dudas de clientes"],
   ["expiry", "⏰", "Por vencer"],
@@ -82,7 +84,7 @@ const SECTIONS = [
   ["subscription", "💳", "Planes y suscripciones"],
   ["gallery", "🖼️", "Guías de ingreso"],
   ["deliveries", "🛡️", "Entregas protegidas"],
-  ["catalogs", "🏪", "Catálogos de clientes"],
+  ["catalogs", "🏪", "Catálogos de negocios"],
 ] as const;
 export type Section = (typeof SECTIONS)[number][0];
 type Summary = Awaited<ReturnType<typeof adminDashboard>>;
@@ -94,7 +96,6 @@ export function SellerLayout({
   dark,
   onTheme,
   onLogout,
-  onCatalog,
   children,
   onNotifications,
   appearance,
@@ -106,7 +107,6 @@ export function SellerLayout({
   dark: boolean;
   onTheme: () => void;
   onLogout: () => void;
-  onCatalog: () => void;
   children: ReactNode;
   onNotifications?: () => void;
   appearance?: Appearance;
@@ -118,7 +118,7 @@ export function SellerLayout({
   const nav = (
     <>
       <div className="seller-share">
-        <p>🔗 Link para tus clientes</p>
+        <p>🔗 Enlace de mi tienda web</p>
         <strong className="break-all">{shareUrl.replace(/^https?:\/\//, "")}</strong>
         <div className="seller-share-actions">
           <button onClick={() => void copyText(shareUrl)}>Copiar</button>
@@ -155,14 +155,6 @@ export function SellerLayout({
             {label}
           </button>
         ))}
-        <button
-          onClick={() => {
-            onCatalog();
-            setOpen(false);
-          }}
-        >
-          <span aria-hidden="true">🛍️</span>Editar catálogo público
-        </button>
       </nav>
     </>
   );
@@ -274,12 +266,14 @@ export function SellerLayout({
   );
 }
 const DESCRIPTIONS: Partial<Record<Section, string>> = {
+  shop: "Tu página de ventas, enlace público y acceso de compradores.",
+  ownCatalogs: "Tus listas de precios independientes y el catálogo de tu tienda web.",
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
   sales: "Entregas e importes registrados en tu inventario.",
   wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
   credit: "Registra crédito otorgado y sus abonos, con historial.",
   inventory: "Cuentas completas y perfiles. Agrega stock, copia credenciales y entrega.",
-  orders: "Pedidos de Cyberdoc y solicitudes por encargo.",
+  orders: "Pedidos de CyberDocs, ventas web y solicitudes por encargo.",
   appearance: "Portada, logo, tarjetas, temporadas y transparencia.",
   helpers: "Administra el equipo y los accesos de los catálogos de clientes.",
   assistant: "Consulta tus registros y resultados del negocio.",
@@ -472,7 +466,7 @@ export function SellerHome({
     </div>
   );
 }
-export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
+export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => void }) {
   const store = useCatalogStore();
   const [section, setSection] = useState<Section>("home");
   const [records, setRecords] = useState<OpsRecord[]>([]);
@@ -558,6 +552,12 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
         }}
       />
     ) : null;
+  else if (section === "shop") content = <section className="seller-card space-y-4">
+    <div><h2 className="font-bold text-lg">{store.state.catalogs.clientes?.name || "Mi tienda MA²"}</h2><p className="text-sm text-muted-foreground">Un enlace para consultar tus productos, comprar con saldo, solicitar encargos y recargar.</p></div>
+    <div className="rounded-xl border p-3 space-y-2"><p className="text-xs text-muted-foreground">Enlace para compartir con tus compradores</p><strong className="break-all">{buildCatalogLink("clientes")}</strong><div className="flex flex-wrap gap-2"><Button onClick={() => void copyText(buildCatalogLink("clientes"))}>Copiar enlace</Button><Button variant="outline" asChild><a href={mainStoreLink("tienda")} target="_blank" rel="noopener noreferrer">Abrir tienda web</a></Button></div></div>
+    <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={() => onCatalog("clientes")}>Editar catálogo y precios</Button><Button variant="outline" onClick={() => {navigate("inventory");}}>Inventario disponible</Button><Button variant="outline" onClick={() => {store.setCatalogId("clientes");navigate("inventory");setTab("on-request");}}>Publicar por encargo</Button><Button variant="outline" onClick={() => {navigate("orders");setTab("web");}}>Pedidos web</Button><Button variant="outline" onClick={() => navigate("wallet")}>Recargas y saldos</Button><Button variant="outline" onClick={() => navigate("clients")}>Clientes y suscripciones</Button></div>
+  </section>;
+  else if (section === "ownCatalogs") content = <div className="space-y-3">{Object.values(store.state.catalogs).map(c => <article key={c.id} className="seller-card space-y-3"><div><h2 className="font-bold">{c.name}</h2><p className="text-xs text-muted-foreground">{c.id === "clientes" ? "Catálogo de tu tienda web" : c.id === "cyberdoc" ? "Lista de precios de CyberDocs" : c.id === "revendedores" ? "Lista de precios para revendedores" : "Catálogo independiente"}{c.hidden ? " · Oculto" : ""}</p></div><div className="flex flex-wrap gap-2"><Button onClick={() => onCatalog(c.id)}>Editar</Button><Button variant="outline" onClick={() => void copyText(buildCatalogLink(c.id))}>Copiar enlace</Button>{c.id === "clientes" && <Button variant="outline" onClick={() => navigate("shop")}>Gestionar tienda</Button>}</div></article>)}</div>;
   else if (section === "inventory")
     content = <div className="space-y-4"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Stock disponible</button><button className={tab==="on-request"?"active":""} onClick={()=>setTab("on-request")}>Por encargo</button></div>{tab==="on-request"?<OnRequestInventory/>:<StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />}</div>;
   else if (section === "expiry") content = <StockInsights />;
@@ -705,7 +705,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       <div className="space-y-4">
         <div className="seller-actions">
           <Button onClick={() => setService(true)}>Agregar combo al catálogo</Button>
-          <Button variant="outline" onClick={onCatalog}>
+          <Button variant="outline" onClick={() => onCatalog()}>
             Editar servicios y precios
           </Button>
         </div>
@@ -716,7 +716,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
                 <h3 className="font-bold">{c.name}</h3>
                 <p className="text-2xl font-bold mt-2">{money(c.price)}</p>
                 <p className="text-sm mt-2">{c.description}</p>
-                <Button variant="outline" className="mt-3" onClick={onCatalog}>
+                <Button variant="outline" className="mt-3" onClick={() => onCatalog()}>
                   Editar en catálogo
                 </Button>
               </article>
@@ -750,13 +750,12 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       appearance={store.catalog.appearance}
       onSection={navigate}
       name={store.catalog.name}
-      shareUrl={buildCatalogLink(store.catalogId)}
+      shareUrl={buildCatalogLink("clientes")}
       dark={store.prefs.themeMode === "oscuro"}
       onTheme={() =>
         store.setPrefs({ themeMode: store.prefs.themeMode === "oscuro" ? "claro" : "oscuro" })
       }
       onLogout={store.logout}
-      onCatalog={onCatalog}
       onNotifications={() => {
         navigate("settings");
         setTab("notifications");

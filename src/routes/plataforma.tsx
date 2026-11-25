@@ -65,7 +65,7 @@ function Platform() {
               <a href="/acceso">Ya tengo una tienda</a>
             </Button>
             <Button variant="ghost" asChild>
-              <a href="/tienda/ma2">Soy comprador</a>
+              <a href="/?cat=clientes">Soy comprador</a>
             </Button>
           </div>
         </nav>

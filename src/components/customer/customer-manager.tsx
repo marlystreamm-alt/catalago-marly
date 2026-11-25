@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { copyText } from "@/lib/browser/clipboard";
 import { money, type OpsRecord, STATUS } from "@/lib/workspace/model";
 import { getSavedCode } from "@/lib/notify/client";
+import { mainStoreLink } from "@/lib/catalog/links";
 import {
   customerManageLoad,
   customerManageCredit,
@@ -69,7 +70,7 @@ export function CustomerManager({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => void copyText(`${location.origin}/tienda/${encodeURIComponent(slug)}`)}
+          onClick={() => void copyText(`${location.origin}${slug === "ma2" ? mainStoreLink() : `/tienda/${encodeURIComponent(slug)}`}`)}
         >
           Copiar enlace de la tienda
         </Button>
