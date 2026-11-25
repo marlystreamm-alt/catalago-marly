@@ -45,6 +45,7 @@ async function loadConfig(): Promise<SalesConfig> {
     return {
       ...DEFAULT,
       ...(await (await cryptoLib()).decryptPayload<SalesConfig>(String(data.detail ?? ""))),
+      demoMinutes: 60,
     };
   } catch {
     return DEFAULT;
@@ -222,7 +223,8 @@ export const salesSetStatus = createServerFn({ method: "POST" })
     const { error } = await d
       .from("notification_log")
       .update({ detail, status: data.status })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("channel", SALE_CHANNEL);
     if (error) throw new Error(error.message);
     return item;
   });
@@ -231,7 +233,7 @@ export const salesCreateDemo = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     adminCode
       .extend({
-        minutes: z.union([z.literal(20), z.literal(30), z.literal(60)]),
+        minutes: z.union([z.literal(20), z.literal(30), z.literal(60)]).transform(() => 60 as const),
         label: z.string().max(100).default(""),
       })
       .parse(v),
