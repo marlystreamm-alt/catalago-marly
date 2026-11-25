@@ -170,6 +170,7 @@ export interface CloudOrder {
 
 /** Datos que el cliente envía al registrar un pedido. */
 export interface OrderInput {
+  requestId?: string;
   catalogId: string;
   catalogName: string;
   serviceName: string;

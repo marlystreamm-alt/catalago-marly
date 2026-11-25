@@ -34,6 +34,7 @@ const ops = url(
 );
 const decrypt = url(`export const decryptPayload=async()=>({password:'fixture-password'});`);
 const date = url(`export const businessToday=()=>new Date().toISOString().slice(0,10);`);
+const purchaseNotice = url(`export const notifyPaidPurchase=async (id,businessId)=>{globalThis.__customer.purchaseNotices.push({id,businessId})}`);
 async function moduleAt(path) {
   let s = compile(await read(path));
   for (const [name, target] of Object.entries({
@@ -44,6 +45,7 @@ async function moduleAt(path) {
     "@/lib/notify/notify.server": auth,
     "@/lib/deliveries/deliveries.server": decrypt,
     "@/lib/stock/duration": date,
+    "./purchase-notify.server": purchaseNotice,
   }))
     s = s
       .replaceAll(`'${name}'`, JSON.stringify(target))
@@ -63,6 +65,7 @@ function fixture() {
     },
     records: [],
     calls: [],
+    purchaseNotices: [],
     stock: [],
     single: null,
     record: null,
@@ -103,6 +106,8 @@ test("purchase derives identity from session and passes exact integer cents and 
       p_request: requestId,
     },
   });
+  assert.equal(s.purchaseNotices.length, 1);
+  assert.equal(s.purchaseNotices[0].businessId, null);
   await assert.rejects(
     api.customerBuy({ data: { slug: "ma2", stockId, requestId, priceCents: 15.2 } }),
   );

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 const bodySchema = z.object({
+  requestId: z.string().min(8).max(100).regex(/^[a-zA-Z0-9_-]+$/).optional(),
   catalogId: z.string().max(80).default(""),
   catalogName: z.string().max(120).default(""),
   serviceName: z.string().max(200).default("Servicio"),
@@ -37,9 +38,10 @@ export const Route = createFileRoute("/api/public/orders")({
         );
         const settings = await loadSettings();
         const db = await admin();
-        const { data, error } = await db
-          .from("orders")
-          .insert({
+        const { requestId, ...details } = order;
+        const id = requestId ? (await import("@/lib/customer/purchase-identity.server")).purchaseRecordId("public-order", requestId, JSON.stringify(details)) : undefined;
+        const row = {
+            ...(id ? { id } : {}),
             catalog_id: order.catalogId,
             catalog_name: order.catalogName,
             service_name: order.serviceName,
@@ -48,9 +50,12 @@ export const Route = createFileRoute("/api/public/orders")({
             message: order.message,
             link: order.link,
             recipient: order.recipient,
-          })
+          };
+        const query = id ? db.from("orders").upsert(row, { onConflict: "id", ignoreDuplicates: true }) : db.from("orders").insert(row);
+        const { data, error } = await query
           .select("*")
-          .single();
+          .maybeSingle();
+        if (!error && !data && id) return Response.json({ ok: true, id, duplicate: true });
         if (error || !data) {
           console.error("No se pudo registrar el pedido:", error);
           return Response.json({ error: "No se pudo registrar" }, { status: 500 });

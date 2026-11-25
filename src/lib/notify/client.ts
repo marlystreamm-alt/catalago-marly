@@ -48,13 +48,19 @@ export function clearCode() {
  * Avisa a la nube que se hizo un pedido. Nunca interrumpe al cliente:
  * si falla (sin internet, etc.) simplemente se ignora.
  */
+const recentReports = new Map<string, { id: string; at: number }>();
 export async function reportOrder(order: OrderInput): Promise<boolean> {
   if (typeof window === "undefined") return false;
   try {
+    const now = Date.now();
+    for (const [key, entry] of recentReports) if (now - entry.at > 30_000) recentReports.delete(key);
+    const key = JSON.stringify(order);
+    const requestId = order.requestId || recentReports.get(key)?.id || crypto.randomUUID();
+    recentReports.set(key, { id: requestId, at: now });
     const response = await fetch("/api/public/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(order),
+      body: JSON.stringify({ ...order, requestId }),
       keepalive: true,
     });
     return response.ok;

@@ -58,6 +58,9 @@ import {
   cyberdocsRetryDeliveryCompletion,
   cyberdocsGetDeliveryLink,
   cyberdocsIntegrationStatus,
+  cyberdocsCopyCredentials,
+  cyberdocsAlexaStatus,
+  cyberdocsTestAlexa,
   cyberdocsListEvents,
   cyberdocsListOrders,
   cyberdocsListStock,
@@ -82,6 +85,7 @@ import type { DeliveryAttachment } from "@/lib/deliveries/types";
 import { loadPanelPresets, type PanelPreset } from "@/lib/delivery-fichas";
 import { buildOrderDeliveryMessage, type DeliveryMessageKind } from "@/lib/cyberdocs/delivery-message";
 import { getSavedCode } from "@/lib/notify/client";
+import { extraOrderDetails } from "@/lib/cyberdocs/order-details";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : "Ocurrió un error");
@@ -133,19 +137,26 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
   return { name: file.name, type: file.type || "application/octet-stream", dataUrl };
 }
 
-export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
+export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{embedded?:boolean; initialSelectedId?:string|null}={}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
   const [orders, setOrders] = useState<CyberDocsOrder[]>([]);
   const [stock, setStock] = useState<CyberDocsStockOption[]>([]);
   const [status, setStatus] = useState<CyberDocsIntegrationStatus | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [alexaStatus, setAlexaStatus] = useState<Awaited<ReturnType<typeof cyberdocsAlexaStatus>> | null>(null);
+  const [alexaBusy, setAlexaBusy] = useState(false);
+  const [alexaResult, setAlexaResult] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
   const [events, setEvents] = useState<CyberDocsOrderEvent[]>([]);
   const [stockItemId, setStockItemId] = useState("");
   const [accessPassword, setAccessPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const generateDocumentPassword = () => {
+    const value = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2,"0")).join("");
+    setAccessPassword(value); setConfirmPassword(value);
+  };
   const [days, setDays] = useState(7);
   const [maxViews, setMaxViews] = useState("0");
   const [deliveryNotes, setDeliveryNotes] = useState("");
@@ -238,6 +249,22 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
       setBusy(false);
     }
   }, [code]);
+
+  const checkAlexa = useCallback(async () => {
+    try { setAlexaStatus(await cyberdocsAlexaStatus({ data: { code } })); }
+    catch { setAlexaStatus(null); }
+  }, [code]);
+  useEffect(() => { if (open) void checkAlexa(); }, [open, checkAlexa]);
+  const testAlexa = async () => {
+    setAlexaBusy(true);
+    setAlexaResult("");
+    try {
+      const results = await cyberdocsTestAlexa({ data: { code } });
+      setAlexaResult(results.length ? results.map(r => `${r.channel}: ${r.ok ? "proveedor aceptó la prueba; confirma que la escuchaste" : "prueba fallida; revisa configuración"}`).join(" · ") : "No hay canales Alexa activos.");
+      await checkAlexa();
+    } catch { setAlexaResult("No se pudo enviar la prueba."); }
+    finally { setAlexaBusy(false); }
+  };
 
   const loadEvents = useCallback(
     async (orderId: string) => {
@@ -387,7 +414,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
       }});
       replaceOrder(result.order);
       if (result.completionError) toast.warning(result.completionError);
-      else toast.success("Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
+      else toast.success(selected.sourceKey === "web_catalog" ? "Entrega preparada · copia y envía los datos, después confirma la entrega" : "Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setStockItemId(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       await refresh();
     } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
@@ -412,7 +439,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
       }});
       replaceOrder(result.order);
       if (result.completionError) toast.warning(result.completionError);
-      else toast.success("Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
+      else toast.success(selected.sourceKey === "web_catalog" ? "Entrega preparada · copia y envía los datos, después confirma la entrega" : "Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
       setAccessPassword(""); setConfirmPassword(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       setManualUsername(""); setManualPassword(""); setManualPin(""); setManualLink(""); setManualPanelUsername(""); setManualPanelPassword("");
       await refresh();
@@ -476,6 +503,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
 
   const retryCompletion = async () => {
     if (!selected || busy) return;
+    if (selected.sourceKey === "web_catalog" && !confirm("¿Confirmas que ya entregaste los datos al cliente? Se guardará la fecha y se cerrará el aviso.")) return;
     setBusy(true);
     try {
       replaceOrder(await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: selected.id } }));
@@ -694,6 +722,15 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
           </DialogDescription>
         </DialogHeader>
 
+        <section className="rounded-2xl border bg-muted/20 p-3 space-y-3">
+          <h3 className="font-semibold flex items-center gap-2"><Bot className="size-4"/> CyberDocs y Alexa</h3>
+          <div className="flex flex-wrap gap-2"><Badge variant={ready ? "default" : "secondary"}>Telegram: {status ? ready ? "Conectado" : "Revisar conexión" : "Consultando"}</Badge><Badge variant="secondary">Alexa: {alexaStatus ? alexaStatus.enabled && alexaStatus.newOrders && (alexaStatus.echo || alexaStatus.app) ? "Avisos activos" : "Avisos desactivados" : "Sin verificar"}</Badge></div>
+          <p className="text-xs text-muted-foreground">Último pedido: {dateTime(status?.lastOrderAt || null)}. {alexaStatus && !alexaStatus.inSchedule ? "Fuera del horario de avisos automáticos." : ""}</p>
+          {alexaStatus?.history.length ? <div className="text-xs space-y-1">{alexaStatus.history.map(r => <p key={r.channel}>{r.channel}: {r.accepted ? "Aviso registrado como enviado" : "Aviso no confirmado"} · {dateTime(r.createdAt)}</p>)}</div> : <p className="text-xs text-muted-foreground">Sin constancia de Alexa para el último pedido.</p>}
+          <div className="flex flex-wrap gap-2"><Button size="sm" disabled={alexaBusy} onClick={() => void testAlexa()}>Probar Alexa</Button><Button size="sm" variant="outline" disabled={busy || alexaBusy} onClick={() => { void refresh(); void checkAlexa(); }}>Actualizar conexión</Button></div>
+          {alexaResult ? <p role="status" className="text-xs">{alexaResult}</p> : null}
+          <p className="text-xs text-muted-foreground">La prueba no crea pedidos ni modifica el inventario. El proveedor puede aceptar el aviso sin confirmar que el altavoz lo reprodujo.</p>
+        </section>
         <details className="rounded-2xl border bg-muted/20 p-3">
           <summary className="cursor-pointer text-sm font-semibold">Mensajes de entrega · Link y contraseña</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -926,11 +963,8 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                   {expanded && selected ? (
                     <div className="grid gap-3 border-t p-3 sm:p-4">
                       <div className="grid gap-2 rounded-xl bg-muted/30 p-3 text-xs sm:grid-cols-2">
-                        <p><b>Cliente:</b> {selected.clientName || "Sin nombre"}</p>
-                        <p><b>Contacto original:</b> {selected.contactValue || "Sin dato"}</p>
-                        <p><b>Fecha y hora:</b> {dateTime(selected.createdAt)}</p>
-                        <p><b>Origen:</b> {selected.sourceLabel || "Telegram"} · @{selected.sourceKey}</p>
-                        {Object.entries(selected.parsedPayload || {}).map(([k,v]) => <p key={k}><b>{k}:</b> {String(v)}</p>)}
+                        {selected.contactValue && selected.contactLabel !== "WhatsApp" && !extraOrderDetails(selected.parsedPayload || {}).some(([,v]) => v === selected.contactValue) ? <p><b>{selected.contactLabel || "Contacto"}:</b> {selected.contactValue}</p> : null}
+                        {extraOrderDetails(selected.parsedPayload || {}).map(([k,v]) => <p key={k}><b>{k.replaceAll("_", " ")}:</b> {String(v)}</p>)}
                         <div className="grid gap-2 sm:col-span-2">
                           <Label htmlFor={`whatsapp-${selected.id}`}>WhatsApp para la entrega</Label>
                           <div className="flex flex-col gap-2 sm:flex-row">
@@ -938,7 +972,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                             <Button type="button" size="sm" variant="outline" onClick={() => void saveOrderWhatsApp()} disabled={busy}>Guardar</Button>
                             <Button type="button" size="sm" onClick={() => void openWhatsApp()} disabled={!normalizeWhatsApp(selectedWhatsApp)}><MessageCircle className="mr-1 size-4" />Abrir WhatsApp</Button>
                           </div>
-                          <p className="text-[11px] text-muted-foreground">Se llena con el número del pedido. Puedes corregirlo o agregarlo sin guardar el contacto en el teléfono.</p>
+                          <p className="text-[11px] text-muted-foreground">Se guarda en Clientes para futuras renovaciones.</p>
                         </div>
                       </div>
 
@@ -948,9 +982,10 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                             <p className="flex items-center gap-1.5 text-sm font-semibold"><CalendarDays className="size-4" />Entrega, vencimiento y renovación</p>
                             <p className="text-xs text-muted-foreground">El sistema revisa estas fechas cada 15 minutos y te avisa antes del vencimiento.</p>
                           </div>
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <div><Label>Fecha de entrega</Label><Input type="date" value={deliveredOn} onChange={(event) => setDeliveredOn(event.target.value)} /></div>
-                            <div><Label>Fecha de vencimiento</Label><Input type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} /></div>
+                          <p className="text-xs text-muted-foreground">Al finalizar, se guarda automáticamente la fecha de entrega. Si entregas desde stock, también se toma su vigencia. Usa estos campos solo para hacer ajustes.</p>
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="min-w-0"><Label>Fecha de entrega</Label><Input className="min-w-0 w-full" type="date" value={deliveredOn} onChange={(event) => setDeliveredOn(event.target.value)} /></div>
+                            <div className="min-w-0"><Label>Fecha de vencimiento</Label><Input className="min-w-0 w-full" type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} /></div>
                             <div><Label>Avisar días antes</Label><Input type="number" min={0} max={90} value={renewalWarningDays} onChange={(event) => setRenewalWarningDays(event.target.value)} /></div>
                           </div>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -966,10 +1001,10 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                           <p className="text-sm font-semibold">Entregar este pedido</p>
                           <p className="mb-3 text-xs text-muted-foreground">Elige stock o entrega manual. Todo se despliega aquí mismo y se guarda en este pedido.</p>
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <Button type="button" variant={deliverySource === "stock" ? "default" : "outline"} onClick={() => { setDeliverySource("stock"); setStockItemId(""); setWithPassword(true); setAccessPassword(""); setConfirmPassword(""); }} disabled={busy}>
+                            <Button type="button" variant={deliverySource === "stock" ? "default" : "outline"} onClick={() => { setDeliverySource("stock"); setStockItemId(""); setWithPassword(true); generateDocumentPassword(); }} disabled={busy}>
                               <PackageCheck className="mr-1 size-4" />Cuentas disponibles
                             </Button>
-                            <Button type="button" variant={deliverySource === "manual" ? "default" : "outline"} onClick={() => { setDeliverySource("manual"); setManualPlatform(selected.serviceName || ""); setWithPassword(true); setAccessPassword(""); setConfirmPassword(""); }} disabled={busy}>
+                            <Button type="button" variant={deliverySource === "manual" ? "default" : "outline"} onClick={() => { setDeliverySource("manual"); setManualPlatform(selected.serviceName || ""); setWithPassword(true); generateDocumentPassword(); }} disabled={busy}>
                               Entrega manual
                             </Button>
                           </div>
@@ -1054,12 +1089,13 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
 
                       {selected.protectedDeliveryId || selected.status === "completed" ? (
                         <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
-                          <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : "Entrega vinculada a este pedido"}</p>
-                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Documento protegido guardado; el pedido sigue pendiente de cierre."}</p>
+                          <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : selected.sourceKey === "web_catalog" ? "Entrega preparada · pendiente de enviar" : "Entrega vinculada a este pedido"}</p>
+                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Copia el mensaje o los datos y confirma cuando hayas realizado la entrega."}</p>
                           {selected.protectedDeliveryId ? (
                             <>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <Button size="sm" onClick={() => void shareDeliveryMessage("combined")}><Copy className="mr-1 size-4" />Copiar mensaje</Button>
+                                <Button size="sm" variant="outline" onClick={async () => { try { await copyText(await cyberdocsCopyCredentials({data:{code,orderId:selected.id}})); toast.success("Credenciales copiadas"); } catch(e) { toast.error(errorText(e)); } }}><Copy className="mr-1 size-4" />Copiar credenciales</Button>
                                 <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("combined", true)}><MessageCircle className="mr-1 size-4" />WhatsApp</Button>
                               </div>
                               <p className="mt-2 text-xs">Usa tu mensaje de LINK + CONTRASEÑA; si el documento no tiene contraseña, usa tu mensaje de LINK.</p>
@@ -1078,7 +1114,7 @@ export function CyberDocsOrdersDialog({embedded=false}:{embedded?:boolean}={}) {
                             </>
                           ) : null}
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><RefreshCw className="mr-1 size-4" />Reintentar cierre</Button> : null}
+                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><CheckCircle2 className="mr-1 size-4" />{selected.sourceKey === "web_catalog" ? "Confirmar entrega" : "Reintentar cierre"}</Button> : null}
                             {selected.stockItemId && !terminal(selected) ? <Button size="sm" variant="outline" onClick={() => void release()}><RotateCcw className="mr-1 size-4" />Liberar cuenta</Button> : null}
                             {selected.status === "completed" ? <>
                               {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); window.open(`${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`, "_blank", "noopener,noreferrer"); } catch (e) { toast.error(errorText(e)); } }}><Link2 className="mr-1 size-4" />Abrir página</Button> : null}

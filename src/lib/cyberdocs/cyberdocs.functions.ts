@@ -12,6 +12,21 @@ const code = z.string().min(4).max(100);
 const adminInput = z.object({ code });
 const orderInput = adminInput.extend({ orderId: z.string().uuid() });
 
+export const cyberdocsCopyCredentials = createServerFn({ method: "POST" })
+  .validator((v: unknown) => orderInput.parse(v))
+  .handler(async ({ data }) => {
+    await authorize(data.code);
+    const order = await (await import("./cyberdocs.server")).getCyberDocsOrder(data.orderId);
+    if (!order.protectedDeliveryId || !["in_process", "completed"].includes(order.status)) throw new Error("La entrega no está preparada");
+    const ds = await import("@/lib/deliveries/deliveries.server");
+    const row = await ds.getDeliveryRow(order.protectedDeliveryId);
+    if (!row) throw new Error("Entrega no disponible");
+    const p = await ds.decryptPayload<import("@/lib/deliveries/types").ProtectedDeliveryPrivate>(String(row.detail));
+    if (p.status !== "active") throw new Error("Entrega no disponible");
+    const pin = (p.notes || "").split("\n").find(line => /^Perfil \/ PIN:/i.test(line)) || "";
+    return [p.platform, p.username ? `Usuario: ${p.username}` : "", p.password ? `Contraseña: ${p.password}` : "", p.link ? `Enlace: ${p.link}` : "", p.panelUsername ? `Usuario del panel: ${p.panelUsername}` : "", p.panelPassword ? `Contraseña del panel: ${p.panelPassword}` : "", pin].filter(Boolean).join("\n");
+  });
+
 async function authorize(value: string) {
   const { requireAdminCode } = await import("@/lib/notify/notify.server");
   await requireAdminCode(value);
@@ -23,6 +38,38 @@ export const cyberdocsIntegrationStatus = createServerFn({ method: "POST" })
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
     return server.getCyberDocsIntegrationStatus();
+  });
+
+export const cyberdocsAlexaStatus = createServerFn({ method: "POST" })
+  .validator((value: unknown) => adminInput.parse(value))
+  .handler(async ({ data }) => {
+    await authorize(data.code);
+    const notify = await import("@/lib/notify/notify.server");
+    const settings = await notify.loadSettings();
+    const db = await notify.admin();
+    const { data: latest, error } = await db.from("cyberdocs_orders")
+      .select("notification_order_id,created_at").neq("source_key", "web_catalog").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw new Error("No se pudo consultar el último pedido");
+    const history: { channel: string; createdAt: string; accepted: boolean }[] = [];
+    if (latest?.notification_order_id) {
+      const { data: rows, error: logError } = await db.from("notification_log")
+        .select("channel,created_at,status,detail").eq("order_id", latest.notification_order_id)
+        .in("channel", ["alexa", "alexa_app"]).eq("kind", "nuevo").order("created_at", { ascending: false });
+      if (logError) throw new Error("No se pudo consultar el historial de Alexa");
+      for (const row of rows ?? []) {
+        const channel = row.channel === "alexa" ? "Echo" : "Alexa app";
+        if (history.some((entry) => entry.channel === channel)) continue;
+        history.push({ channel, createdAt: row.created_at, accepted: row.status === "enviado" && !/omitid|fall|falta|no se pudo|no es válido|no se encontró|limitó/i.test(row.detail || "") });
+      }
+    }
+    return { enabled: settings.enabled, echo: settings.channelAlexa, app: settings.channelAlexaApp, newOrders: settings.alexaEvents.order_new, inSchedule: notify.withinSchedule(settings), lastOrderAt: latest?.created_at ?? null, history };
+  });
+
+export const cyberdocsTestAlexa = createServerFn({ method: "POST" })
+  .validator((value: unknown) => adminInput.parse(value))
+  .handler(async ({ data }) => {
+    await authorize(data.code);
+    return (await import("@/lib/notify/notify.server")).testCyberDocsAlexa();
   });
 
 export const cyberdocsRegisterWebhook = createServerFn({ method: "POST" })

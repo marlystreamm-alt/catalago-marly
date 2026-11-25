@@ -1,4 +1,5 @@
 import { CustomerManager } from "@/components/customer/customer-manager";
+import { WebOrders } from "@/components/customer/web-orders";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -479,6 +480,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
   const [addStock, setAddStock] = useState(false);
   const [walletClient, setWalletClient] = useState("");
@@ -522,6 +524,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
   const navigate = (s: Section) => {
     setSection(s);
     setTab("main");
+    setSelectedOrderId(null);
     setAddStock(false);
     setAssignClient(null);
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -592,13 +595,14 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       <>
         <div className="seller-tabs">
           <button className={tab === "main" ? "active" : ""} onClick={() => setTab("main")}>
-            Cyberdoc
+            CyberDocs y entregas
           </button>
+          <button className={tab === "web" ? "active" : ""} onClick={() => setTab("web")}>Página web</button>
           <button className={tab === "requests" ? "active" : ""} onClick={() => setTab("requests")}>
             Por encargo
           </button>
         </div>
-        {tab === "main" ? <CyberDocsOrdersDialog embedded /> : resource("requests")}
+        {tab === "main" ? <CyberDocsOrdersDialog key={selectedOrderId || "all"} embedded initialSelectedId={selectedOrderId} /> : tab === "web" ? <WebOrders onOpenOrder={id => { setSelectedOrderId(id); setTab("main"); }} /> : resource("requests")}
       </>
     );
   else if (section === "questions")

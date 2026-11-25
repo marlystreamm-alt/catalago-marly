@@ -221,6 +221,11 @@ export const customerBuy = createServerFn({ method: "POST" })
     } catch {
       console.warn("Customer purchase contact metadata was not updated");
     }
+    try {
+      await (await import("./purchase-notify.server")).notifyPaidPurchase(String(r.data), ctx.shop.id);
+    } catch {
+      console.warn("Customer purchase committed; notification could not be registered");
+    }
     return { id: String(r.data) };
   });
 export const customerDelivery = createServerFn({ method: "POST" })

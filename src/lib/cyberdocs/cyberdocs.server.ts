@@ -10,6 +10,7 @@ import type {
   TelegramOrderBot,
 } from "./types";
 import { normalizeTelegramUsername, parseCyberDocsMessage } from "./parser";
+import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
 
 type Row = Record<string, unknown>;
 // Los tipos generados de v20.10 no incluyen aún la migración v20.11.
@@ -54,7 +55,7 @@ export function rowToCyberDocsOrder(row: Row): CyberDocsOrder {
     serviceName: str(row["service_name"]),
     contactLabel: str(row["contact_label"]),
     contactValue: str(row["contact_value"]),
-    whatsapp: str(row["whatsapp"]),
+    whatsapp: str(row["whatsapp"]) || (str(row["contact_label"]) === "WhatsApp" ? str(row["contact_value"]) : "") || (parsed && typeof parsed === "object" ? str((parsed as Record<string, unknown>)["contacto_(whatsapp)"]) : ""),
     status: str(row["status"]) as CyberDocsOrderStatus,
     assignFromStock:
       typeof row["assign_from_stock"] === "boolean" ? Boolean(row["assign_from_stock"]) : null,
@@ -260,6 +261,10 @@ export async function ingestCyberDocsOrder(
     "system",
     `Pedido recibido de ${sourceLabel} por ${input.source}`,
   );
+  if (order.whatsapp && order.clientName && input.source !== "manual_fallback") {
+    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, order.whatsapp); }
+    catch { await recordOrderEvent(order.id, "client_contact_pending", "system", "No se pudo registrar el contacto; se reintentará al entregar"); }
+  }
 
   // Se crea un pedido genérico en el módulo de avisos. Cliente, contacto e ID externo
   // permanecen exclusivamente en el panel privado CyberDocs y nunca llegan a Alexa.
@@ -417,6 +422,10 @@ export async function updateOrderWhatsApp(
       ? `WhatsApp de entrega actualizado (${order.whatsapp ? "corregido" : "agregado"})`
       : "WhatsApp de entrega eliminado",
   );
+  if (value && order.clientName) {
+    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, value); }
+    catch { await recordOrderEvent(order.id, "client_contact_pending", actor, "No se pudo registrar el contacto; se reintentará al entregar"); }
+  }
   return rowToCyberDocsOrder(data as Row);
 }
 
@@ -489,7 +498,7 @@ export async function assignStockToOrder(input: {
     accessPassword: input.withPassword ? input.accessPassword.trim() : "",
     platformMessage: "",
     passwordMessage: input.withPassword ? `Hola ${order.clientName || ""} 😊\nContraseña de tu documento protegido: ${input.accessPassword.trim()}` : "",
-    notes: input.notes.trim() || item.notes || "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía.",
+    notes: [item.profilePin ? `Perfil / PIN: ${item.profilePin}` : "", input.notes.trim() || item.notes || "⚠️ Soporte únicamente al número de WhatsApp 8443852364, evita perder garantía."].filter(Boolean).join("\n"),
     images: input.images?.slice(0, 2) ?? [],
     attachment: input.attachment ?? null,
     imageCount: input.images?.length ?? 0,
@@ -512,7 +521,7 @@ export async function assignStockToOrder(input: {
 
   if (!insertedDelivery) throw new Error("No se guardó el documento protegido");
   const linked = await linkSavedDelivery(order.id, insertedDelivery.id, item.id, actor,
-    `Stock asignado al pedido y documento protegido creado`, input.stockExpiresOn ?? null, input.salePrice ?? null);
+    `Stock asignado al pedido y documento protegido creado`, input.stockExpiresOn ?? order.expiresOn ?? item.expiresOn ?? expiresAfterMonths(businessToday(), item.durationMonths || 1), input.salePrice ?? null);
   return savedDeliveryResult(linked, actor);
 
 }
@@ -651,12 +660,43 @@ export async function finalizeCyberDocsOrder(
   action = "manually_completed",
 ) {
   if (pin) await authorize(pin);
+  const before = await getCyberDocsOrder(orderId);
   const db = await database();
   const { data, error } = await db.rpc("ma2_finalize_cyberdocs_order", {
     p_order: orderId, p_notes: notes, p_actor: actor, p_delivery: deliveryId, p_action: action,
   });
   if (error || !data?.order) throw new Error(error?.message || "No se pudo finalizar el pedido");
-  return rowToCyberDocsOrder(data.order as Row);
+  const completed = rowToCyberDocsOrder(data.order as Row);
+  if (completed.status !== "completed") return completed;
+  // Preserve dates previously saved by the administrator and make retries idempotent.
+  const deliveredOn = completed.finalizedAt ? new Intl.DateTimeFormat("en-CA", { timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(completed.finalizedAt)) : businessToday();
+  if (!completed.deliveredOn || (!before.deliveredOn && before.status !== "completed" && completed.deliveredOn !== deliveredOn)) {
+    let update = db.from("cyberdocs_orders").update({ delivered_on: deliveredOn }).eq("id", completed.id).eq("status", "completed");
+    update = completed.deliveredOn ? update.eq("delivered_on", completed.deliveredOn) : update.is("delivered_on", null);
+    const { error: dateError } = await update;
+    if (dateError) throw new Error("Pedido finalizado; no se pudo guardar la fecha automática. Puedes reintentar sin generar otro documento.");
+  }
+  if (completed.stockItemId && before.status !== "completed") {
+    const { error: stockDateError } = await db.from("stock_items").update({ delivered_on: before.deliveredOn || deliveredOn }).eq("id", completed.stockItemId).eq("related_order_id", completed.id);
+    if (stockDateError) throw new Error("Pedido finalizado; no se pudo actualizar la fecha del stock.");
+  }
+  if (completed.stockItemId && !completed.expiresOn) {
+    const { data: stock, error: stockError } = await db.from("stock_items").select("expires_on").eq("id", completed.stockItemId).maybeSingle();
+    if (stockError) throw new Error("Pedido finalizado; no se pudo consultar la vigencia del stock.");
+    if (stock?.expires_on) {
+      const { error: expiryError } = await db.from("cyberdocs_orders").update({ expires_on: stock.expires_on }).eq("id", completed.id).is("expires_on", null).eq("status", "completed");
+      if (expiryError) throw new Error("Pedido finalizado; no se pudo guardar la vigencia del stock.");
+    }
+  }
+  if (completed.whatsapp && completed.clientName) {
+    try {
+      const { rememberOrderClient } = await import("@/lib/customer/remember-client.server");
+      await rememberOrderClient(completed.clientName, completed.whatsapp);
+      // Backfill the actual phone column for older Telegram message formats.
+      await db.from("cyberdocs_orders").update({ whatsapp: completed.whatsapp }).eq("id", completed.id).eq("whatsapp", "");
+    } catch { await recordOrderEvent(completed.id, "client_contact_pending", actor, "Pedido guardado; no se pudo registrar el contacto automáticamente"); }
+  }
+  return getCyberDocsOrder(completed.id);
 }
 
 export async function finalizeCyberDocsOrders(
@@ -688,7 +728,11 @@ async function savedDeliveryResult(order: CyberDocsOrder, actor: string) {
   // Verify that the saved encrypted document can actually be read before closing.
   const saved = await getProtectedDeliveryTokenForOrder(order.id);
   if (saved.status !== "active") throw new Error("El documento del pedido no está activo");
-  const completion = await completeSavedDelivery(order, () => retrySavedDeliveryCompletion(order.id, actor));
+  // Web/catalog orders are paid and reserved, but the administrator still sends
+  // the prepared credentials. Keep the alert pending until she confirms delivery.
+  const completion = order.sourceKey === "web_catalog"
+    ? { order, completionError: null }
+    : await completeSavedDelivery(order, () => retrySavedDeliveryCompletion(order.id, actor));
   const deliveryLink = `/e/${saved.id}?t=${encodeURIComponent(saved.token)}`;
   return { ...completion, token: saved.token,
     platformMessage: [`Hola ${order.clientName || ""} 😊 Te entrego ${order.serviceName}.`, `Documento: ${deliveryLink}`,

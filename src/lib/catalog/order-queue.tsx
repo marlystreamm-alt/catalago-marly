@@ -153,6 +153,7 @@ export function OrderQueueProvider({ children }: { children: ReactNode }) {
               error: undefined,
             });
             reportOrder({
+              requestId: order.id,
               catalogId: order.catalogId,
               catalogName: order.catalogName,
               serviceName: order.serviceName,

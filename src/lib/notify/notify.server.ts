@@ -135,13 +135,23 @@ export async function runPendingReminders() {
   let escalated = 0;
   let renewals = 0;
 
+  // Purchases received outside the configured schedule still get their initial
+  // alert when the schedule opens, even if repeated reminders are disabled.
+  const { data: freshOrders, error: freshError } = await db.from("orders").select("*")
+    .eq("status", "nuevo").is("notified_at", null).order("created_at", { ascending: true }).limit(20);
+  if (freshError) throw new Error(freshError.message);
+  for (const row of freshOrders ?? []) {
+    try { await notifyOrder(rowToOrder(row as Record<string, unknown>), settings, false); sent++; }
+    catch (error) { console.error("Aviso inicial pendiente falló:", error); }
+  }
+
   if (settings.repeatEnabled) {
     const cutoff = new Date(Date.now() - settings.repeatMinutes * 60_000).toISOString();
     const { data, error } = await db
       .from("orders")
       .select("*")
       .eq("status", "nuevo")
-      .or(`notified_at.is.null,notified_at.lt.${cutoff}`)
+      .lt("notified_at", cutoff)
       .order("created_at", { ascending: true })
       .limit(20);
     if (error) throw new Error(error.message);
@@ -180,6 +190,9 @@ export async function runPendingReminders() {
   } catch (error) {
     console.error("Alertas de renovación fallaron:", error);
   }
+  try {
+    renewals += await createPaidPurchaseRenewalAlerts(settings);
+  } catch (error) { console.error("Alertas de compras con saldo fallaron:", error); }
 
   return { ok: true, sent, escalated, renewals };
 }
@@ -205,6 +218,27 @@ function daysBetweenDates(from: string, to: string) {
   const fromTime = Date.parse(`${from}T12:00:00Z`);
   const toTime = Date.parse(`${to}T12:00:00Z`);
   return Math.round((toTime - fromTime) / 86_400_000);
+}
+
+async function createPaidPurchaseRenewalAlerts(settings: NotifySettings) {
+  const db = await admin();
+  const today = dateInTimezone(settings.timezone);
+  const horizon = new Date(`${today}T12:00:00Z`);
+  horizon.setUTCDate(horizon.getUTCDate() + 3);
+  const ops = await import("@/lib/workspace/operations.server");
+  const { data, error } = await ops.opsDB().from("ma2_customer_orders").select("id,title,expires_on").is("business_id", null).gte("expires_on",today).lte("expires_on",horizon.toISOString().slice(0,10)).order("expires_on",{ascending:true}).limit(250);
+  if (error) throw error;
+  const { purchaseRecordId } = await import("@/lib/customer/purchase-identity.server");
+  let count = 0;
+  for (const order of data || []) {
+    const id = purchaseRecordId("renewal", order.id, order.expires_on);
+    const { data: row, error: insertError } = await db.from("orders").upsert({ id, catalog_id: `renewal-wallet-${order.id}-${order.expires_on}`, catalog_name: "Renovaciones", service_name: `Renovación próxima: ${order.title}`, message: "Una compra con saldo está por vencer. Revisa Pedidos y contacta al cliente.", link: "/?cat=pedidos", recipient: "", items: [{ name: "Renovación de suscripción", price: 0 }] }, { onConflict: "id", ignoreDuplicates: true }).select("*").maybeSingle();
+    if (insertError) throw insertError;
+    if (!row) continue;
+    await notifyOrder(rowToOrder(row as Row), settings, true, "recordatorio");
+    count++;
+  }
+  return count;
 }
 
 async function createCyberDocsRenewalAlerts(settings: NotifySettings) {
@@ -692,6 +726,24 @@ function alexaConfigFromSettings(settings: NotifySettings, event: string): Alexa
   };
 }
 
+/** Test only Alexa using the saved settings, without creating an order. */
+export async function testCyberDocsAlexa() {
+  const settings = await loadSettings();
+  const results: { channel: string; ok: boolean }[] = [];
+  const text = "Prueba de MA dos. Tienes un nuevo pedido de CyberDocs. Revisa el apartado de pedidos.";
+  if (settings.channelAlexa) {
+    const result = await sendAlexaText(text, alexaConfigFromSettings(settings, "order_new"));
+    results.push({ channel: "Echo", ok: result.ok });
+    await logEvent({ orderId: null, channel: "alexa", kind: "prueba", attempt: 1, detail: result.ok ? "Prueba CyberDocs aceptada por el proveedor" : "Prueba CyberDocs fallida" });
+  }
+  if (settings.channelAlexaApp) {
+    const result = await sendAlexaAppTrigger(settings);
+    results.push({ channel: "Alexa app", ok: result.ok });
+    await logEvent({ orderId: null, channel: "alexa_app", kind: "prueba", attempt: 1, detail: result.ok ? "Prueba CyberDocs aceptada por el proveedor" : "Prueba CyberDocs fallida" });
+  }
+  return results;
+}
+
 /** Aviso de Alexa para eventos que no son pedidos (directorio, pago, suspensión, etc.). */
 export async function notifyAlexaEvent(event: AlexaEventKey, text: string) {
   const settings = await loadSettings();
@@ -775,7 +827,7 @@ export function rowToOrder(row: Row): CloudOrder {
 
 export type NotifyKind = "nuevo" | "recordatorio" | "escalamiento" | "prueba" | "evento";
 
-const FAILED = /(fall|falta|no configurado|no se pudo|sin dispositivos)/i;
+const FAILED = /(fall|falta|no configurado|no se pudo|sin dispositivos|omitid|no es válido|no se encontró|limitó)/i;
 
 /** Guarda una línea en el historial de avisos. */
 export async function logEvent(entry: {
@@ -810,7 +862,7 @@ export async function sendByChannel(
   if (channel === "push") return sendPush(order, repeat);
   if (channel === "email") return sendEmail(order, settings, repeat);
   if (channel === "whatsapp") return sendWhatsapp(order, settings, repeat);
-  if (channel === "alexa_app") return (await sendAlexaAppTrigger(settings)).message;
+  if (channel === "alexa_app") return settings.alexaEvents[repeat ? "order_reminder" : "order_new"] ? (await sendAlexaAppTrigger(settings)).message : "Alexa app omitida para este tipo de evento";
   return sendAlexa(order, settings, repeat);
 }
 

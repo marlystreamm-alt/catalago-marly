@@ -41,6 +41,9 @@ export function parseCyberDocsMessage(raw: string): ParsedCyberDocsOrder {
   const clientName = lineValue(text, ["Cliente"]);
   const serviceName = lineValue(text, ["Servicio"]);
   const whatsapp = lineValue(text, [
+    "contacto_(whatsapp)",
+    "Contacto (WhatsApp)",
+    "WhatsApp del cliente",
     "Número para contactar whatsapp",
     "Número para contactar WhatsApp",
     "WhatsApp",
