@@ -1,3 +1,4 @@
+import { opsLoad } from "@/lib/workspace/operations.functions";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
@@ -57,7 +58,7 @@ import { getPrimaryFichaTemplate, renderDeliveryFicha } from "@/lib/delivery-fic
 
 type FeatureMap = Record<string, boolean>;
 type HistoryRow = { id: string; action: string; detail: string; createdAt: string };
-type StockTab = "available" | "sold" | "expiring" | "expired";
+type StockTab = "all" | "available" | "sold" | "expiring" | "expired";
 
 
 const blank = (): StockItem => ({
@@ -122,7 +123,7 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 
 export function StockManagerDialog({
   embedded = false,
-  initialTab = "available",
+  initialTab = "all",
   autoAdd = false,
   ownerToken,
   ownerFeatures,
@@ -143,7 +144,6 @@ export function StockManagerDialog({
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<StockItem[]>([]);
   const [stockTab, setStockTab] = useState<StockTab>(initialTab);
-  const [stockKindTab, setStockKindTab] = useState<"complete" | "profile">("complete");
   const [q, setQ] = useState("");
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
 
@@ -154,6 +154,8 @@ export function StockManagerDialog({
   const [bulkText, setBulkText] = useState("");
   const [form, setForm] = useState<StockItem>(blank());
   const [showPass, setShowPass] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  useEffect(() => { if (formOpen) setPanelOpen(Boolean(form.panelUrl || form.panelUsername || form.panelPassword)); }, [formOpen, form.id]);
   const formRef = useRef<HTMLDivElement | null>(null);
 
   const [toolsItem, setToolsItem] = useState<StockItem | null>(null);
@@ -161,7 +163,19 @@ export function StockManagerDialog({
   const [history, setHistory] = useState<HistoryRow[]>([]);
 
   const [deliver, setDeliver] = useState<StockItem | null>(null);
+  const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string; ficha:string} | null>(null);
   const [deliverClient, setDeliverClient] = useState("");
+  const [registeredClients, setRegisteredClients] = useState<{id:string; name:string; whatsapp:string}[]>([]);
+  const [clientChoice, setClientChoice] = useState("manual");
+  const [clientLoadError, setClientLoadError] = useState(false);
+  const deliveryOpen = Boolean(deliver);
+  useEffect(() => {
+    if (!deliveryOpen || !admin) return;
+    let active = true;
+    setClientChoice("manual"); setClientLoadError(false); setRegisteredClients([]);
+    void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || ""}))); }).catch(() => { if (active) setClientLoadError(true); });
+    return () => { active = false; };
+  }, [deliveryOpen, admin, code]);
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
@@ -215,7 +229,7 @@ export function StockManagerDialog({
   const expiredCount = items.filter((x) => x.status === "expired" || (x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0)).length;
 
   const tabItems = useMemo(() => {
-    let base = items.filter((x) => (x.stockKind || "complete") === stockKindTab);
+    let base = [...items];
     if (!admin) base = base.filter((x) => x.status !== "available");
     if (stockTab === "available") base = base.filter((x) => x.status === "available");
     if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "expired");
@@ -231,7 +245,7 @@ export function StockManagerDialog({
         const bd = b.expiresOn ? new Date(b.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
-  }, [items, stockTab, stockKindTab, q, admin]);
+  }, [items, stockTab, q, admin]);
 
   async function persist(item: StockItem, success = "Registro guardado") {
     const saved = ownerToken
@@ -257,7 +271,6 @@ export function StockManagerDialog({
       // If conversion fails, keep the saved id so retrying cannot insert the complete again.
       setForm(saved);
       if (splitting) await splitAccount(saved.id, count);
-      setStockKindTab(splitting ? "profile" : saved.stockKind);
       if (splitting || saved.status === "available") setStockTab("available");
       setQ(""); setSplitOnSave(false);
       await load();
@@ -285,7 +298,7 @@ export function StockManagerDialog({
         // En modo lote nunca reutilizar credenciales capturadas previamente en modo individual.
         await persist({ ...form, id: "", stockKind: form.stockKind, accountType: form.stockKind === "profile" ? "Perfil" : "Completa", parentStockId: null, username, password, profilePin, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "", renewalNotifiedAt: null }, "");
       }
-      setStockKindTab(form.stockKind); setStockTab("available"); setQ("");
+      setStockTab("available"); setQ("");
       setBulkText("");
       setForm(blank());
       setFormOpen(false);
@@ -315,7 +328,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       await splitAccount(x.id, count);
-      await load(); setToolsItem(null); setStockKindTab("profile"); setStockTab("available"); setQ("");
+      await load(); setToolsItem(null); setStockTab("available"); setQ("");
       toast.success(`${count} perfiles creados`);
     } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
@@ -331,7 +344,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       for (const child of plan.children) ownerToken ? await stockOwnerDelete({data:{token:ownerToken,id:child.id}}) : await stockAdminDelete({data:{code:getSavedCode(),id:child.id}});
-      await persist(plan.item, ""); await load(); setToolsItem(null); setStockKindTab("complete"); toast.success("Cuenta restaurada en Completas");
+      await persist(plan.item, ""); await load(); setToolsItem(null); toast.success("Cuenta restaurada en Completas");
     } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
 
@@ -350,7 +363,7 @@ export function StockManagerDialog({
       toast.success("Registro eliminado. Puedes volver a agregarlo.", deleted && deleted.status === "available" && can("stock_add") ? {
         action: { label: "Agregar de nuevo", onClick: () => {
           setForm({ ...deleted, id: "", status: "available", clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", protectedDeliveryId: "", renewalStatus: "", renewalNotifiedAt: null });
-          setStockKindTab(deleted.stockKind); setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
+          setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
         } },
       } : undefined);
     } catch (e) {
@@ -395,13 +408,13 @@ export function StockManagerDialog({
 
   async function copyFullAccess(x: StockItem) {
     const body = [
-      `📺 ${x.platform}${x.accountType ? ` · ${x.accountType}` : ""}`,
-      x.username ? `Usuario/correo: ${x.username}` : "",
-      x.password ? `Contraseña: ${x.password}` : "",
-      x.profilePin ? `PIN: ${x.profilePin}` : "",
-      x.panelUrl ? `Panel: ${x.panelUrl}` : "",
-      x.panelUsername ? `Usuario panel: ${x.panelUsername}` : "",
-      x.panelPassword ? `Contraseña panel: ${x.panelPassword}` : "",
+      `${x.platform}`,
+      x.username ? `✉️ Correo: ${x.username}` : "",
+      x.password ? `🔑 Contraseña: ${x.password}` : "",
+      x.profilePin ? `👤 Perfil / PIN: ${x.profilePin}` : "",
+      x.panelUrl ? `🔗 Link: ${x.panelUrl}` : "",
+      x.panelUsername ? `👤 Usuario: ${x.panelUsername}` : "",
+      x.panelPassword ? `🔑 Contraseña: ${x.panelPassword}` : "",
     ].filter(Boolean).join("\n");
     await copyText(body);
     toast.success("Acceso completo copiado");
@@ -471,7 +484,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       const payload = {
-        itemId: deliver.id, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
+        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
         stockExpiresOn: deliverStockExpires || null, salePrice: Number(deliverSalePrice) || 0,
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
@@ -479,24 +492,13 @@ export function StockManagerDialog({
       const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload } });
       if ("completionError" in res && res.completionError) toast.warning(String(res.completionError));
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
-      const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl || link, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
-      if (ficha) { await copyText(ficha); toast.success("Entrega realizada · ficha copiada"); }
+      const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
+      if (ficha) { toast.success("Ficha de entrega preparada"); }
       const platformText = (message || whatsappTemplate)
         .replaceAll("{cliente}", deliverClient || "cliente").replaceAll("{plataforma}", deliver.platform)
         .replaceAll("{usuario}", deliver.username).replaceAll("{vigencia}", `${days} día(s)`).replaceAll("{link}", link);
-      if (protect) {
-        await copyText(platformText);
-        toast.success("Mensaje con enlace copiado · ahora envía la contraseña por WhatsApp");
-        const passwordText = `Hola ${deliverClient || ""} 😊\nContraseña de tu documento protegido: ${accessPassword}`;
-        const digits = deliverWhatsapp.replace(/\D/g, "");
-        if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(passwordText)}`, "_blank", "noopener,noreferrer");
-        else await copyText(passwordText);
-      } else {
-        const digits = deliverWhatsapp.replace(/\D/g, "");
-        if (digits) window.open(`https://wa.me/${digits}?text=${encodeURIComponent(platformText)}`, "_blank", "noopener,noreferrer");
-        else await copyText(platformText);
-        toast.success("Documento sin contraseña listo · un solo enlace");
-      }
+      setDeliveryResult({ link, text: platformText, phone: deliverWhatsapp.replace(/\D/g, ""), item: deliver, password: protect ? accessPassword : "", ficha: ficha || "" });
+      toast.success("Entrega registrada");
       setDeliver(null); setAccessPassword(""); setConfirmPassword(""); setDeliverSalePrice(""); setDeliverOrderRef(""); setDeliveryAttachment(null); setProtect(true);
       await load();
     } catch (e) { toast.error(err(e)); } finally { setBusy(false); }
@@ -514,6 +516,7 @@ export function StockManagerDialog({
   };
 
   const countTab = (tab: StockTab) => {
+    if (tab === "all") return items.length;
     if (tab === "available") return items.filter((x) => x.status === "available").length;
     if (tab === "sold") return soldItems.length;
     if (tab === "expiring") return renewalItems.filter((x) => (daysUntil(x.expiresOn) ?? -1) >= 0).length;
@@ -534,13 +537,13 @@ export function StockManagerDialog({
 
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
-              <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Selecciona una subpestaña. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") ? <Button onClick={() => { setForm({...blank(),stockKind:stockKindTab,accountType:stockKindTab === "profile" ? "Perfil" : "Completa"}); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />{stockKindTab==="profile"?"Agregar perfiles":"Agregar completas"}</Button> : null}
+              <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Consulta cuentas completas y perfiles en un mismo listado. La información sensible queda dentro de ⚙️.</p></div>
+              {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar cuenta</Button> : null}
             </div>
 
-            <div className="flex flex-wrap gap-2"><Button size="sm" variant={stockKindTab === "complete" ? "default" : "outline"} onClick={() => setStockKindTab("complete")}>📺 Completas</Button><Button size="sm" variant={stockKindTab === "profile" ? "default" : "outline"} onClick={() => setStockKindTab("profile")}>👤 Perfiles</Button></div>
             <div className="flex flex-wrap gap-2">
               {([
+                ["all", "Todos"],
                 ["available", "Disponibles"],
                 ["sold", "Vendidas"],
                 ["expiring", "Por vencer"],
@@ -576,9 +579,7 @@ export function StockManagerDialog({
               {!bulkMode ? <div><Label>Contraseña</Label><div className="relative"><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPass((v) => !v)}>{showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button></div></div> : null}
               {!bulkMode ? <div><Label>Perfil / PIN</Label><Input value={form.profilePin} onChange={(e) => setForm({ ...form, profilePin: e.target.value })} /></div> : null}
               <div><Label>Proveedor</Label><Input value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} /></div>
-              <div><Label>Link del panel</Label><Input value={form.panelUrl} onChange={(e) => setForm({ ...form, panelUrl: e.target.value })} /></div>
-              <div><Label>Usuario del panel</Label><Input value={form.panelUsername} onChange={(e) => setForm({ ...form, panelUsername: e.target.value })} /></div>
-              <div><Label>Contraseña del panel</Label><Input type={showPass ? "text" : "password"} value={form.panelPassword} onChange={(e) => setForm({ ...form, panelPassword: e.target.value })} /></div>
+              <div className="sm:col-span-3 space-y-3"><Button type="button" variant="outline" className="w-full justify-between" aria-expanded={panelOpen} onClick={() => setPanelOpen(v => !v)}><span>＋ Agregar panel</span><span>{panelOpen ? "⌃" : "⌄"}</span></Button>{panelOpen ? <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-3"><div><Label>🔗 Link</Label><Input value={form.panelUrl} onChange={(e) => setForm({ ...form, panelUrl: e.target.value })} /></div><div><Label>👤 Usuario</Label><Input value={form.panelUsername} onChange={(e) => setForm({ ...form, panelUsername: e.target.value })} /></div><div><Label>🔑 Contraseña</Label><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.panelPassword} onChange={(e) => setForm({ ...form, panelPassword: e.target.value })} /></div></div> : null}</div>
               <div><Label>Costo</Label><Input type="number" min={0} step="0.01" value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} /></div>
               <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={form.salePrice || ""} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} /></div>
               <div><Label>Fecha de compra</Label><Input type="date" value={form.acquiredOn || ""} onChange={(e) => setForm({ ...form, acquiredOn: e.target.value || null })} /></div>
@@ -638,13 +639,15 @@ export function StockManagerDialog({
             {deliver ? <>
               <DialogHeader><DialogTitle>Entregar · {deliver.platform}</DialogTitle><DialogDescription>Los datos de cliente se capturan aquí, nunca al agregar stock.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => setDeliverClient(e.target.value)} /></div>
-                <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => setDeliverWhatsapp(e.target.value)} /></div>
+                {admin ? <div className="sm:col-span-2"><Label>Cliente registrado (opcional)</Label><Select value={clientChoice} disabled={Boolean(deliverOrderRef)} onValueChange={value => { setClientChoice(value); const client = registeredClients.find(c => c.id === value); if (client) { setDeliverClient(client.name); setDeliverWhatsapp(client.whatsapp); } }}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="manual">Capturar cliente manualmente</SelectItem>{registeredClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.whatsapp}</SelectItem>)}</SelectContent></Select>{clientLoadError ? <p className="text-xs text-muted-foreground">No se pudo cargar el registro. Puedes capturar los datos manualmente.</p> : null}</div> : null}
+                <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverClient(e.target.value); }} /></div>
+                <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverWhatsapp(e.target.value); }} /></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
                 <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} /></div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
                   <Select value={deliverOrderRef || "manual"} onValueChange={(value) => {
                     const selected = cyberdocOrders.find((order) => order.id === value);
+                    setClientChoice("manual");
                     setDeliverOrderRef(selected?.id || "");
                     setDeliverClient(selected?.clientName || "");
                     setDeliverWhatsapp(selected ? selected.whatsapp || (selected.contactLabel === "WhatsApp" ? selected.contactValue : "") : "");
@@ -666,6 +669,20 @@ export function StockManagerDialog({
               </div>
               <div className="flex gap-2"><Button onClick={() => void send()} disabled={busy}><MessageCircle className="mr-1 size-4" />Entregar</Button><Button variant="outline" onClick={() => setDeliver(null)}>Cancelar</Button></div>
             </> : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={Boolean(deliveryResult)} onOpenChange={value => { if (!value) setDeliveryResult(null); }}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader><DialogTitle>Entrega registrada</DialogTitle><DialogDescription>Elige cómo compartir el servicio con tu cliente.</DialogDescription></DialogHeader>
+            {deliveryResult ? <div className="grid gap-2">
+              {can("stock_view_password") ? <Button onClick={() => void copyFullAccess(deliveryResult.item)}><Copy className="mr-1 size-4" />Copiar credenciales</Button> : null}
+              {can("stock_view_password") && deliveryResult.ficha ? <Button variant="outline" onClick={() => void copyValue("Ficha de entrega", deliveryResult.ficha)}>Copiar ficha de entrega</Button> : null}
+              <Button variant="outline" onClick={() => void copyValue("Enlace de entrega", deliveryResult.link)}>🔗 Copiar enlace de entrega</Button>
+              <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent(deliveryResult.text), "_blank", "noopener,noreferrer")}><MessageCircle className="mr-1 size-4" />Compartir por WhatsApp</Button>
+              {deliveryResult.password ? <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent("Contraseña del documento protegido: " + deliveryResult.password), "_blank", "noopener,noreferrer")}>Enviar contraseña del documento por WhatsApp</Button> : null}
+              <Button variant="ghost" onClick={() => setDeliveryResult(null)}>Cerrar</Button>
+            </div> : null}
           </DialogContent>
         </Dialog>
 
