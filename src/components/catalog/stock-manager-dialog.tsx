@@ -478,6 +478,20 @@ export function StockManagerDialog({
     }
   }
 
+  function openManualDelivery(item: StockItem) {
+    if (busy || item.status !== "available" || !can("stock_assign")) return;
+    setDeliver(item);
+    setDeliveryImages([]);
+    setDeliveryAttachment(null);
+    setDeliverClient(initialClient?.name || "");
+    setDeliverWhatsapp(initialClient?.whatsapp || "");
+    setClientChoice(initialClient?.id || "manual");
+    setDeliverStockExpires(item.expiresOn || expiresAfterMonths(businessToday(), item.durationMonths || 1));
+    setDeliverSalePrice(item.salePrice ? String(item.salePrice) : "");
+    setDeliverOrderRef("");
+    setToolsItem(null);
+  }
+
   async function send() {
     if (!deliver) return;
     if (!can("stock_assign")) return toast.error("No tienes permiso para entregar stock");
@@ -529,7 +543,7 @@ export function StockManagerDialog({
     <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>} className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Gestor</DialogTitle>
-          {initialClient ? <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name} · Selecciona una cuenta disponible y abre Entrega manual.</p> : null}
+          {initialClient ? <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name} · Elige una cuenta disponible y pulsa Asignar.</p> : null}
           <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
         </DialogHeader>
 
@@ -561,11 +575,11 @@ export function StockManagerDialog({
 
             {busy ? <Loader2 className="mx-auto size-5 animate-spin" /> : null}
             <div className="overflow-hidden rounded-2xl border">
-              <div className="grid grid-cols-[1fr_150px_74px] border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Plataforma</span><span>Estado</span><span className="text-center">Configuración</span></div>
+              <div className="grid grid-cols-[1fr_110px_86px] border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Plataforma</span><span>Estado</span><span className="text-center">{initialClient ? "Acción" : "Config."}</span></div>
               {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
                 const statusText = x.status !== "available" && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
-                return <div key={x.id} className="grid grid-cols-[1fr_150px_74px] items-center border-b px-3 py-3 last:border-b-0"><div className="min-w-0"><p className="truncate font-semibold">{x.platform}</p>{x.accountType ? <p className="truncate text-xs text-muted-foreground">{x.accountType}</p> : null}</div><div className="flex items-center gap-2 text-sm"><span className={`size-2.5 shrink-0 rounded-full ${statusDot(x)}`} /><span className="truncate">{statusText}</span></div><div className="text-center"><Button size="icon" variant="outline" className="size-9" onClick={() => setToolsItem(x)} aria-label={`Configurar ${x.platform}`}><Settings2 className="size-4" /></Button></div></div>;
+                return <div key={x.id} className="grid grid-cols-[1fr_110px_86px] items-center border-b px-3 py-3 last:border-b-0"><div className="min-w-0"><p className="truncate font-semibold">{x.platform}</p>{x.accountType ? <p className="truncate text-xs text-muted-foreground">{x.accountType}</p> : null}</div><div className="flex items-center gap-2 text-sm"><span className={`size-2.5 shrink-0 rounded-full ${statusDot(x)}`} /><span className="truncate">{statusText}</span></div><div className="text-center">{initialClient && x.status === "available" && can("stock_assign") ? <Button size="sm" disabled={busy} onClick={() => openManualDelivery(x)}>Asignar</Button> : <Button size="icon" variant="outline" className="size-9" onClick={() => setToolsItem(x)} aria-label={`Configurar ${x.platform}`}><Settings2 className="size-4" /></Button>}</div></div>;
               })}
               {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay registros en esta subpestaña.</p> : null}
             </div>
@@ -628,7 +642,7 @@ export function StockManagerDialog({
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && can("stock_add") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(initialClient?.name || ""); setDeliverWhatsapp(initialClient?.whatsapp || ""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => openManualDelivery(toolsItem)}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}

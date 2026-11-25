@@ -526,7 +526,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
     setAssignClient(null);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
-  const assign = (id: string) => { const client = records.find(r => r.id === id && r.module === "clients" && r.status === "active"); if (!client) return; navigate("inventory"); setAssignClient(client); };
+  const assign = (id: string) => { const client = records.find(r => r.id === id && r.module === "clients" && r.status === "active"); if (!client) return toast.error("El cliente no está disponible. Actualiza clientes e inténtalo de nuevo."); navigate("inventory"); setAssignClient(client); };
   const resource = (module: Module) => (
     <ResourcePanel
       key={module}
