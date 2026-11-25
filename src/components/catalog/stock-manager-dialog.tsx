@@ -143,7 +143,6 @@ export function StockManagerDialog({
   const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<StockItem[]>([]);
   const [stockTab, setStockTab] = useState<StockTab>(initialTab);
-  const [stockKindTab, setStockKindTab] = useState<"complete" | "profile">("complete");
   const [q, setQ] = useState("");
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
 
@@ -154,6 +153,8 @@ export function StockManagerDialog({
   const [bulkText, setBulkText] = useState("");
   const [form, setForm] = useState<StockItem>(blank());
   const [showPass, setShowPass] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  useEffect(() => { if (formOpen) setPanelOpen(Boolean(form.panelUrl || form.panelUsername || form.panelPassword)); }, [formOpen, form.id]);
   const formRef = useRef<HTMLDivElement | null>(null);
 
   const [toolsItem, setToolsItem] = useState<StockItem | null>(null);
@@ -215,7 +216,7 @@ export function StockManagerDialog({
   const expiredCount = items.filter((x) => x.status === "expired" || (x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0)).length;
 
   const tabItems = useMemo(() => {
-    let base = items.filter((x) => (x.stockKind || "complete") === stockKindTab);
+    let base = [...items];
     if (!admin) base = base.filter((x) => x.status !== "available");
     if (stockTab === "available") base = base.filter((x) => x.status === "available");
     if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "expired");
@@ -231,7 +232,7 @@ export function StockManagerDialog({
         const bd = b.expiresOn ? new Date(b.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
-  }, [items, stockTab, stockKindTab, q, admin]);
+  }, [items, stockTab, q, admin]);
 
   async function persist(item: StockItem, success = "Registro guardado") {
     const saved = ownerToken
@@ -257,7 +258,6 @@ export function StockManagerDialog({
       // If conversion fails, keep the saved id so retrying cannot insert the complete again.
       setForm(saved);
       if (splitting) await splitAccount(saved.id, count);
-      setStockKindTab(splitting ? "profile" : saved.stockKind);
       if (splitting || saved.status === "available") setStockTab("available");
       setQ(""); setSplitOnSave(false);
       await load();
@@ -285,7 +285,7 @@ export function StockManagerDialog({
         // En modo lote nunca reutilizar credenciales capturadas previamente en modo individual.
         await persist({ ...form, id: "", stockKind: form.stockKind, accountType: form.stockKind === "profile" ? "Perfil" : "Completa", parentStockId: null, username, password, profilePin, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "", renewalNotifiedAt: null }, "");
       }
-      setStockKindTab(form.stockKind); setStockTab("available"); setQ("");
+      setStockTab("available"); setQ("");
       setBulkText("");
       setForm(blank());
       setFormOpen(false);
@@ -315,7 +315,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       await splitAccount(x.id, count);
-      await load(); setToolsItem(null); setStockKindTab("profile"); setStockTab("available"); setQ("");
+      await load(); setToolsItem(null); setStockTab("available"); setQ("");
       toast.success(`${count} perfiles creados`);
     } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
@@ -331,7 +331,7 @@ export function StockManagerDialog({
     setBusy(true);
     try {
       for (const child of plan.children) ownerToken ? await stockOwnerDelete({data:{token:ownerToken,id:child.id}}) : await stockAdminDelete({data:{code:getSavedCode(),id:child.id}});
-      await persist(plan.item, ""); await load(); setToolsItem(null); setStockKindTab("complete"); toast.success("Cuenta restaurada en Completas");
+      await persist(plan.item, ""); await load(); setToolsItem(null); toast.success("Cuenta restaurada en Completas");
     } catch(e) { toast.error(err(e)); } finally { setBusy(false); }
   }
 
@@ -350,7 +350,7 @@ export function StockManagerDialog({
       toast.success("Registro eliminado. Puedes volver a agregarlo.", deleted && deleted.status === "available" && can("stock_add") ? {
         action: { label: "Agregar de nuevo", onClick: () => {
           setForm({ ...deleted, id: "", status: "available", clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", protectedDeliveryId: "", renewalStatus: "", renewalNotifiedAt: null });
-          setStockKindTab(deleted.stockKind); setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
+          setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
         } },
       } : undefined);
     } catch (e) {
@@ -395,13 +395,13 @@ export function StockManagerDialog({
 
   async function copyFullAccess(x: StockItem) {
     const body = [
-      `📺 ${x.platform}${x.accountType ? ` · ${x.accountType}` : ""}`,
-      x.username ? `Usuario/correo: ${x.username}` : "",
-      x.password ? `Contraseña: ${x.password}` : "",
-      x.profilePin ? `PIN: ${x.profilePin}` : "",
-      x.panelUrl ? `Panel: ${x.panelUrl}` : "",
-      x.panelUsername ? `Usuario panel: ${x.panelUsername}` : "",
-      x.panelPassword ? `Contraseña panel: ${x.panelPassword}` : "",
+      `${x.platform}`,
+      x.username ? `✉️ Correo: ${x.username}` : "",
+      x.password ? `🔑 Contraseña: ${x.password}` : "",
+      x.profilePin ? `👤 Perfil / PIN: ${x.profilePin}` : "",
+      x.panelUrl ? `🔗 Link: ${x.panelUrl}` : "",
+      x.panelUsername ? `👤 Usuario: ${x.panelUsername}` : "",
+      x.panelPassword ? `🔑 Contraseña: ${x.panelPassword}` : "",
     ].filter(Boolean).join("\n");
     await copyText(body);
     toast.success("Acceso completo copiado");
@@ -534,11 +534,10 @@ export function StockManagerDialog({
 
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
-              <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Selecciona una subpestaña. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") ? <Button onClick={() => { setForm({...blank(),stockKind:stockKindTab,accountType:stockKindTab === "profile" ? "Perfil" : "Completa"}); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />{stockKindTab==="profile"?"Agregar perfiles":"Agregar completas"}</Button> : null}
+              <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Consulta cuentas completas y perfiles en un mismo listado. La información sensible queda dentro de ⚙️.</p></div>
+              {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar cuenta</Button> : null}
             </div>
 
-            <div className="flex flex-wrap gap-2"><Button size="sm" variant={stockKindTab === "complete" ? "default" : "outline"} onClick={() => setStockKindTab("complete")}>📺 Completas</Button><Button size="sm" variant={stockKindTab === "profile" ? "default" : "outline"} onClick={() => setStockKindTab("profile")}>👤 Perfiles</Button></div>
             <div className="flex flex-wrap gap-2">
               {([
                 ["available", "Disponibles"],
@@ -576,9 +575,7 @@ export function StockManagerDialog({
               {!bulkMode ? <div><Label>Contraseña</Label><div className="relative"><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPass((v) => !v)}>{showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button></div></div> : null}
               {!bulkMode ? <div><Label>Perfil / PIN</Label><Input value={form.profilePin} onChange={(e) => setForm({ ...form, profilePin: e.target.value })} /></div> : null}
               <div><Label>Proveedor</Label><Input value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} /></div>
-              <div><Label>Link del panel</Label><Input value={form.panelUrl} onChange={(e) => setForm({ ...form, panelUrl: e.target.value })} /></div>
-              <div><Label>Usuario del panel</Label><Input value={form.panelUsername} onChange={(e) => setForm({ ...form, panelUsername: e.target.value })} /></div>
-              <div><Label>Contraseña del panel</Label><Input type={showPass ? "text" : "password"} value={form.panelPassword} onChange={(e) => setForm({ ...form, panelPassword: e.target.value })} /></div>
+              <div className="sm:col-span-3 space-y-3"><Button type="button" variant="outline" className="w-full justify-between" aria-expanded={panelOpen} onClick={() => setPanelOpen(v => !v)}><span>＋ Agregar panel</span><span>{panelOpen ? "⌃" : "⌄"}</span></Button>{panelOpen ? <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-3"><div><Label>🔗 Link</Label><Input value={form.panelUrl} onChange={(e) => setForm({ ...form, panelUrl: e.target.value })} /></div><div><Label>👤 Usuario</Label><Input value={form.panelUsername} onChange={(e) => setForm({ ...form, panelUsername: e.target.value })} /></div><div><Label>🔑 Contraseña</Label><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.panelPassword} onChange={(e) => setForm({ ...form, panelPassword: e.target.value })} /></div></div> : null}</div>
               <div><Label>Costo</Label><Input type="number" min={0} step="0.01" value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} /></div>
               <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={form.salePrice || ""} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} /></div>
               <div><Label>Fecha de compra</Label><Input type="date" value={form.acquiredOn || ""} onChange={(e) => setForm({ ...form, acquiredOn: e.target.value || null })} /></div>
