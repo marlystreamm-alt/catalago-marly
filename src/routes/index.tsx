@@ -22,6 +22,7 @@ import {
   Star,
   Tags,
   WifiOff,
+  Home, ShoppingBag, Wallet, Package, UserRound, Sparkles,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ import { buildMeta, downloadCsv, formatStamp, printPdf, stamp } from "@/lib/cata
 import { buildCatalogLink, mainStoreLink, MAIN_STORE_VIEWS } from "@/lib/catalog/links";
 import { ServiceDetailDialog } from "@/components/catalog/service-detail-dialog";
 import { BulkOrderBar } from "@/components/catalog/bulk-order-bar";
+import { displayPrice } from "@/lib/catalog/whatsapp";
 
 import { toast } from "sonner";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
@@ -627,15 +629,12 @@ function CatalogPage() {
           ) : null}
         </header>
 
-        {!isAdmin && catalog.id === "clientes" && <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-4 space-y-3" aria-label="Mi tienda web">
-          <div><h2 className="font-bold">Mi tienda web</h2><p className="text-sm text-muted-foreground">Consulta los precios aquí, compra con tu saldo o solicita productos por encargo.</p></div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Button asChild><a href={mainStoreLink("tienda")}>Comprar con saldo</a></Button>
-            <Button asChild variant="outline"><a href={mainStoreLink("saldo")}>Recargar saldo</a></Button>
-            <Button asChild variant="outline"><a href={mainStoreLink("compras")}>Mis compras</a></Button>
-            <Button asChild variant="outline"><a href={mainStoreLink("cuenta")}>Mi cuenta</a></Button>
-          </div>
-        </section>}
+        {!isAdmin && catalog.id === "clientes" && <>
+          <section className="relative mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-cyan-800 p-6 text-white shadow-lg sm:p-10" aria-label="Mi tienda web"><div className="relative z-10 max-w-xl space-y-4"><span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold tracking-widest"><Sparkles className="size-4"/> EXPERIENCIA MA²</span><h2 className="text-3xl font-black leading-tight sm:text-5xl">Tu entretenimiento,<br/><span className="text-cyan-200">a un toque.</span></h2><p className="max-w-md text-sm leading-relaxed text-slate-200">Streaming, invitaciones y servicios digitales. Recarga tu saldo, descubre tus plataformas favoritas y consulta tus compras desde un solo lugar.</p><div className="flex flex-wrap gap-2"><Button asChild className="bg-cyan-300 text-slate-950 hover:bg-cyan-200"><a href={mainStoreLink("tienda")}>Comprar con saldo</a></Button><Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"><a href="#catalog-products">Explorar catálogo</a></Button></div></div><div aria-hidden className="pointer-events-none absolute -right-12 -top-16 size-72 rounded-full bg-fuchsia-400/30 blur-3xl"/><div aria-hidden className="pointer-events-none absolute -bottom-20 right-4 size-64 rounded-full bg-cyan-300/20 blur-3xl"/></section>
+          <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Accesos rápidos">{[["saldo","💳","Recargar saldo"],["compras","📦","Mis compras"],["cuenta","👤","Mi perfil"],["tienda","🛒","Stock disponible"]].map(([v,icon,label])=><a key={v} href={mainStoreLink(v as "saldo"|"compras"|"cuenta"|"tienda")} className="rounded-2xl border bg-card p-3 shadow-sm transition hover:border-primary"><span className="text-2xl">{icon}</span><p className="mt-2 text-sm font-bold">{label}</p></a>)}</section>
+          <section className="mt-6"><h2 className="mb-3 text-xl font-bold">Explora por categoría</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{sectionTabs.map((s,i)=><button key={s.id} onClick={()=>{setPublicSection(s.id);document.getElementById("catalog-products")?.scrollIntoView({behavior:"smooth"});}} className={`rounded-2xl border p-4 text-left shadow-sm ${i%2?"bg-primary/5":"bg-card"}`}><span className="text-3xl">{s.id==="perfiles"?"🎬":s.id==="completas"?"📺":s.id==="ia-creatividad"?"🎨":"✨"}</span><p className="mt-2 text-sm font-bold">{s.name}</p></button>)}</div></section>
+          {catalog.services.filter(s=>s.active&&s.favorite).length>0&&<section className="mt-6"><h2 className="mb-3 text-xl font-bold">✨ Productos destacados</h2><div className="flex gap-3 overflow-x-auto pb-2">{catalog.services.filter(s=>s.active&&s.favorite).slice(0,8).map(s=><button key={s.id} onClick={()=>setDetailId(s.id)} className="min-w-36 rounded-2xl border bg-card p-3 text-left shadow-sm"><div className="mb-2 text-2xl">{s.icon&&/^https:\/\/|^data:image\//.test(s.icon)?<img src={s.icon} alt="" className="size-16 rounded-xl object-cover"/>:"✨"}</div><p className="text-sm font-bold">{s.name}</p><p className="font-bold text-primary">{displayPrice(s)}</p></button>)}</div></section>}
+        </>}
 
         {!isAdmin ? <StoreNotices /> : null}
         {isAdmin && homeView ? <AdminDashboard /> : null}
@@ -654,7 +653,7 @@ function CatalogPage() {
             </div>
           ) : null}
 
-          {!isAdmin ? (
+          {!isAdmin && catalog.id !== "clientes" ? (
             <section
               className="card-soft mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-card p-3"
               aria-label="Resumen público"
@@ -684,7 +683,7 @@ function CatalogPage() {
             </div>
           ) : null}
 
-          <section className="card-soft mt-4 rounded-2xl border border-border bg-card p-3">
+          <section id="catalog-products" className="card-soft mt-4 scroll-mt-4 rounded-2xl border border-border bg-card p-3">
             <div className="mb-2 flex flex-wrap justify-end gap-2">
               {(catalog.spaceType === "directory" || catalog.spaceType === "provider") &&
               !isAdmin ? (
@@ -1029,7 +1028,7 @@ function CatalogPage() {
           if (!v) setDetailId(null);
         }}
       />
-      <BackNav />
+      {!isAdmin&&catalog.id==="clientes"&&!selectedIds.length?<nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t bg-card/95 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-sm sm:hidden" aria-label="Navegación de tienda">{[["#ma2-catalog-workspace",Home,"Inicio"],["#catalog-products",ShoppingBag,"Tienda"],[mainStoreLink("saldo"),Wallet,"Saldo"],[mainStoreLink("compras"),Package,"Compras"],[mainStoreLink("cuenta"),UserRound,"Perfil"]].map(([href,Icon,label])=>{const I=Icon as typeof Home;return <a href={href as string} key={label as string} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-muted-foreground hover:text-primary"><I className="size-5"/>{label as string}</a>})}</nav>:<BackNav />}
     </main>
   );
 }

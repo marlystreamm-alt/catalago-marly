@@ -35,6 +35,7 @@ import {
 import { useCatalogStore } from "@/lib/catalog/store";
 import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
+import { FinancePanel } from "./finance-panel";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { adminDashboard } from "@/lib/stock/dashboard.functions";
@@ -58,6 +59,7 @@ import { AppearanceEditor } from "@/components/catalog/appearance-editor";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
+  ["finance", "💰", "Finanzas"],
   ["shop", "🛒", "Mi tienda web"],
   ["ownCatalogs", "📚", "Mis catálogos"],
   ["reports", "🛠️", "Reportes"],
@@ -268,6 +270,7 @@ export function SellerLayout({
 }
 const DESCRIPTIONS: Partial<Record<Section, string>> = {
   shop: "Tu página de ventas, enlace público y acceso de compradores.",
+  finance: "Entradas, salidas, cuentas de efectivo y control de pagos.",
   ownCatalogs: "Tus listas de precios independientes y el catálogo de tu tienda web.",
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
   sales: "Entregas e importes registrados en tu inventario.",
@@ -563,6 +566,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
     content = <div className="space-y-4"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Stock disponible</button><button className={tab==="pricing"?"active":""} onClick={()=>setTab("pricing")}>Productos y precios</button><button className={tab==="on-request"?"active":""} onClick={()=>setTab("on-request")}>Por encargo</button></div>{tab==="pricing"?<ProductPricing/>:tab==="on-request"?<OnRequestInventory/>:<StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />}</div>;
   else if (section === "expiry") content = <StockInsights />;
   else if (section === "sales") content = <StockInsights sales />;
+  else if (section === "finance") content = <FinancePanel/>;
   else if (section === "wallet")
     content = (
       <div className="space-y-5">
