@@ -479,6 +479,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
+  const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
   const [addStock, setAddStock] = useState(false);
   const [walletClient, setWalletClient] = useState("");
   const [settings, setSettings] = useState(false);
@@ -522,8 +523,10 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
     setSection(s);
     setTab("main");
     setAddStock(false);
+    setAssignClient(null);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
+  const assign = (id: string) => { const client = records.find(r => r.id === id && r.module === "clients" && r.status === "active"); if (!client) return; navigate("inventory"); setAssignClient(client); };
   const resource = (module: Module) => (
     <ResourcePanel
       key={module}
@@ -531,6 +534,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       records={records}
       entries={entries}
       reload={load}
+      onAssign={assign}
       onWallet={(id) => {
         setWalletClient(id);
         navigate("wallet");
@@ -551,7 +555,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
       />
     ) : null;
   else if (section === "inventory")
-    content = <StockManagerDialog key={String(addStock)} embedded autoAdd={addStock} />;
+    content = <StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />;
   else if (section === "expiry") content = <StockInsights />;
   else if (section === "sales") content = <StockInsights sales />;
   else if (section === "wallet")
@@ -614,7 +618,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: () => void }) {
   else if (section === "clients")
     content = (
       <div className="space-y-5">
-        <CustomerManager slug="ma2" records={records} />
+        <CustomerManager slug="ma2" records={records} onAssign={assign} />
         {resource("clients")}
       </div>
     );

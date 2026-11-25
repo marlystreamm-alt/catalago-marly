@@ -86,11 +86,13 @@ export function ResourcePanel({
   entries,
   reload,
   onWallet,
+  onAssign,
 }: {
   module: Module;
   records: OpsRecord[];
   entries: Entry[];
   reload: () => Promise<void>;
+  onAssign?: (id: string) => void;
   onWallet?: (id: string, debt?: boolean) => void;
 }) {
   const def = DEFINITIONS[module];
@@ -281,6 +283,7 @@ export function ResourcePanel({
                 ) : null}
                 {module === "clients" ? (
                   <>
+                    {onAssign ? <Button size="sm" disabled={busy || r.status !== "active"} onClick={() => onAssign(r.id)}>Asignar cuenta</Button> : null}
                     <Button size="sm" variant="outline" onClick={() => onWallet?.(r.id)}>
                       Saldo / crédito
                     </Button>

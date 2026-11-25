@@ -125,6 +125,7 @@ export function StockManagerDialog({
   embedded = false,
   initialTab = "all",
   autoAdd = false,
+  initialClient,
   ownerToken,
   ownerFeatures,
   whatsappTemplate = "Hola {cliente}, aquí tienes tu entrega: {link}",
@@ -132,6 +133,7 @@ export function StockManagerDialog({
   embedded?: boolean;
   initialTab?: StockTab;
   autoAdd?: boolean;
+  initialClient?: {id:string;name:string;whatsapp:string};
   ownerToken?: string;
   ownerFeatures?: FeatureMap;
   whatsappTemplate?: string;
@@ -172,10 +174,10 @@ export function StockManagerDialog({
   useEffect(() => {
     if (!deliveryOpen || !admin) return;
     let active = true;
-    setClientChoice("manual"); setClientLoadError(false); setRegisteredClients([]);
+    setClientChoice(initialClient?.id || "manual"); setClientLoadError(false); setRegisteredClients(initialClient ? [initialClient] : []);
     void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || ""}))); }).catch(() => { if (active) setClientLoadError(true); });
     return () => { active = false; };
-  }, [deliveryOpen, admin, code]);
+  }, [deliveryOpen, admin, code, initialClient]);
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
@@ -393,20 +395,20 @@ export function StockManagerDialog({
     toast.success(`${label} copiado`);
   }
 
-  async function copyProtectedLink(x: StockItem) {
+  async function copyProtectedLink(x: StockItem, withMessage = false) {
     try {
       const result = ownerToken
         ? await stockOwnerProtectedLink({ data: { token: ownerToken, id: x.id } })
         : await stockAdminProtectedLink({ data: { code, id: x.id } });
       const link = `${window.location.origin}/e/${result.id}?t=${encodeURIComponent(result.token)}`;
-      await copyText(link);
-      toast.success("Enlace protegido copiado");
+      await copyText(withMessage ? (message || whatsappTemplate).replaceAll("{cliente}", x.clientName || "cliente").replaceAll("{plataforma}", x.platform).replaceAll("{usuario}", x.username).replaceAll("{vigencia}", x.expiresOn || "").replaceAll("{link}", link) + ((message || whatsappTemplate).includes("{link}") ? "" : "\n🔗 " + link) : link);
+      toast.success(withMessage ? "Mensaje con link copiado" : "Enlace protegido copiado");
     } catch (e) {
       toast.error(err(e));
     }
   }
 
-  async function copyFullAccess(x: StockItem) {
+  async function copyFullAccess(x: StockItem, whatsapp = false) {
     const body = [
       `${x.platform}`,
       x.username ? `✉️ Correo: ${x.username}` : "",
@@ -416,8 +418,8 @@ export function StockManagerDialog({
       x.panelUsername ? `👤 Usuario: ${x.panelUsername}` : "",
       x.panelPassword ? `🔑 Contraseña: ${x.panelPassword}` : "",
     ].filter(Boolean).join("\n");
-    await copyText(body);
-    toast.success("Acceso completo copiado");
+    await copyText(whatsapp ? `Hola ${x.clientName || ""}, aquí tienes tu acceso:\n\n${body}${x.expiresOn ? "\n📅 Vence: " + x.expiresOn : ""}` : body);
+    toast.success(whatsapp ? "Mensaje para WhatsApp copiado" : "Acceso completo copiado");
   }
 
   async function informClient(x: StockItem) {
@@ -527,6 +529,7 @@ export function StockManagerDialog({
     <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>} className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
         <DialogHeader>
           <DialogTitle>Gestor</DialogTitle>
+          {initialClient ? <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name} · Selecciona una cuenta disponible y abre Entrega manual.</p> : null}
           <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
         </DialogHeader>
 
@@ -614,18 +617,18 @@ export function StockManagerDialog({
                 {toolsItem.cost || toolsItem.salePrice ? <p><b>Ganancia:</b> ${(toolsItem.salePrice - toolsItem.cost).toFixed(2)}</p> : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                {toolsItem.username ? <Button size="sm" variant="outline" onClick={() => void copyValue("Usuario/correo", toolsItem.username)}><Copy className="mr-1 size-3.5" />Correo</Button> : null}
-                {can("stock_view_password") && toolsItem.password ? <Button size="sm" variant="outline" onClick={() => void copyValue("Contraseña", toolsItem.password)}><Copy className="mr-1 size-3.5" />Contraseña</Button> : null}
                 {toolsItem.profilePin ? <Button size="sm" variant="outline" onClick={() => void copyValue("PIN", toolsItem.profilePin)}><Copy className="mr-1 size-3.5" />PIN</Button> : null}
                 {toolsItem.panelUrl ? <Button size="sm" variant="outline" onClick={() => void copyValue("Link del panel", toolsItem.panelUrl)}><Copy className="mr-1 size-3.5" />Panel</Button> : null}
                 {toolsItem.panelUsername ? <Button size="sm" variant="outline" onClick={() => void copyValue("Usuario del panel", toolsItem.panelUsername)}><Copy className="mr-1 size-3.5" />Usuario panel</Button> : null}
                 {can("stock_view_password") && toolsItem.panelPassword ? <Button size="sm" variant="outline" onClick={() => void copyValue("Contraseña del panel", toolsItem.panelPassword)}><Copy className="mr-1 size-3.5" />Clave panel</Button> : null}
                 {can("stock_view_password") ? <Button size="sm" variant="outline" onClick={() => void copyFullAccess(toolsItem)}><Copy className="mr-1 size-3.5" />Copiar credenciales</Button> : null}
+                {can("stock_view_password") ? <Button size="sm" variant="outline" onClick={() => void copyFullAccess(toolsItem, true)}><MessageCircle className="mr-1 size-3.5" />Copiar mensaje para WhatsApp</Button> : null}
+                {toolsItem.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={() => void copyProtectedLink(toolsItem, true)}><Copy className="mr-1 size-3.5" />Copiar mensaje con link</Button> : null}
                 {toolsItem.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={() => void copyProtectedLink(toolsItem)}><Copy className="mr-1 size-3.5" />Documento protegido</Button> : null}
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && can("stock_add") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(""); setDeliverWhatsapp(""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => { setDeliver(toolsItem); setDeliveryImages([]); setDeliveryAttachment(null); setDeliverClient(initialClient?.name || ""); setDeliverWhatsapp(initialClient?.whatsapp || ""); setDeliverStockExpires(toolsItem.expiresOn||expiresAfterMonths(businessToday(),toolsItem.durationMonths||1)); setDeliverSalePrice(toolsItem.salePrice ? String(toolsItem.salePrice) : ""); setDeliverOrderRef(""); setToolsItem(null); }}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
@@ -678,6 +681,7 @@ export function StockManagerDialog({
             {deliveryResult ? <div className="grid gap-2">
               {can("stock_view_password") ? <Button onClick={() => void copyFullAccess(deliveryResult.item)}><Copy className="mr-1 size-4" />Copiar credenciales</Button> : null}
               {can("stock_view_password") && deliveryResult.ficha ? <Button variant="outline" onClick={() => void copyValue("Ficha de entrega", deliveryResult.ficha)}>Copiar ficha de entrega</Button> : null}
+              <Button variant="outline" onClick={() => void copyValue("Mensaje con link", deliveryResult.text.includes(deliveryResult.link) ? deliveryResult.text : deliveryResult.text + "\n" + deliveryResult.link)}>Copiar mensaje con link</Button>
               <Button variant="outline" onClick={() => void copyValue("Enlace de entrega", deliveryResult.link)}>🔗 Copiar enlace de entrega</Button>
               <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent(deliveryResult.text), "_blank", "noopener,noreferrer")}><MessageCircle className="mr-1 size-4" />Compartir por WhatsApp</Button>
               {deliveryResult.password ? <Button variant="outline" onClick={() => window.open("https://wa.me/" + deliveryResult.phone + "?text=" + encodeURIComponent("Contraseña del documento protegido: " + deliveryResult.password), "_blank", "noopener,noreferrer")}>Enviar contraseña del documento por WhatsApp</Button> : null}
