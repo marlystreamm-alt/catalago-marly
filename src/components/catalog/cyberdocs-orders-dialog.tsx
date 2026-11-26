@@ -1027,18 +1027,21 @@ export function CyberDocsOrdersDialog({
                         <div className="grid gap-3 rounded-xl border border-amber-300/60 bg-amber-50/50 p-3">
                           <div>
                             <p className="flex items-center gap-1.5 text-sm font-semibold"><CalendarDays className="size-4" />Entrega, vencimiento y renovación</p>
-                            <p className="text-xs text-muted-foreground">El sistema revisa estas fechas cada 15 minutos y te avisa antes del vencimiento.</p>
+
                           </div>
-                          <p className="text-xs text-muted-foreground">Al finalizar, se guarda automáticamente la fecha de entrega. Si entregas desde stock, también se toma su vigencia. Usa estos campos solo para hacer ajustes.</p>
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <p className="text-xs text-muted-foreground">{selected.status === "completed" ? `Entregado: ${selected.deliveredOn || "sin fecha"}` : "La fecha de entrega se guarda al finalizar."}{selected.expiresOn ? ` · Vence: ${selected.expiresOn}` : ""}</p>
+                          <details>
+                            <summary className="cursor-pointer text-xs font-semibold">Editar fechas</summary>
+                          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="min-w-0"><Label>Fecha de entrega</Label><Input className="min-w-0 w-full" type="date" value={deliveredOn} onChange={(event) => setDeliveredOn(event.target.value)} /></div>
                             <div className="min-w-0"><Label>Fecha de vencimiento</Label><Input className="min-w-0 w-full" type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} /></div>
                             <div><Label>Avisar días antes</Label><Input type="number" min={0} max={90} value={renewalWarningDays} onChange={(event) => setRenewalWarningDays(event.target.value)} /></div>
                           </div>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                             <Button type="button" size="sm" variant="outline" onClick={() => void saveRenewalDates()} disabled={busy}><CalendarDays className="mr-1 size-4" />Guardar fechas</Button>
-                            {selected.status === "completed" && selected.expiresOn ? <Button type="button" size="sm" onClick={() => void offerRenewal()} disabled={busy}><MessageCircle className="mr-1 size-4" />Ofrecer renovación por WhatsApp</Button> : null}
                           </div>
+                          </details>
+                            {selected.status === "completed" && selected.expiresOn ? <Button type="button" size="sm" onClick={() => void offerRenewal()} disabled={busy}><MessageCircle className="mr-1 size-4" />Ofrecer renovación por WhatsApp</Button> : null}
                           {selected.expiresOn ? <p className="text-xs"><b>Recordatorio:</b> {daysUntilDate(selected.expiresOn) === 0 ? "vence hoy" : (daysUntilDate(selected.expiresOn) ?? 0) < 0 ? `venció hace ${Math.abs(daysUntilDate(selected.expiresOn) ?? 0)} día(s)` : `vence en ${daysUntilDate(selected.expiresOn)} día(s)`} · aviso {selected.renewalWarningDays} día(s) antes{selected.renewalStatus ? ` · ${selected.renewalStatus}` : ""}</p> : null}
                         </div>
                       ) : null}
