@@ -18,7 +18,7 @@ export function WebOrders({ onOpenOrder, onRequestOnly=false,stage="all" }: { on
   const [tab, setTab] = useState<"paid" | "requests">(stage==="orders"||onRequestOnly?"requests":"paid");
   const [editing, setEditing] = useState(""), [name, setName] = useState(""), [phone, setPhone] = useState("");
   const code = getSavedCode();
-  const requests=data?.requests.filter(r=>stage==="orders"?!r.linkedId:stage==="deliveries"?false:isOnRequestMessage(r.message)===onRequestOnly) || [];
+  const requests=data?.requests.filter(r=>stage==="orders"?r.status==="nuevo"&&!r.linkedId:stage==="deliveries"?false:isOnRequestMessage(r.message)===onRequestOnly) || [];
   const refresh = useCallback(async () => {
     try { setData(await webOrderList({ data: { code } })); setError(""); }
     catch (e) { setError(err(e)); }
@@ -31,6 +31,7 @@ export function WebOrders({ onOpenOrder, onRequestOnly=false,stage="all" }: { on
     catch (e) { setError(err(e)); toast.error(err(e)); }
     finally { setBusy(false); }
   };
+  if (stage === "orders" && data && !error && requests.length === 0) return null;
   return <section className="seller-card space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-bold">{stage==="deliveries"?"Página web · Entregas automáticas":stage==="orders"?"Página web · Solicitudes pendientes":onRequestOnly?"Solicitudes por encargo":"Pedidos de la página"}</h2><p className="text-xs text-muted-foreground">{onRequestOnly?"Servicios solicitados sin stock inmediato.":"Compras con saldo confirmado y solicitudes normales."}</p></div><Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh()}>Actualizar</Button></div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
