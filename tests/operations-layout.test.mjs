@@ -12,7 +12,7 @@ test("the three order stages share navigation and hide the duplicate filters",as
  assert.match(cyber,/onStageChange\(order.id, "closed"\)/);
  assert.match(cyber,/\{!navigation && <div className="-mx-3/);
  assert.match(cyber,/\{navigation\}[\s\S]*?size="icon"[\s\S]*?aria-label="Ajustes de pedidos"/);
- assert.match(web,/stage==="orders"\?!r.linkedId/);
+ assert.match(web,/stage==="orders"\?r.status==="nuevo"&&!r.linkedId/);
  assert.match(cyber,/aria-label="Ajustes de pedidos"/);
  assert.doesNotMatch(notices,/<TabsTrigger value="pedidos"/);
 });
