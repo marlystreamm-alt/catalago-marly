@@ -501,7 +501,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   <article className="violet">
                     <Package />
                     <span>Compras</span>
-                    <strong>{data.orders.length}</strong>
+                    <strong>{data.orders.length + data.webOrders.length}</strong>
                     <button onClick={() => setTab("compras")}>Ver mis entregas →</button>
                   </article>
                 </div>
@@ -525,7 +525,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 )}
               </>
             ) : null}
-            {tab === "tienda" ? (!shop.id&&!sku?<Storefront embedded onSelect={(key,name)=>{setSku(key);setQuery(name);setKind("all");void loadProducts();}}/>:
+            {tab === "tienda" ? (!shop.id&&!sku?<Storefront embedded onPurchase={() => void load()} onSelect={(key,name)=>{setSku(key);setQuery(name);setKind("all");void loadProducts();}}/>:
               <>
                 <p className="mb-4 text-sm text-muted-foreground">
                   {data.priceTier === "reseller" ? "Estás viendo las tarifas de revendedor. Solo aparecen productos con precio de revendedor configurado." : "Precios para cliente normal."} Disponibilidad y precio comprobados al comprar. Recibe tus accesos aquí mismo.
@@ -591,7 +591,13 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               </>
             ) : null}
             {tab === "compras" ? (
-              <div className="space-y-3">{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
+              <div className="space-y-3">
+                {data.webOrders.map(order => (
+                  <article key={order.id} className="seller-card space-y-2">
+                    <div className="flex justify-between gap-3"><h3 className="font-bold">{order.title}</h3><strong>{money(order.total)}</strong></div>
+                    <p className="text-sm text-muted-foreground">{({completed:"Entregado", in_process:"En proceso", cancelled:"Cancelado", rejected:"Rechazado"} as Record<string,string>)[order.status] || "Pagado · pendiente de entrega"}</p>
+                  </article>
+                ))}{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
                 {data.records
                   .filter((r) => ["documents", "codes"].includes(r.module))
                   .map((r) => (
@@ -663,7 +669,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                       </div>
                     </article>
                   ))
-                ) : (
+                ) : data.webOrders.length ? null : (
                   <p className="seller-card text-muted-foreground">
                     Tus compras y entregas aparecerán aquí.
                   </p>
