@@ -378,9 +378,9 @@ export function MenusDialog({embedded=false}:{embedded?:boolean}={}) {
           Mis clientes
         </Button>} className="max-h-[85vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-3xl">
         <DialogHeader>
-          <DialogTitle>Mis clientes · catálogos vendidos</DialogTitle>
+          <DialogTitle>Tiendas contratadas</DialogTitle>
           <DialogDescription>
-            Apartado privado del administrador. Los clientes del catálogo no lo ven.
+            Apartado privado del administrador. Los compradores de cada tienda no lo ven.
           </DialogDescription>
         </DialogHeader>
 
@@ -708,7 +708,7 @@ export function MenusDialog({embedded=false}:{embedded?:boolean}={}) {
                   checked={business.active}
                   onCheckedChange={(v) => void patchBusiness({ ...business, active: v })}
                 />
-                <Label htmlFor="biz-active">Catálogo activo</Label>
+                <Label htmlFor="biz-active">Tienda activa</Label>
                 <Badge variant="secondary" className="ml-auto capitalize">
                   {businessStatus(business)}
                 </Badge>

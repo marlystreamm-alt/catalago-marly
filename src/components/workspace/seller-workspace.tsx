@@ -51,7 +51,6 @@ import { ProtectedDeliveriesDialog } from "@/components/catalog/protected-delive
 import { GalleryContents } from "@/components/catalog/platform-gallery-dialog";
 import { MethodsDialog } from "@/components/catalog/methods-dialog";
 import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
-import { CatalogManager } from "@/components/catalog/catalog-manager";
 import { SalesDialog } from "@/components/catalog/sales-dialog";
 import { AdminBar } from "@/components/catalog/admin-bar";
 import { SystemStatusDialog } from "@/components/catalog/system-status-dialog";
@@ -65,7 +64,6 @@ const SECTIONS = [
   ["home", "📊", "Inicio"],
   ["finance", "💰", "Finanzas"],
   ["shop", "🏷️", "Productos y precios"],
-  ["ownCatalogs", "📚", "Mis catálogos"],
   ["reports", "🛠️", "Reportes"],
   ["questions", "💬", "Dudas de clientes"],
   ["expiry", "⏰", "Vigencias y renovaciones"],
@@ -90,7 +88,7 @@ const SECTIONS = [
   ["subscription", "💳", "Planes y suscripciones"],
   ["gallery", "🖼️", "Guías de ingreso"],
   ["deliveries", "🛡️", "Entregas protegidas"],
-  ["catalogs", "🏪", "Catálogos de negocios"],
+  ["catalogs", "🏪", "Tiendas contratadas"],
   ["extras","✨","Extras"],
 ] as const;
 export type Section = (typeof SECTIONS)[number][0];
@@ -110,8 +108,9 @@ const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"gallery",children:[]},
   {main:"notices",children:[]},
   {main:"helpers",children:[]},
+  {main:"catalogs",children:[]},
   {main:"settings",label:"Ajustes",children:["appearance","subscription"]},
-  {main:"extras",children:["documents","ownCatalogs","catalogs","assistant","songs","games","memory","codes","deliveries"]},
+  {main:"extras",children:["documents","assistant","songs","games","memory","codes","deliveries"]},
 ];
 type Summary = Awaited<ReturnType<typeof adminDashboard>>;
 export function SellerLayout({
@@ -297,7 +296,6 @@ export function SellerLayout({
 const DESCRIPTIONS: Partial<Record<Section, string>> = {
   shop: "Tu página de ventas, enlace público y acceso de compradores.",
   finance: "Entradas, salidas, cuentas de efectivo y control de pagos.",
-  ownCatalogs: "Tus listas anteriores, independientes de la tienda web.",
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
   wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
   credit: "Registra crédito otorgado y sus abonos, con historial.",
@@ -308,7 +306,7 @@ const DESCRIPTIONS: Partial<Record<Section, string>> = {
   assistant: "Consulta tus registros y resultados del negocio.",
   gallery: "Guarda instrucciones por plataforma y reutilízalas en cada entrega.",
   deliveries: "Enlaces protegidos con instrucciones, imágenes y soporte.",
-  catalogs: "Gestiona los catálogos vendidos y las funciones habilitadas.",
+  catalogs: "Gestiona las tiendas contratadas y sus funciones habilitadas.",
   settings: "Contacto, mensajes, avisos de pedidos y respaldos.",
   subscription: "Administra tus planes, demos y solicitudes de contratación.",
   combos: "Asigna paquetes de perfiles o cuentas completas del inventario.",
@@ -581,7 +579,6 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       />
     ) : null;
   else if (section === "shop") content = <ProductPricing/>;
-  else if (section === "ownCatalogs") content = <section className="seller-card space-y-3"><h2 className="font-bold">Archivo histórico de catálogos</h2><p className="text-sm text-muted-foreground">Conservados sin editar. No forman parte de la tienda web.</p>{Object.values(store.state.catalogs).map(c=><div key={c.id} className="rounded-xl border p-3"><strong>{c.name}</strong><p className="text-xs text-muted-foreground">{c.services.length} servicios archivados</p></div>)}</section>;
   else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} /></div>;
   else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
   else if (section === "finance") content = <FinancePanel/>;
@@ -716,17 +713,16 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       </>
     );
   else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("orders");setTab("delivered");void load();}}/>;
-  else if(section==="extras") content=<div className="seller-card grid grid-cols-2 gap-3">{(["documents","ownCatalogs","catalogs","assistant","songs","games","memory","codes","deliveries"] as Section[]).map(id=><Button key={id} variant="outline" className="h-auto whitespace-normal p-3" onClick={()=>navigate(id)}>{SECTIONS.find(s=>s[0]===id)?.[2]}</Button>)}</div>;
+  else if(section==="extras") content=<div className="seller-card grid grid-cols-2 gap-3">{(["documents","assistant","songs","games","memory","codes","deliveries"] as Section[]).map(id=><Button key={id} variant="outline" className="h-auto whitespace-normal p-3" onClick={()=>navigate(id)}>{SECTIONS.find(s=>s[0]===id)?.[2]}</Button>)}</div>;
   else if (section === "subscription")
     content = (
       <div className="seller-card space-y-4">
-        <h3 className="font-bold">Planes de tus catálogos</h3>
+        <h3 className="font-bold">Planes de tus tiendas</h3>
         <p className="text-sm text-muted-foreground">
           Configura planes, instrucciones de pago, demos y solicitudes de contratación. La
           activación de pagos se confirma desde tu panel.
         </p>
         <SalesDialog />
-        <MenusDialog />
       </div>
     );
   else content = resource(section as Module);
