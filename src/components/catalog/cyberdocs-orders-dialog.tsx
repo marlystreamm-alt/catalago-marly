@@ -1,4 +1,5 @@
 import { ToolFrame } from '@/components/workspace/tool-frame';
+import { transferReferenceMessage } from "@/lib/workspace/model";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -373,14 +374,15 @@ export function CyberDocsOrdersDialog({
     try {
       // Read the saved delivery every time, including when reopening a completed order.
       const result = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } });
-      const message = buildOrderDeliveryMessage(
+      const baseMessage = buildOrderDeliveryMessage(
         { link: linkTemplate, password: passwordTemplate, combined: combinedTemplate },
         { client: selected.clientName || "", platform: selected.serviceName || "",
           link: `${window.location.origin}/e/${result.id}?t=${encodeURIComponent(result.token)}`,
           accessPassword: result.accessPassword },
         kind,
       );
-      if (!message) return toast.info("Este documento no tiene contraseña de protección");
+      if (!baseMessage) return toast.info("Este documento no tiene contraseña de protección");
+      const message=baseMessage+(kind==="password"?"":transferReferenceMessage(result.clientReference));
       if (whatsapp) await openWhatsApp(message);
       else if (kind === "password") { await copyText(message); toast.success("Mensaje copiado"); }
       else await copyAndComplete(message, selected);

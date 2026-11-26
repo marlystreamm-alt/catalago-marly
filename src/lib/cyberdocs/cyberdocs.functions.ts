@@ -302,10 +302,12 @@ export const cyberdocsClose = createServerFn({ method: "POST" })
 
 export const cyberdocsGetDeliveryLink = createServerFn({ method: "POST" })
   .validator((value: unknown) => orderInput.parse(value))
-  .handler(async ({ data }): Promise<{ id: string; token: string; status: string; accessPassword: string }> => {
+  .handler(async ({ data }): Promise<{ id: string; token: string; status: string; accessPassword: string; clientReference?:string }> => {
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
-    return server.getProtectedDeliveryTokenForOrder(data.orderId);
+    const result=await server.getProtectedDeliveryTokenForOrder(data.orderId);
+    const order=await server.getCyberDocsOrder(data.orderId);
+    return {...result,clientReference:order.sourceKey==="web_catalog"?await (await import("@/lib/customer/order-reference.server")).referenceForWebOrder(order):""};
   });
 
 export const cyberdocsManualFallback = createServerFn({ method: "POST" })

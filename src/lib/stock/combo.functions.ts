@@ -21,6 +21,8 @@ export const comboAssign=createServerFn({method:"POST"}).validator((v:unknown)=>
  const client=await ops.readRecord(data.clientId);
  if(client.module!=="clients"||client.status!=="active"||(client.data.shopId&&client.data.shopId!=="main"))throw new Error("Cliente no disponible");
  if(!(await import("@/lib/workspace/model")).validWhatsApp(client.data.whatsapp||""))throw new Error("Actualiza el WhatsApp del cliente antes de entregar el combo.");
+ const {validFullName,validClientEmail,transferReferenceMessage}=await import("@/lib/workspace/model");
+ if(!validFullName(client.title)||!validClientEmail(client.data.email||""))throw new Error("Completa el nombre y correo del cliente en Clientes antes de entregar el combo.");
  const ids=data.items.map(i=>i.id).sort();
  if(new Set(ids).size!==ids.length)throw new Error("No repitas una cuenta");
  const existing=await ops.readRecord(data.requestId).catch(()=>null);
@@ -38,6 +40,7 @@ export const comboAssign=createServerFn({method:"POST"}).validator((v:unknown)=>
   const payload:ProtectedDeliveryPrivate={id:data.requestId,createdAt:now,updatedAt:now,platform:data.title,client:client.title,whatsapp:phone,username:"",password:"",link:"",notes:lines,images:[],attachment:null,expiresAt:new Date(Date.now()+7*86400000).toISOString(),maxViews:null,viewCount:0,lastViewedAt:null,status:"active",imageCount:0,protectedWithPassword:true,history:[{at:now,kind:"created",detail:"Combo desde inventario"}],accessPassword,token};
   document=await ds.encryptPayload(payload);url="https://martgor.shop/e/"+data.requestId+"?t="+encodeURIComponent(token);reply="Documento: "+url+"\nContraseña: "+accessPassword;
  }
+ reply+=transferReferenceMessage(client.clientReference);
  const payload=await ds.encryptPayload({clientId:client.id,platform:data.title,amount:String(total),message:stock.map(s=>s.platform).join(" · "),reply,deliveryUrl:url,comboStockIds:JSON.stringify(ids)});
  const {error:assignError}=await db.rpc("ma2_assign_stock_combo_wallet",{p_request:data.requestId,p_client:client.id,p_client_version:client.version,p_name:client.title,p_phone:phone,p_title:data.title,p_kind:data.kind,p_items:data.items,p_payload:payload,p_document:document});
  if(assignError)throw new Error(assignError.message||"No se pudo asignar el combo");

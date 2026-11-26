@@ -115,7 +115,7 @@ export function ResourcePanel({
         (r) =>
           r.module === module &&
           (filter === "all" || r.status === filter || (module === "reports" && filter === "pending" && r.status === "in_progress")) &&
-          `${r.title} ${records.find(c=>c.module==="clients" && c.id===r.data.clientId)?.title || ""} ${Object.values(r.data).join(" ")}`
+          `${r.title} ${r.clientReference||""} ${records.find(c=>c.module==="clients" && c.id===r.data.clientId)?.title || ""} ${Object.values(r.data).join(" ")}`
             .toLowerCase()
             .includes(query.toLowerCase()),
       ),
@@ -244,6 +244,7 @@ export function ResourcePanel({
               {module === "reports" && <p className="mt-2 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString("es-MX")}{r.data.orderId ? ` · Folio de compra ${r.data.orderId.slice(0,8)}` : ""}</p>}
               {module === "clients" ? (
                 <div className="my-3 grid grid-cols-2 gap-2">
+                  {r.clientReference&&<div className="col-span-2 flex items-center justify-between rounded-xl border p-2"><div><small>Referencia permanente</small><b className="block">{r.clientReference}</b></div><Button size="sm" variant="outline" onClick={()=>void copyText(r.clientReference!)}>Copiar</Button></div>}
                   <div className="seller-mini-stat">
                     <small>Saldo</small>
                     <b>{money(balanceFor(entries, r.id))}</b>

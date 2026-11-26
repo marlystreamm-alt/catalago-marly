@@ -55,12 +55,14 @@ export const webPaidDelivery = createServerFn({ method: "POST" }).validator((v: 
   const ds = await import("@/lib/deliveries/deliveries.server");
   const snapshot = order.detail as { username: string; password_cipher: string; profilePin?: string };
   const { password } = await ds.decryptPayload<{password:string}>(snapshot.password_cipher);
-  if (!data.protected) return { text: [order.title, `Usuario: ${snapshot.username}`, `Contraseña: ${password}`, snapshot.profilePin ? `Perfil / PIN: ${snapshot.profilePin}` : ""].filter(Boolean).join("\n"), id: "", token: "", password: "" };
+  const client = await ops.readRecord(order.client_id).catch(() => null);
+  const clientReference=client?.clientReference||"";
+  const {transferReferenceMessage}=await import("@/lib/workspace/model");
+  if (!data.protected) return { text: [order.title, `Usuario: ${snapshot.username}`, `Contraseña: ${password}`, snapshot.profilePin ? `Perfil / PIN: ${snapshot.profilePin}` : ""].filter(Boolean).join("\n")+transferReferenceMessage(clientReference), id: "", token: "", password: "",clientReference };
   // A stable document ID makes concurrent clicks and retries return the same document.
   const { purchaseRecordId } = await import("./purchase-identity.server");
   const documentId = purchaseRecordId("document", order.id);
   const now = new Date().toISOString();
-  const client = await ops.readRecord(order.client_id).catch(() => null);
   const expiryLimit = order.expires_on ? Date.parse(`${order.expires_on}T23:59:59-06:00`) : Infinity;
   const payload: ProtectedDeliveryPrivate = { id: documentId, createdAt: now, updatedAt: now, platform: order.title, client: client?.title || "Cliente", whatsapp: client?.data.whatsapp || "", username: snapshot.username, password, link: "", notes: snapshot.profilePin ? `Perfil / PIN: ${snapshot.profilePin}` : "", images: [], attachment: null, expiresAt: new Date(Math.min(Date.now() + 7*86400000, expiryLimit)).toISOString(), maxViews: null, viewCount: 0, lastViewedAt: null, status: "active", imageCount: 0, protectedWithPassword: true, history: [{ at: now, kind: "created", detail: "Documento de compra con saldo" }], accessPassword: ds.randomToken().slice(0, 12), token: ds.randomToken() };
   const { error: createError } = await db.from("notification_log").upsert({ id: documentId, channel: "protected_delivery", kind: "delivery", attempt: 0, status: "active", detail: await ds.encryptPayload(payload) }, { onConflict: "id", ignoreDuplicates: true });
@@ -69,7 +71,7 @@ export const webPaidDelivery = createServerFn({ method: "POST" }).validator((v: 
   if (!row) throw new Error("No se pudo recuperar el documento");
   const saved = await ds.decryptPayload<ProtectedDeliveryPrivate>(String(row.detail));
   if (saved.status !== "active" || Date.parse(saved.expiresAt) <= Date.now()) throw new Error("El documento expiró o fue revocado; revisa Entregas protegidas");
-  return { text: "", id: saved.id, token: saved.token, password: saved.accessPassword };
+  return { text: "", id: saved.id, token: saved.token, password: saved.accessPassword,clientReference };
 });
 
 export const webAcknowledgePaid = createServerFn({ method: "POST" }).validator((v: unknown) => auth.extend({ id: z.string().uuid() }).parse(v)).handler(async ({ data }) => {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { webOrderList, webPaidDelivery, webAcknowledgePaid, webPrepareCatalog } from "@/lib/customer/order-management.functions";
+import { transferReferenceMessage } from "@/lib/workspace/model";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { money, phoneNumber } from "@/lib/workspace/model";
@@ -44,7 +45,7 @@ export function WebOrders({ onOpenOrder, onRequestOnly=false,stage="all" }: { on
         <p className="text-sm">WhatsApp: {o.whatsapp || "Sin dato"} · Vence: {o.expiresOn || "Sin fecha"}</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy} onClick={() => void run(async () => { const r = await webPaidDelivery({ data: { code, id: o.id, protected: false } }); await copyText(r.text); toast.success("Credenciales copiadas"); })}>Copiar credenciales</Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => { const r = await webPaidDelivery({ data: { code, id: o.id, protected: true } }); await copyText(`Documento: ${location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}\nContraseña: ${r.password}`); toast.success("Enlace y contraseña copiados"); })}>Documento protegido</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => { const r = await webPaidDelivery({ data: { code, id: o.id, protected: true } }); await copyText(`Documento: ${location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}\nContraseña: ${r.password}`+transferReferenceMessage(r.clientReference)); toast.success("Enlace y contraseña copiados"); })}>Documento protegido</Button>
           {o.whatsapp && o.expiresOn ? <Button size="sm" variant="outline" asChild><a href={`https://wa.me/${phoneNumber(o.whatsapp)}?text=${encodeURIComponent(`Hola ${o.client} 😊 Tu suscripción ${o.title} vence el ${o.expiresOn}. ¿Deseas renovarla?`)}`} target="_blank" rel="noopener noreferrer">Recordar renovación</a></Button> : null}
           <Button size="sm" variant="ghost" disabled={busy || o.acknowledged} onClick={() => void run(async () => { await webAcknowledgePaid({ data: { code, id: o.id } }); toast.success("Aviso atendido"); })}>{o.acknowledged ? "Aviso atendido" : "Marcar aviso atendido"}</Button>
         </div>

@@ -894,6 +894,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   <h3 className="font-bold">Tus datos</h3>
                   <p className="text-sm mt-3">{data.name}</p>
                   <p className="text-sm text-muted-foreground">{data.email}</p>
+                  {data.clientReference&&<p className="mt-2 text-sm font-semibold">Referencia permanente: {data.clientReference}</p>}
                 </section>
                 <form
                   className="seller-card space-y-3"

@@ -84,5 +84,6 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
     client: order.clientName,
     whatsapp: order.whatsapp || (order.contactLabel === "WhatsApp" ? order.contactValue : ""),
     platform: order.serviceName,
+    clientReference:order.sourceKey==="web_catalog"?await (await import("@/lib/customer/order-reference.server")).referenceForWebOrder(order):"",
   };
 }

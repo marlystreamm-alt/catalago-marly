@@ -34,7 +34,8 @@ export const customerSignUp = createServerFn({ method: "POST" })
     const c = await server(),
       s = await ops(),
       store = await c.customerShop(data.slug);
-    const {validWhatsApp,phoneNumber}=await import("@/lib/workspace/model");
+    const {validWhatsApp,phoneNumber,validFullName}=await import("@/lib/workspace/model");
+    if(!validFullName(data.name))throw new Error("Escribe tu nombre completo y apellido");
     if(!validWhatsApp(data.whatsapp)) throw new Error("Escribe un WhatsApp válido con lada");
     await c.customerThrottle("signup", store.slug + ":" + data.email, 5);
     if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail())throw new Error("No se pudo crear la cuenta. Si ya tienes acceso, inicia sesión.");
@@ -127,6 +128,7 @@ export const customerLoad = createServerFn({ method: "POST" })
       shop: ctx.shop,
       name: ctx.client.title,
       email: String(ctx.account.email),
+      clientReference:ctx.client.clientReference||"",
       priceTier: !ctx.shop.id && ctx.account.price_tier === "reseller" ? "reseller" as const : "retail" as const,
       mustChange: Boolean(ctx.account.must_change),
       ...s.totals(entries),

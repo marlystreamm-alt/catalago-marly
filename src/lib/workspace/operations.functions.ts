@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { MODULES, DEFINITIONS, validatePayload, phoneNumber, type Payload } from "./model";
+import { MODULES, DEFINITIONS, validatePayload, phoneNumber, validFullName, type Payload } from "./model";
 const auth = z.object({ code: z.string().min(4).max(200) });
 const id = z.string().uuid();
 const payload = z.record(z.string().max(7_100_000));
@@ -58,6 +58,7 @@ export const opsSave = createServerFn({ method: "POST" })
     )
       throw new Error("El código activo debe tener una vigencia futura");
     if (data.module === "clients") {
+      if(!validFullName(data.title))throw new Error("Escribe nombre completo y apellido");
       const clients = await s.readRecords("clients");
       if (
         clients.some(

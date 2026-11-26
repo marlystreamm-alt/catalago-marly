@@ -21,6 +21,7 @@ export type OpsRecord = {
   status: string;
   data: Payload;
   priceTier?: "retail" | "reseller";
+  clientReference?: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -50,7 +51,7 @@ export const DEFINITIONS: Record<
     icon: "👥",
     fields: [
       { key: "whatsapp", label: "WhatsApp con lada", required: true },
-      { key: "email", label: "Correo" },
+      { key: "email", label: "Correo electrónico", required: true },
       { key: "referrer", label: "Código de referido" },
       { key: "notes", label: "Notas", type: "textarea" },
     ],
@@ -244,6 +245,7 @@ export function validatePayload(module: Module, data: Payload) {
   }
   if (module === "clients" && !validWhatsApp(data.whatsapp || ""))
     throw new Error("Escribe el WhatsApp con lada");
+  if(module==="clients"&&!validClientEmail(data.email||""))throw new Error("Escribe un correo electrónico válido");
   if(module==="config"){
     const red=Number(data.renewalRedDays||3),yellow=Number(data.renewalYellowDays||7);
     if(!Number.isInteger(red)||!Number.isInteger(yellow)||red<0||yellow<=red||yellow>365)throw new Error("El límite amarillo debe ser mayor al rojo (entre 0 y 365 días).");
@@ -276,3 +278,6 @@ export function phoneNumber(value: string) {
 export function validWhatsApp(value:string){
   return /^\+?[\d\s()-]{10,25}$/.test(value.trim()) && /^\d{11,15}$/.test(phoneNumber(value));
 }
+export const validClientEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())&&value.trim().length<=254;
+export const validFullName=(value:string)=>value.trim().split(/\s+/).filter(Boolean).length>=2;
+export const transferReferenceMessage=(reference?:string)=>reference?`\n\n💳 Cuando realices una transferencia, coloca esta referencia permanente en el concepto de pago: ${reference}. Si generas una recarga automática, utiliza la referencia de esa recarga.`:"";
