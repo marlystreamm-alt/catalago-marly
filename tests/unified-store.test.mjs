@@ -9,13 +9,13 @@ async function load(file) {
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 }
 
-test("all customer views use the same main catalog URL", async () => {
+test("all customer views use the independent store URL", async () => {
   const { mainStoreLink, MAIN_STORE_VIEWS } = await load("src/lib/catalog/links.ts");
-  assert.equal(mainStoreLink(), "/?cat=clientes");
+  assert.equal(mainStoreLink(), "/tienda/ma2");
   for (const view of MAIN_STORE_VIEWS) {
     const url = new URL(mainStoreLink(view), "https://example.invalid");
-    assert.equal(url.pathname, "/");
-    assert.equal(url.searchParams.get("cat"), "clientes");
+    assert.equal(url.pathname, "/tienda/ma2");
+    assert.equal(url.searchParams.get("cat"), null);
     assert.equal(url.searchParams.get("vista"), view);
   }
 });

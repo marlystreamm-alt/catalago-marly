@@ -1,6 +1,5 @@
 import { CustomerManager } from "@/components/customer/customer-manager";
 import { WebOrders } from "@/components/customer/web-orders";
-import { OnRequestInventory } from "@/components/catalog/on-request-inventory";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -93,10 +92,11 @@ export type Section = (typeof SECTIONS)[number][0];
 const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"home",children:[]},
   {main:"orders",label:"Pedidos y entregas",children:["deliveries","codes"]},
-  {main:"inventory",children:["expiry","combos","providers","gallery"]},
+  {main:"inventory",children:["expiry","providers","gallery"]},
   {main:"clients",children:["reports","questions","referrals"]},
   {main:"finance",children:["sales","wallet","credit"]},
-  {main:"shop",label:"Tienda y catálogos",children:["ownCatalogs","catalogs"]},
+  {main:"shop",label:"Mi tienda web",children:[]},
+  {main:"ownCatalogs",label:"Catálogos",children:["catalogs","combos"]},
   {main:"settings",label:"Ajustes",children:["appearance","notices","helpers","subscription","documents"]},
   {main:"assistant",label:"Herramientas",children:["songs","games","memory"]},
 ];
@@ -274,7 +274,7 @@ export function SellerLayout({
 const DESCRIPTIONS: Partial<Record<Section, string>> = {
   shop: "Tu página de ventas, enlace público y acceso de compradores.",
   finance: "Entradas, salidas, cuentas de efectivo y control de pagos.",
-  ownCatalogs: "Tus listas de precios independientes y el catálogo de tu tienda web.",
+  ownCatalogs: "Tus listas anteriores, independientes de la tienda web.",
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
   sales: "Entregas e importes registrados en tu inventario.",
   wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
@@ -559,14 +559,14 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         }}
       />
     ) : null;
-  else if (section === "shop") content = <section className="seller-card space-y-4">
-    <div><h2 className="font-bold text-lg">{store.state.catalogs.clientes?.name || "Mi tienda MA²"}</h2><p className="text-sm text-muted-foreground">Un enlace para consultar tus productos, comprar con saldo, solicitar encargos y recargar.</p></div>
-    <div className="rounded-xl border p-3 space-y-2"><p className="text-xs text-muted-foreground">Enlace para compartir con tus compradores</p><strong className="break-all">{buildCatalogLink("clientes")}</strong><div className="flex flex-wrap gap-2"><Button onClick={() => void copyText(buildCatalogLink("clientes"))}>Copiar enlace</Button><Button variant="outline" asChild><a href={mainStoreLink("tienda")} target="_blank" rel="noopener noreferrer">Abrir tienda web</a></Button></div></div>
-    <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={() => onCatalog("clientes")}>Editar catálogo</Button><Button variant="outline" onClick={()=>{navigate("inventory");setTab("pricing");}}>Productos y precios</Button><Button variant="outline" onClick={() => {navigate("inventory");}}>Inventario disponible</Button><Button variant="outline" onClick={() => {store.setCatalogId("clientes");navigate("inventory");setTab("on-request");}}>Publicar por encargo</Button><Button variant="outline" onClick={() => {navigate("orders");setTab("web");}}>Pedidos web</Button><Button variant="outline" onClick={() => navigate("wallet")}>Recargas y saldos</Button><Button variant="outline" onClick={() => navigate("clients")}>Clientes y suscripciones</Button></div>
-  </section>;
-  else if (section === "ownCatalogs") content = <div className="space-y-3">{Object.values(store.state.catalogs).map(c => <article key={c.id} className="seller-card space-y-3"><div><h2 className="font-bold">{c.name}</h2><p className="text-xs text-muted-foreground">{c.id === "clientes" ? "Catálogo de tu tienda web" : c.id === "cyberdoc" ? "Lista de precios de CyberDocs" : c.id === "revendedores" ? "Lista de precios para revendedores" : "Catálogo independiente"}{c.hidden ? " · Oculto" : ""}</p></div><div className="flex flex-wrap gap-2"><Button onClick={() => onCatalog(c.id)}>Editar</Button><Button variant="outline" onClick={() => void copyText(buildCatalogLink(c.id))}>Copiar enlace</Button>{c.id === "clientes" && <Button variant="outline" onClick={() => navigate("shop")}>Gestionar tienda</Button>}</div></article>)}</div>;
+  else if (section === "shop") content = <div className="space-y-4"><section className="seller-card space-y-4">
+    <div><h2 className="font-bold text-lg">Mi tienda MA²</h2><p className="text-sm text-muted-foreground">Un enlace para consultar tus productos, comprar con saldo, solicitar encargos y recargar.</p></div>
+    <div className="rounded-xl border p-3 space-y-2"><p className="text-xs text-muted-foreground">Enlace para compartir con tus compradores</p><strong className="break-all">{`${typeof window!=="undefined"?window.location.origin:"https://martgor.shop"}${mainStoreLink()}`}</strong><div className="flex flex-wrap gap-2"><Button onClick={() => void copyText(`${typeof window!=="undefined"?window.location.origin:"https://martgor.shop"}${mainStoreLink()}`)}>Copiar enlace</Button><Button variant="outline" asChild><a href={mainStoreLink()} target="_blank" rel="noopener noreferrer">Abrir tienda web</a></Button></div></div>
+    <div className="grid gap-2 sm:grid-cols-2"><Button variant="outline" onClick={()=>{navigate("inventory");setTab("pricing");}}>Productos y precios</Button><Button variant="outline" onClick={() => {navigate("inventory");}}>Inventario disponible</Button><Button variant="outline" onClick={() => {navigate("inventory");setTab("on-request");}}>Publicar por encargo</Button><Button variant="outline" onClick={() => {navigate("orders");setTab("web");}}>Pedidos web</Button><Button variant="outline" onClick={() => navigate("wallet")}>Recargas y saldos</Button><Button variant="outline" onClick={() => navigate("clients")}>Clientes y suscripciones</Button></div>
+  </section><ProductPricing/></div>;
+  else if (section === "ownCatalogs") content = <div className="space-y-3">{Object.values(store.state.catalogs).map(c => <article key={c.id} className="seller-card space-y-3"><div><h2 className="font-bold">{c.name}</h2><p className="text-xs text-muted-foreground">{c.id === "clientes" ? "Catálogo anterior para clientes" : c.id === "cyberdoc" ? "Lista de precios de CyberDocs" : c.id === "revendedores" ? "Lista de precios para revendedores" : "Catálogo independiente"}{c.hidden ? " · Oculto" : ""}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" asChild><a href={buildCatalogLink(c.id)} target="_blank" rel="noopener noreferrer">Ver catálogo</a></Button><Button variant="outline" onClick={() => void copyText(buildCatalogLink(c.id))}>Copiar enlace</Button></div></article>)}</div>;
   else if (section === "inventory")
-    content = <div className="space-y-4"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Stock disponible</button><button className={tab==="pricing"?"active":""} onClick={()=>setTab("pricing")}>Productos y precios</button><button className={tab==="on-request"?"active":""} onClick={()=>setTab("on-request")}>Por encargo</button></div>{tab==="pricing"?<ProductPricing/>:tab==="on-request"?<OnRequestInventory/>:<StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />}</div>;
+    content = <div className="space-y-4"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Stock disponible</button><button className={tab==="pricing"?"active":""} onClick={()=>setTab("pricing")}>Productos y precios</button><button className={tab==="on-request"?"active":""} onClick={()=>setTab("on-request")}>Por encargo</button></div>{tab==="pricing"?<ProductPricing/>:tab==="on-request"?<ProductPricing key="manual" initialFilter="manual"/>:<StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} />}</div>;
   else if (section === "expiry") content = <StockInsights />;
   else if (section === "sales") content = <StockInsights sales />;
   else if (section === "finance") content = <FinancePanel/>;
@@ -759,7 +759,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       appearance={store.catalog.appearance}
       onSection={navigate}
       name={store.catalog.name}
-      shareUrl={buildCatalogLink("clientes")}
+      shareUrl={`${typeof window!=="undefined"?window.location.origin:"https://martgor.shop"}${mainStoreLink()}`}
       dark={store.prefs.themeMode === "oscuro"}
       onTheme={() =>
         store.setPrefs({ themeMode: store.prefs.themeMode === "oscuro" ? "claro" : "oscuro" })

@@ -1,10 +1,10 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { Storefront } from "@/components/customer/storefront";
+import { MAIN_STORE_VIEWS, type MainStoreView } from "@/lib/catalog/links";
 import { CustomerStore } from "@/components/customer/customer-store";
 export const Route = createFileRoute("/tienda/$slug")({
   ssr: false,
-  beforeLoad: ({ params }) => {
-    if (params.slug === "ma2") throw redirect({ to: "/", search: { cat: "clientes", vista: "inicio" } });
-  },
+  validateSearch: (s:Record<string,unknown>) => ({ vista:MAIN_STORE_VIEWS.includes(s.vista as MainStoreView)?s.vista as MainStoreView:undefined,q:typeof s.q==="string"?s.q:"",sku:typeof s.sku==="string"?s.sku:"" }),
   head: () => ({
     meta: [
       { title: "Mi cuenta y tienda · MA²" },
@@ -14,6 +14,8 @@ export const Route = createFileRoute("/tienda/$slug")({
   }),
   component: () => {
     const { slug } = Route.useParams();
-    return <CustomerStore key={slug} slug={slug} />;
+    const {vista,q,sku}=Route.useSearch();
+    if(slug==="ma2"&&!vista)return <Storefront/>;
+    return <CustomerStore key={slug+vista+q+sku} slug={slug} initialView={vista} initialQuery={q} initialSku={sku}/>;
   },
 });

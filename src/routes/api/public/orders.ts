@@ -32,6 +32,7 @@ export const Route = createFileRoute("/api/public/orders")({
           return Response.json({ error: "Datos inválidos" }, { status: 400 });
         }
         const order = parsed.data;
+        if(order.catalogId==="store-ma2") return Response.json({error:"Usa la tienda web"}, {status:400});
 
         const { loadSettings, admin, rowToOrder, notifyOrder, withinSchedule } = await import(
           "@/lib/notify/notify.server"

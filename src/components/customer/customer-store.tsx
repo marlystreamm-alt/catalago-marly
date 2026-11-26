@@ -31,6 +31,7 @@ import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
 import { copyText } from "@/lib/browser/clipboard";
 import { mainStoreLink, type MainStoreView } from "@/lib/catalog/links";
+import { pricingKey } from "@/lib/customer/pricing";
 import { groupProducts } from "@/lib/customer/group-products";
 import { money, phoneNumber, STATUS } from "@/lib/workspace/model";
 import {
@@ -59,7 +60,7 @@ const tabs = [
   ["movimientos", "Movimientos", History],
   ["cuenta", "Mi cuenta", User],
 ] as const;
-export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" }: { slug: string; initialView?: MainStoreView; initialQuery?: string }) {
+export function CustomerStore({ slug, initialView = "inicio", initialQuery = "", initialSku = "" }: { slug: string; initialView?: MainStoreView; initialQuery?: string; initialSku?:string }) {
   const [shop, setShop] = useState<Awaited<ReturnType<typeof customerShopInfo>> | null>(null),
     [data, setData] = useState<View | null>(null),
     [tab, setTab] = useState<string>(initialView),
@@ -78,6 +79,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
   const [products, setProducts] = useState<Product[]>([]),
     [productsError, setProductsError] = useState(""),
     [query, setQuery] = useState(initialQuery),
+    [sku,setSku]=useState(initialSku),
     [kind, setKind] = useState("all"),
     [ledger, setLedger] = useState("all");
   const [delivery, setDelivery] = useState<Awaited<ReturnType<typeof customerDelivery>> | null>(
@@ -243,7 +245,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={data.priceTier==="reseller"?"/?cat=revendedores":mainStoreLink()}>Catálogo</a></Button>}
+          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={mainStoreLink()}>Tienda web</a></Button>}
           {data ? (
             <>
               <button
@@ -543,7 +545,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
                   aria-label="Buscar producto"
                   placeholder="Buscar plataforma o producto…"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {setSku("");setQuery(e.target.value);}}
                 />
                 <div className="seller-tabs">
                   {[
@@ -569,7 +571,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
                   products.filter(
                     (p) =>
                       (kind === "all" || p.kind === kind) &&
-                      `${p.name} ${p.type}`.toLowerCase().includes(query.toLowerCase()),
+                      (sku ? pricingKey(p.name,p.kind,p.months)===sku : `${p.name} ${p.type}`.toLowerCase().includes(query.toLowerCase())),
                   ),
                 )}
                 {!products.length ? (
@@ -579,7 +581,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "" 
                   </p>
                 ) : null}
                 <Button variant="outline" className="mt-5" asChild>
-                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : data.priceTier==="reseller"?"/?cat=revendedores":mainStoreLink()}>
+                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
                     Catálogo y pedidos por WhatsApp
                   </a>
                 </Button>

@@ -2,11 +2,12 @@ import type { CatalogId } from "./types";
 
 export const MAIN_STORE_VIEWS = ["inicio", "tienda", "saldo", "compras", "cuenta"] as const;
 export type MainStoreView = (typeof MAIN_STORE_VIEWS)[number];
-export function mainStoreLink(view?: MainStoreView, query?: string) {
-  const params = new URLSearchParams({ cat: "clientes" });
+export function mainStoreLink(view?: MainStoreView, query?: string, sku?:string) {
+  const params = new URLSearchParams();
   if (view) params.set("vista", view);
   if (query?.trim()) params.set("q", query.trim());
-  return `/?${params.toString()}`;
+  if(sku) params.set("sku",sku);
+  return `/tienda/ma2${params.size?`?${params.toString()}`:""}`;
 }
 
 export interface ShareFilters {
@@ -29,7 +30,7 @@ export function buildCatalogLink(catalogId: CatalogId, filters: ShareFilters = {
   if (filters.orden && filters.orden !== "categoria") params.set("orden", filters.orden);
   if (filters.svc) params.set("svc", filters.svc);
   const origin =
-    typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "/";
+    typeof window !== "undefined" ? `${window.location.origin}/` : "/";
   return `${origin}?${params.toString()}`;
 }
 

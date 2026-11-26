@@ -4,23 +4,17 @@ const COOKIE = "ma2_customer_session";
 export async function customerShop(slug: string) {
   if (slug === "ma2") {
     const cfg = (await readRecords("config")).find((r) => r.status === "active");
-    const catalog = await opsDB()
-      .from("catalog_app_state")
-      .select("state")
-      .eq("id", 1)
-      .maybeSingle();
-    const brand = catalog.error ? null : catalog.data?.state?.catalogs?.clientes;
-    const support = [cfg?.data.whatsapp, brand?.whatsappNumber, "528443852364"].find(value => {
+    const support = [cfg?.data.whatsapp, "528443852364"].find(value => {
       const digits = String(value || "").replace(/\D/g, "");
       return digits.length >= 10 && !["5500000000", "525500000000", "5215500000000"].includes(digits);
     });
     return {
       id: null as string | null,
       slug: "ma2",
-      name: String(brand?.name || "Mi tienda MA²"),
+      name: "MA² · Tienda web",
       whatsapp: String(support || "528443852364"),
-      logoUrl: String(brand?.appearance?.logoImage || brand?.imageUrl || ""),
-      appearance: brand?.appearance || {},
+      logoUrl: "",
+      appearance: {},
     };
   }
   const { data, error } = await opsDB()
