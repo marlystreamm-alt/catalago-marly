@@ -326,12 +326,21 @@ export const customerSubmit = createServerFn({ method: "POST" })
     const records = await c.customerRecords(ctx.client.id);
     if (records.filter((r) => r.module === data.module && r.status === "pending").length >= 20)
       throw new Error("Espera la atención de tus solicitudes pendientes");
-    await s.createRecord(data.module, data.title, "pending", {
+    const record=await s.createRecord(data.module, data.title, "pending", {
       clientId: ctx.client.id,
       shopId: ctx.shop.id || "main",
       message: data.message,
+      ...(data.module==="requests"?{platform:data.title}:{}),
       orderId: data.orderId || "",
     });
+    if(data.module==="requests"&&!ctx.shop.id){
+      try{
+        const notify=await import("@/lib/notify/notify.server"),db=await notify.admin();
+        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:"customer-request",catalog_name:"Página web MA² · Por encargo",service_name:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\nSolicitud por encargo: "+data.message,link:"/?panel=1",recipient:""},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
+        if(error)throw error;
+        if(row){const settings=await notify.loadSettings();if(settings.enabled&&notify.withinSchedule(settings))await notify.notifyOrder(notify.rowToOrder(row as Record<string,unknown>),settings);}
+      }catch{/* La solicitud está guardada; no volver a crearla por un fallo de aviso. */}
+    }
     return { ok: true };
   });
 export const customerChangePassword = createServerFn({ method: "POST" })

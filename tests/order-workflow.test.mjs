@@ -53,7 +53,8 @@ const notify = url(`
   export const rowToOrder = r => r;
   export const notifyOrder = async () => {globalThis.__purchaseNotice.sent++};
 `);
-const { notifyPaidPurchase } = await import(await compile("src/lib/customer/purchase-notify.server.ts", { "./purchase-identity.server": identityURL, "@/lib/notify/notify.server": notify }));
+const purchaseOps=url(`export const opsDB=()=>({from:table=>{if(table!=='ma2_customer_orders')throw Error('wrong table');const q={select:()=>q,eq:()=>q,is:()=>q,maybeSingle:async()=>({data:{title:"Producto de prueba",amount_cents:2500}})};return q}});`);
+const { notifyPaidPurchase } = await import(await compile("src/lib/customer/purchase-notify.server.ts", { "./purchase-identity.server": identityURL, "@/lib/notify/notify.server": notify, "@/lib/workspace/operations.server":purchaseOps }));
 test("paid purchase retries notify once and separate merchants never notify the main shop", async () => {
   globalThis.__purchaseNotice = { rows:new Map(), sent:0 };
   const id = crypto.randomUUID();
@@ -64,6 +65,8 @@ test("paid purchase retries notify once and separate merchants never notify the 
   const row = [...globalThis.__purchaseNotice.rows.values()][0];
   assert.equal(row.recipient, "");
   assert.equal(row.id, purchaseRecordId("notice",id));
+  assert.equal(row.catalog_name,"Página web MA²");
+  assert.equal(row.total,25);
 });
 const model = await compile("src/lib/workspace/model.ts");
 const ops = url(`export const readRecords=async()=>globalThis.__remember.existing;export const opsDB=()=>({from:()=>({upsert:async(row,options)=>{if(!options.ignoreDuplicates)throw Error('not idempotent');globalThis.__remember.rows.set(row.id,globalThis.__remember.rows.get(row.id)||row);return {error:null}}})});`);

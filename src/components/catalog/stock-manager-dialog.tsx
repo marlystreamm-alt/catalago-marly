@@ -556,7 +556,7 @@ export function StockManagerDialog({
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
               <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Consulta cuentas completas y perfiles en un mismo listado. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar cuenta</Button> : null}
+              {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar stock</Button> : null}
             </div>
 
             <div className="flex flex-wrap gap-2">

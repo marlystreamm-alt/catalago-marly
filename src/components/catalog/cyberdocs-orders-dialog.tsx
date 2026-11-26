@@ -137,7 +137,7 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
   return { name: file.name, type: file.type || "application/octet-stream", dataUrl };
 }
 
-export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{embedded?:boolean; initialSelectedId?:string|null}={}) {
+export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,stage="all"}:{embedded?:boolean; initialSelectedId?:string|null;stage?:"all"|"orders"|"deliveries"}={}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
@@ -232,7 +232,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
         cyberdocsIntegrationStatus({ data: { code } }),
         cyberdocsListStock({ data: { code } }),
       ]);
-      const relevantOrders=embedded ? nextOrders.filter(o=>initialSelectedId ? o.id===initialSelectedId : o.sourceKey!=="web_catalog") : nextOrders;
+      const relevantOrders=embedded && stage==="all" ? nextOrders.filter(o=>initialSelectedId ? o.id===initialSelectedId : o.sourceKey!=="web_catalog") : nextOrders;
       setOrders(relevantOrders);
       setCheckedIds((current) =>
         new Set([...current].filter((id) => nextOrders.some((order) => order.id === id && !terminal(order)))),
@@ -685,8 +685,9 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
   const pending = orders.filter((order) => !terminal(order)).length;
   const visibleOrders = useMemo(() => [...orders]
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .filter(order=>stage==="all"||(stage==="deliveries"?order.status==="completed":order.status!=="completed"))
     .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
-    .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch]);
+    .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
   const selectableVisibleIds = useMemo(
     () => visibleOrders.filter((order) => !terminal(order)).map((order) => order.id),
     [visibleOrders],
@@ -712,18 +713,18 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
             <Button type="button" size="sm" variant="outline" className="shrink-0 rounded-full" onClick={() => setOpen(false)} hidden={embedded}>
               <ArrowLeft className="mr-1 size-4" />Regresar
             </Button>
-            <Badge variant="secondary" className="shrink-0">
+            {!embedded&&<Badge variant="secondary" className="shrink-0">
               {isMobile ? <Smartphone className="mr-1 size-3.5" /> : <Monitor className="mr-1 size-3.5" />}
               Vista {isMobile ? "celular" : "computadora"}
-            </Badge>
+            </Badge>}
           </div>
-          <DialogTitle className="pt-1">Pedidos</DialogTitle>
+          <DialogTitle className="pt-1">{stage==="deliveries"?"Entregas registradas":"Pedidos recibidos"}</DialogTitle>
           <DialogDescription>
-            Aquí ves en orden qué llegó, de dónde, de quién es, la fecha, la hora y su estatus.
+            {stage==="deliveries"?"Pedidos completados de CyberDocs y la web.":"Ordenados por fecha y origen."}
           </DialogDescription>
         </DialogHeader>
 
-        <section className="rounded-2xl border bg-muted/20 p-3 space-y-3">
+        {stage!=="deliveries"&&<Dialog><DialogTrigger asChild><Button size="sm" variant="outline" className="w-fit" aria-label="Ajustes de pedidos"><Settings2 className="size-4"/> Ajustes de pedidos</Button></DialogTrigger><DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Ajustes de pedidos</DialogTitle><DialogDescription>Conexiones, avisos y mensajes de entrega.</DialogDescription></DialogHeader><section className="rounded-2xl border bg-muted/20 p-3 space-y-3">
           <h3 className="font-semibold flex items-center gap-2"><Bot className="size-4"/> CyberDocs y Alexa</h3>
           <div className="flex flex-wrap gap-2"><Badge variant={ready ? "default" : "secondary"}>Telegram: {status ? ready ? "Conectado" : "Revisar conexión" : "Consultando"}</Badge><Badge variant="secondary">Alexa: {alexaStatus ? alexaStatus.enabled && alexaStatus.newOrders && (alexaStatus.echo || alexaStatus.app) ? "Avisos activos" : "Avisos desactivados" : "Sin verificar"}</Badge></div>
           <p className="text-xs text-muted-foreground">Último pedido: {dateTime(status?.lastOrderAt || null)}. {alexaStatus && !alexaStatus.inSchedule ? "Fuera del horario de avisos automáticos." : ""}</p>
@@ -866,17 +867,17 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
             </div>
           ) : null}
           </section>
-        </details>
+        </details></DialogContent></Dialog>}
 
         <Input type="search" aria-label="Buscar pedidos" placeholder="Buscar por folio, servicio o cliente" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
         <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => { const target = orders.find(o => !terminal(o)); if (target) { setSelectedId(target.id); setDeliverySource("manual"); setManualPlatform(target.serviceName || ""); setManualType("full"); } else toast.info("No hay pedidos pendientes para entrega manual"); }}>Entrega manual</Button>
+          {stage!=="deliveries"&&<Button size="sm" variant="outline" className="shrink-0" onClick={() => { const target = orders.find(o => !terminal(o)); if (target) { setSelectedId(target.id); setDeliverySource("manual"); setManualPlatform(target.serviceName || ""); setManualType("full"); } else toast.info("No hay pedidos pendientes para entrega manual"); }}>Entrega manual</Button>}
           {[
             ["all","Todos"],
             ["pending",`Pendientes (${orders.filter(o=>o.status==="new").length})`],
             ["in_process",`En proceso (${orders.filter(o=>o.status==="in_process").length})`],
             ["completed",`Entregadas (${orders.filter(o=>o.status==="completed").length})`],
-          ].map(([key,label])=><Button key={key} size="sm" className="shrink-0" variant={orderFilter===key?"default":"outline"} onClick={()=>setOrderFilter(key as typeof orderFilter)}>{label}</Button>)}
+          ].filter(([key])=>stage==="all"||(stage==="orders"?key!=="completed":key==="all")).map(([key,label])=><Button key={key} size="sm" className="shrink-0" variant={orderFilter===key?"default":"outline"} onClick={()=>setOrderFilter(key as typeof orderFilter)}>{label}</Button>)}
         </div>
 
         {busy ? (
@@ -888,8 +889,8 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null}:{
 
         <section className="grid gap-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Pedidos ({visibleOrders.length})</p>
-            <Badge variant="outline">Pendientes {pending}</Badge>
+            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregas":"Pedidos"} ({visibleOrders.length})</p>
+            {stage!=="deliveries"&&<Badge variant="outline">Pendientes {pending}</Badge>}
           </div>
           {selectableVisibleIds.length ? (
             <div className="sticky top-[68px] z-10 grid gap-2 rounded-2xl border border-primary/30 bg-background/95 p-3 shadow-sm backdrop-blur sm:static sm:flex sm:items-center">

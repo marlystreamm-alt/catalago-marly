@@ -807,9 +807,13 @@ function renderAlexaOrderMessage(template: string, order: CloudOrder, repeat: bo
   const fallback = repeat
     ? "Tienes un pedido pendiente de {catalogo}. Revisa MA² Connect."
     : "Tienes un nuevo pedido de {catalogo}. Revisa MA² Connect.";
-  return (template.trim() || fallback)
-    .replaceAll("{catalogo}", order.catalogName || "CyberDocs")
+  const chosen=template.trim()||fallback;
+  const origin=order.catalogName||"Pedido MA²";
+  const sourceAware=chosen.includes("{catalogo}")?chosen:`Origen: ${origin}. ${chosen}`;
+  return sourceAware
+    .replaceAll("{catalogo}", origin)
     .replaceAll("{servicio}", order.serviceName || items || "pedido")
+    .replaceAll("{producto}",items||"pedido")
     .replaceAll("{productos}", items || "pedido")
     .replaceAll("{total}", money(order.total));
 }
@@ -908,7 +912,9 @@ export async function notifyOrder(
 
   for (const [channel, on, label] of channels) {
     if (!on) continue;
-    const detail = await sendByChannel(channel, order, settings, repeat);
+    let detail: string;
+    try { detail = await sendByChannel(channel, order, settings, repeat); }
+    catch { detail = "No se pudo enviar por este canal"; }
     results.push(`${label}: ${detail}`);
     await logEvent({ orderId, channel, kind, attempt, detail });
   }

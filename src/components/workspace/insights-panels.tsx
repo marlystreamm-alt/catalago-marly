@@ -120,6 +120,7 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
               {rows.filter((r) => !r.salePrice).length} ventas sin precio.
             </p>
           </article>
+          <article className="seller-card"><p>Ganancia estimada</p><strong className="text-3xl">{money(rows.filter(r=>r.cost>0&&r.salePrice>0&&!r.parentStockId).reduce((n,r)=>n+r.salePrice-r.cost,0))}</strong><p className="text-xs text-muted-foreground">Solo ventas con costo individual registrado; no incluye gastos.</p></article>
         </div>
       )}
       {busy ? (

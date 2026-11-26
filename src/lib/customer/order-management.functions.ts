@@ -15,7 +15,7 @@ export const webOrderList = createServerFn({ method: "POST" }).validator((v: unk
   const db = ops.opsDB();
   const [paid, requests, imported, clients] = await Promise.all([
     db.from("ma2_customer_orders").select("id,client_id,title,amount_cents,expires_on,created_at").is("business_id", null).order("created_at", { ascending: false }).limit(250),
-    db.from("orders").select("*").not("catalog_id", "like", "telegram-%").not("catalog_id", "like", "renewal-%").neq("catalog_id", "wallet-main").order("created_at", { ascending: false }).limit(250),
+    db.from("orders").select("*").not("catalog_id", "like", "telegram-%").not("catalog_id", "like", "renewal-%").neq("catalog_id", "wallet-main").neq("catalog_id","customer-request").order("created_at", { ascending: false }).limit(250),
     db.from("cyberdocs_orders").select("id,notification_order_id,status").eq("source_key", "web_catalog"),
     ops.readRecords("clients"),
   ]);
@@ -100,14 +100,15 @@ export const webPrepareCatalog = createServerFn({ method: "POST" }).validator((v
   if (linkError || !linked) throw new Error("No se pudo recuperar el pedido preparado");
   await rememberOrderClient(data.name, phone);
   const cyber = await import("@/lib/cyberdocs/cyberdocs.server");
-  if (linked.protected_delivery_id || linked.status === "completed") return { id: String(linked.id), automatic: true };
-  if (onRequest) return {id:String(linked.id),automatic:false};
+  if (linked.protected_delivery_id || linked.status === "completed") return { id: String(linked.id), automatic: true,delivered:linked.status==="completed" };
+  if (onRequest) return {id:String(linked.id),automatic:false,delivered:false};
   const { businessToday } = await import("@/lib/stock/duration");
   const stock = await (await import("@/lib/stock/stock.server")).listStock(null);
   const item = (await import("./order-stock-match")).matchOrderStock(service, stock, businessToday());
   // Do not guess between full accounts and profiles; the admin can choose in the existing order flow.
-  if (!item) return { id: String(linked.id), automatic: false };
+  if (!item) return { id: String(linked.id), automatic: false,delivered:false };
   const ds = await import("@/lib/deliveries/deliveries.server");
   const result = await cyber.assignStockToOrder({ orderId: String(linked.id), stockItemId: item.id, withPassword: true, accessPassword: ds.randomToken().slice(0,12), expiresAt: new Date(Date.now()+7*86400000).toISOString(), maxViews: null, notes: "", salePrice: order.total, attachment: null });
-  return { id: String(linked.id), automatic: !result.completionError };
+  const after=await db.from("cyberdocs_orders").select("status").eq("id",linked.id).maybeSingle();
+  return { id: String(linked.id), automatic: !result.completionError, delivered:after.data?.status==="completed" };
 });

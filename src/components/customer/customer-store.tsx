@@ -601,7 +601,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               </>
             ) : null}
             {tab === "compras" ? (
-              <div className="space-y-3">
+              <div className="space-y-3">{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
                 {data.records
                   .filter((r) => ["documents", "codes"].includes(r.module))
                   .map((r) => (

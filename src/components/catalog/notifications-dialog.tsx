@@ -255,12 +255,9 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
           </div>
         ) : (
           <Tabs defaultValue="config">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="config" className="text-xs">
                 Ajustes
-              </TabsTrigger>
-              <TabsTrigger value="pedidos" className="text-xs">
-                Avisos {pendientes ? `(${pendientes})` : ""}
               </TabsTrigger>
               <TabsTrigger value="dispositivos" className="text-xs">
                 Equipos

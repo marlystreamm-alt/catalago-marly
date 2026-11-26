@@ -12,13 +12,13 @@ import { isOnRequestMessage } from "@/lib/catalog/on-request";
 const format = (date: string) => new Date(date).toLocaleString("es-MX");
 const err = (e: unknown) => e instanceof Error ? e.message : "Ocurrió un error";
 
-export function WebOrders({ onOpenOrder, onRequestOnly=false }: { onOpenOrder: (id: string) => void; onRequestOnly?:boolean }) {
+export function WebOrders({ onOpenOrder, onRequestOnly=false,stage="all" }: { onOpenOrder: (id: string,delivered?:boolean) => void; onRequestOnly?:boolean;stage?:"all"|"orders"|"deliveries" }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof webOrderList>> | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const [tab, setTab] = useState<"paid" | "requests">(onRequestOnly?"requests":"paid");
+  const [tab, setTab] = useState<"paid" | "requests">(stage==="orders"||onRequestOnly?"requests":"paid");
   const [editing, setEditing] = useState(""), [name, setName] = useState(""), [phone, setPhone] = useState("");
   const code = getSavedCode();
-  const requests=data?.requests.filter(r=>isOnRequestMessage(r.message)===onRequestOnly) || [];
+  const requests=data?.requests.filter(r=>stage==="orders"?!r.linkedId:stage==="deliveries"?false:isOnRequestMessage(r.message)===onRequestOnly) || [];
   const refresh = useCallback(async () => {
     try { setData(await webOrderList({ data: { code } })); setError(""); }
     catch (e) { setError(err(e)); }
@@ -32,14 +32,14 @@ export function WebOrders({ onOpenOrder, onRequestOnly=false }: { onOpenOrder: (
     finally { setBusy(false); }
   };
   return <section className="seller-card space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-bold">{onRequestOnly?"Solicitudes por encargo":"Pedidos de la página"}</h2><p className="text-xs text-muted-foreground">{onRequestOnly?"Servicios solicitados sin stock inmediato.":"Compras con saldo confirmado y solicitudes normales."}</p></div><Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh()}>Actualizar</Button></div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-bold">{stage==="deliveries"?"Página web · Entregas automáticas":stage==="orders"?"Página web · Solicitudes pendientes":onRequestOnly?"Solicitudes por encargo":"Pedidos de la página"}</h2><p className="text-xs text-muted-foreground">{onRequestOnly?"Servicios solicitados sin stock inmediato.":"Compras con saldo confirmado y solicitudes normales."}</p></div><Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh()}>Actualizar</Button></div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    {!onRequestOnly?<div className="flex flex-wrap gap-2"><Button size="sm" variant={tab === "paid" ? "default" : "outline"} onClick={() => setTab("paid")}>Pagados ({data?.paid.length || 0})</Button><Button size="sm" variant={tab === "requests" ? "default" : "outline"} onClick={() => setTab("requests")}>Por confirmar ({requests.filter(r => r.status === "nuevo" && !r.linkedId).length})</Button></div>:null}
+    {stage==="all"&&!onRequestOnly?<div className="flex flex-wrap gap-2"><Button size="sm" variant={tab === "paid" ? "default" : "outline"} onClick={() => setTab("paid")}>Pagados ({data?.paid.length || 0})</Button><Button size="sm" variant={tab === "requests" ? "default" : "outline"} onClick={() => setTab("requests")}>Por confirmar ({requests.filter(r => r.status === "nuevo" && !r.linkedId).length})</Button></div>:null}
     {!data ? <p className="text-sm text-muted-foreground">Cargando pedidos…</p> : null}
     {tab === "paid" ? <>
       <p className="text-xs text-muted-foreground">La tienda reserva la cuenta al descontar el saldo. El cliente conserva el acceso en Mis compras; tú puedes copiar o compartir la entrega por separado.</p>
       {data?.paid.map(o => <article key={o.id} className="rounded-xl border p-3 space-y-2">
-        <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-bold">{o.title}</h3><p className="text-xs text-muted-foreground">{o.client} · {format(o.createdAt)}</p></div><Badge variant="secondary">Pagado · {money(o.total)}</Badge></div>
+        <div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-bold">{o.title}</h3><p className="text-xs text-muted-foreground">Página web · {o.client} · {format(o.createdAt)}</p></div><Badge variant="secondary">Pagado · {money(o.total)}</Badge></div>
         <p className="text-sm">WhatsApp: {o.whatsapp || "Sin dato"} · Vence: {o.expiresOn || "Sin fecha"}</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy} onClick={() => void run(async () => { const r = await webPaidDelivery({ data: { code, id: o.id, protected: false } }); await copyText(r.text); toast.success("Credenciales copiadas"); })}>Copiar credenciales</Button>
@@ -55,7 +55,7 @@ export function WebOrders({ onOpenOrder, onRequestOnly=false }: { onOpenOrder: (
         <div className="flex flex-wrap justify-between gap-2"><h3 className="font-bold">{o.serviceName}</h3><Badge variant="secondary">{o.linkedStatus === "completed" ? "Entregado" : o.linkedId ? "En proceso" : o.status === "atendido" ? "Atendido" : "Pendiente de pago"}</Badge></div>
         <p className="text-xs text-muted-foreground">{o.catalogName} · {format(o.createdAt)} · {money(o.total)}</p><p className="text-xs whitespace-pre-wrap break-words">{o.message}</p>
         {o.linkedId ? <Button size="sm" onClick={() => onOpenOrder(o.linkedId!)}>Abrir entrega</Button> : o.status === "nuevo" ? <>
-          {editing === o.id ? <div className="space-y-2"><label className="text-xs font-semibold">Comprador</label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del comprador"/><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="WhatsApp del comprador" inputMode="tel"/><Button size="sm" disabled={busy || !name.trim() || !phone.trim()} onClick={() => { if (!confirm(`¿Confirmas que verificaste el pago de ${money(o.total)}? Se asignará una cuenta si hay una coincidencia segura.`)) return; void run(async () => { const r = await webPrepareCatalog({ data: { code, id: o.id, name, whatsapp: phone, confirmedPayment: true, protected: true } }); toast.success(r.automatic ? "Entrega preparada" : "Pedido guardado; selecciona la cuenta adecuada"); onOpenOrder(r.id); }); }}>Confirmar pago y preparar entrega</Button><Button size="sm" variant="ghost" onClick={() => setEditing("")}>Cancelar</Button></div> : <Button size="sm" variant="outline" onClick={() => { setEditing(o.id); setName(/^Cliente:\s*(.+)$/im.exec(o.message)?.[1]?.trim() || ""); setPhone(/^WhatsApp del cliente:\s*(.+)$/im.exec(o.message)?.[1]?.trim() || ""); }}>Preparar entrega</Button>}
+          {editing === o.id ? <div className="space-y-2"><label className="text-xs font-semibold">Comprador</label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del comprador"/><Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="WhatsApp del comprador" inputMode="tel"/><Button size="sm" disabled={busy || !name.trim() || !phone.trim()} onClick={() => { if (!confirm(`¿Confirmas que verificaste el pago de ${money(o.total)}? Se asignará una cuenta si hay una coincidencia segura.`)) return; void run(async () => { const r = await webPrepareCatalog({ data: { code, id: o.id, name, whatsapp: phone, confirmedPayment: true, protected: true } }); toast.success(r.automatic ? "Entrega preparada" : "Pedido guardado; selecciona la cuenta adecuada"); onOpenOrder(r.id,r.delivered); }); }}>Confirmar pago y preparar entrega</Button><Button size="sm" variant="ghost" onClick={() => setEditing("")}>Cancelar</Button></div> : <Button size="sm" variant="outline" onClick={() => { setEditing(o.id); setName(/^Cliente:\s*(.+)$/im.exec(o.message)?.[1]?.trim() || ""); setPhone(/^WhatsApp del cliente:\s*(.+)$/im.exec(o.message)?.[1]?.trim() || ""); }}>Preparar entrega</Button>}
         </> : null}
       </article>)}
       {data && !requests.length ? <p className="text-sm text-muted-foreground">Sin solicitudes.</p> : null}
