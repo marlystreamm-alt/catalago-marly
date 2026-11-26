@@ -302,9 +302,19 @@ export const customerDelivery = createServerFn({ method: "POST" })
       password: secret.password,
       profilePin: String(o.detail.profilePin || ""),
       expiresOn: o.expires_on as string | null,
+      link: "",
+      notes: "",
       guides,
     };
   });
+export const customerWebDelivery = createServerFn({ method: "POST" })
+  .validator((v: unknown) => shop.extend({ orderId: z.string().uuid() }).parse(v))
+  .handler(async ({ data }) => {
+    const ctx = await (await server()).customerContext(data.slug);
+    if (ctx.shop.id || ctx.account.must_change) throw new Error("Entrega no disponible");
+    return (await import("./order-access-guide.server")).readWebOrderDelivery(ctx.client.id, data.orderId);
+  });
+
 export const customerDocument = createServerFn({ method: "POST" })
   .validator((v: unknown) => shop.extend({ documentId: z.string().uuid() }).parse(v))
   .handler(async ({ data }) => {

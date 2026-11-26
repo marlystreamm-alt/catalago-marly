@@ -12,6 +12,18 @@ const code = z.string().min(4).max(100);
 const adminInput = z.object({ code });
 const orderInput = adminInput.extend({ orderId: z.string().uuid() });
 
+export const cyberdocsSaveOrderGuide = createServerFn({ method: "POST" })
+  .validator((v: unknown) => orderInput.extend({
+    images: z.array(z.string().max(1_800_000).regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/)).min(1).max(2),
+  }).parse(v))
+  .handler(async ({ data }) => {
+    await authorize(data.code);
+    const order = await (await import("./cyberdocs.server")).getCyberDocsOrder(data.orderId);
+    if (order.sourceKey !== "web_catalog" || ["rejected","cancelled"].includes(order.status))
+      throw new Error("El pedido no admite una guía de ingreso");
+    await (await import("@/lib/customer/order-access-guide.server")).saveOrderAccessGuide(order.id, data.images);
+  });
+
 export const cyberdocsCopyCredentials = createServerFn({ method: "POST" })
   .validator((v: unknown) => orderInput.parse(v))
   .handler(async ({ data }) => {
