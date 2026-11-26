@@ -270,7 +270,11 @@ export const customerDelivery = createServerFn({ method: "POST" })
       .eq("id", data.orderId)
       .eq("client_id", ctx.client.id)
       .maybeSingle();
-    if (error || !o) throw new Error("Entrega no disponible");
+    if (error) throw new Error("Entrega no disponible");
+    if (!o) {
+      if (ctx.shop.id || ctx.account.must_change) throw new Error("Entrega no disponible");
+      return (await import("./order-access-guide.server")).readWebOrderDelivery(ctx.client.id, data.orderId);
+    }
     if (o.expires_on && o.expires_on < (await import("@/lib/stock/duration")).businessToday())
       throw new Error("La entrega venció. Contacta a soporte para renovar");
     const cryptoLib = await import("@/lib/deliveries/deliveries.server"),
@@ -302,6 +306,8 @@ export const customerDelivery = createServerFn({ method: "POST" })
       password: secret.password,
       profilePin: String(o.detail.profilePin || ""),
       expiresOn: o.expires_on as string | null,
+      link: "",
+      notes: "",
       guides,
     };
   });
