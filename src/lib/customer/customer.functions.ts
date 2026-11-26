@@ -386,11 +386,25 @@ export const customerSubmit = createServerFn({ method: "POST" })
       ...(data.module === "reports" ? { platform: purchaseTitle || data.title } : {}),
       ...(data.module === "reports" && data.evidence ? { attachment: data.evidence, filename: "captura-de-falla.jpg", filetype: "image/jpeg" } : {}),
     });
+    let replaced=false;
+    if(data.module==="reports" && !ctx.shop.id && data.orderId && data.evidence){
+      try {
+        const {purchaseRecordId}=await import("./purchase-identity.server");
+        const result=await s.opsDB().rpc("ma2_auto_replace_purchase",{
+          p_purchase:data.orderId,p_client:ctx.client.id,p_report:record.id,
+          p_document:purchaseRecordId("document",data.orderId),p_name:ctx.client.title,p_phone:ctx.client.data.whatsapp||"",
+        });
+        if(!result.error&&result.data===true){
+          await s.changeRecord(record,{status:"resolved",data:{...record.data,reply:"Tu reposición fue realizada sin costo. Abre Mis compras para consultar el acceso actualizado. Conservas tu fecha de vencimiento original."}});
+          replaced=true;
+        }
+      } catch { /* El reporte ya quedó guardado para revisión. */ }
+    }
     if((data.module==="requests"||data.module==="reports")&&!ctx.shop.id){
       try{
         const notify=await import("@/lib/notify/notify.server"),db=await notify.admin();
         const isReport=data.module==="reports";
-        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:isReport?"customer-report":"customer-request",catalog_name:isReport?"Página web MA² · Reportes":"Página web MA² · Por encargo",service_name:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\n"+(isReport?"Reporte de falla: ":"Solicitud por encargo: ")+data.message,link:"/?panel=1",recipient:""},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
+        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:isReport?"customer-report":"customer-request",catalog_name:isReport?"Página web MA² · Reportes":"Página web MA² · Por encargo",service_name:replaced?"Reposición automática · "+purchaseTitle:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\n"+(replaced?"Reposición realizada sin cobro":isReport?"Reporte de falla: "+data.message:"Solicitud por encargo: "+data.message),link:"/?panel=1",recipient:"",...(replaced?{status:"atendido" as const,attended_at:new Date().toISOString()}:{})},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
         if(error)throw error;
         if(row){const settings=await notify.loadSettings();if(settings.enabled&&notify.withinSchedule(settings))await notify.notifyOrder(notify.rowToOrder(row as Record<string,unknown>),settings);}
       }catch{/* La solicitud está guardada; no volver a crearla por un fallo de aviso. */}

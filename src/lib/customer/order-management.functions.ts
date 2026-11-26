@@ -44,6 +44,10 @@ export const webOrderList = createServerFn({ method: "POST" }).validator((v: unk
 export const webPaidDelivery = createServerFn({ method: "POST" }).validator((v: unknown) => auth.extend({ id: z.string().uuid(), protected: z.boolean() }).parse(v)).handler(async ({ data }) => {
   const { ops } = await context(data.code);
   const db = ops.opsDB();
+  if(data.protected){
+    const claim=await db.rpc("ma2_claim_paid_document",{p_purchase:data.id});
+    if(claim.error||claim.data!==true)throw new Error("Compra no disponible");
+  }
   const { data: order, error } = await db.from("ma2_customer_orders").select("*").eq("id", data.id).is("business_id", null).maybeSingle();
   if (error || !order) throw new Error("Compra no disponible");
   const { businessToday } = await import("@/lib/stock/duration");

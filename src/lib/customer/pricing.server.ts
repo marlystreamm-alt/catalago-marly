@@ -1,7 +1,7 @@
 import { opsDB } from "@/lib/workspace/operations.server";
 import { pricingKey, type PriceRow } from "./pricing";
 
-type SavedPrice = { product_key: string; name: string; kind: string; months: number; retail_cents: number | null; reseller_cents: number | null; updated_at: string; cost_cents?:number|null; provider?:string; image?:string; description?:string; published?:boolean|null };
+type SavedPrice = { product_key: string; name: string; kind: string; months: number; retail_cents: number | null; reseller_cents: number | null; updated_at: string; cost_cents?:number|null; provider?:string; image?:string; description?:string; published?:boolean|null; warranty_days?:number; automatic_replacement?:boolean };
 export async function savedPrices(): Promise<SavedPrice[]> {
   const rows:SavedPrice[]=[];
   for(let offset=0;;offset+=500){const {data,error}=await opsDB().from("ma2_product_prices").select("*").order("product_key").range(offset,offset+499);if(error)throw new Error("No se pudieron consultar las tarifas");rows.push(...(data||[]));if((data||[]).length<500)break;}
@@ -26,6 +26,6 @@ export async function listPricing(): Promise<PriceRow[]> {
     }
     if((r.data||[]).length<500) break;
   }
-  for(const p of saved) { const row=ensure(p.product_key,p.name,p.kind,p.months);row.retailCents=p.retail_cents;row.resellerCents=p.reseller_cents;row.source="Tienda web";row.version=p.updated_at;row.costCents=p.cost_cents;row.provider=p.provider;row.image=p.image||row.image;row.description=p.description||row.description;row.published=p.published===true; }
+  for(const p of saved) { const row=ensure(p.product_key,p.name,p.kind,p.months);row.retailCents=p.retail_cents;row.resellerCents=p.reseller_cents;row.source="Tienda web";row.version=p.updated_at;row.costCents=p.cost_cents;row.provider=p.provider;row.image=p.image||row.image;row.description=p.description||row.description;row.published=p.published===true;row.warrantyDays=p.warranty_days||0;row.automaticReplacement=p.automatic_replacement===true; }
   return [...rows.values()].sort((a,b)=>b.available-a.available||a.name.localeCompare(b.name,"es")||a.kind.localeCompare(b.kind)||a.months-b.months);
 }

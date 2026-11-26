@@ -2,7 +2,7 @@ import { masterPlan } from "@/lib/stock/master-products";
 import type { Service } from "@/lib/catalog/types";
 
 export type CustomerTier = "retail" | "reseller";
-export type PriceRow = { key: string; name: string; kind: string; months: number; retailCents: number | null; resellerCents: number | null; available: number; source: string; version: string | null; costCents?:number|null; provider?:string; image?:string; description?:string; published?:boolean|null };
+export type PriceRow = { key: string; name: string; kind: string; months: number; retailCents: number | null; resellerCents: number | null; available: number; source: string; version: string | null; costCents?:number|null; provider?:string; image?:string; description?:string; published?:boolean|null; warrantyDays?:number; automaticReplacement?:boolean };
 export const normalizePriceName = (name: string) => name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 export function pricingKey(name: string, kind: string, months: number) {
   const canonical = masterPlan(name)?.code.toLowerCase() || normalizePriceName(name);
