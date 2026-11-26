@@ -40,6 +40,8 @@ import { cyberdocsListOrders } from "@/lib/cyberdocs/cyberdocs.functions";
 import type { CyberDocsOrder } from "@/lib/cyberdocs/types";
 import {
   stockAdminDelete,
+  stockAdminDeletedList,
+  stockAdminRestoreDeleted,
   stockAdminConvertProfiles,
   stockAdminDeliver,
   stockAdminHistory,
@@ -146,6 +148,7 @@ export function StockManagerDialog({
 
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
+  const [deletedStock,setDeletedStock]=useState<Awaited<ReturnType<typeof stockAdminDeletedList>>|null>(null);
   const [items, setItems] = useState<StockItem[]>([]);
   const [stockTab, setStockTab] = useState<StockTab>(initialTab);
   const [q, setQ] = useState("");
@@ -553,8 +556,31 @@ export function StockManagerDialog({
 
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold">Mi stock actual</h3>
-          <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw className="mr-1 size-4" />Actualizar</Button>
+          <div className="flex flex-wrap gap-2">
+            {admin && <Button size="sm" variant="outline" disabled={busy} onClick={async()=>{
+              try {setDeletedStock(await stockAdminDeletedList({data:{code:getSavedCode()}}));}
+              catch(e){toast.error(err(e));}
+            }}><History className="mr-1 size-4"/>Deshacer eliminación</Button>}
+            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw className="mr-1 size-4" />Actualizar</Button>
+          </div>
         </div>
+        {deletedStock && <section className="rounded-2xl border p-3 space-y-3">
+          <div className="flex items-center justify-between"><h3 className="font-semibold">Papelera de inventario</h3><Button size="sm" variant="ghost" onClick={()=>setDeletedStock(null)}>Cerrar</Button></div>
+          {deletedStock.length===0 && <p className="text-sm text-muted-foreground">No hay cuentas eliminadas para recuperar.</p>}
+          {deletedStock.map(item=><div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+            <div><p className="font-medium">{item.platform}</p><p className="text-xs text-muted-foreground">{new Date(item.deleted_at).toLocaleString("es-MX")}</p></div>
+            <Button size="sm" disabled={busy} onClick={async()=>{
+              if(!confirm("¿Recuperar esta cuenta y sus perfiles vinculados?")) return;
+              setBusy(true);
+              try {
+                const count=await stockAdminRestoreDeleted({data:{code:getSavedCode(),id:item.id}});
+                setDeletedStock(await stockAdminDeletedList({data:{code:getSavedCode()}}));
+                await load();
+                toast.success(`${count} registro(s) recuperados`);
+              } catch(e){toast.error(err(e));} finally {setBusy(false);}
+            }}>Restaurar</Button>
+          </div>)}
+        </section>}
 
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">

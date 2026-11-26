@@ -5,6 +5,20 @@ import { duplicateComplete } from "./duplicate";
 const code=z.string().min(4); const token=z.string().min(10);
 const itemSchema=z.object({ durationMonths:z.number().int().min(1).max(36).default(1), startsOnSale:z.boolean().default(true),  id:z.string().default(""), platform:z.string().min(1).max(100), accountType:z.string().max(100).default(""), stockKind:z.enum(["complete","profile"]).default("complete"), parentStockId:z.string().uuid().nullable().default(null), username:z.string().max(250).default(""), password:z.string().max(1000).default(""), profilePin:z.string().max(100).default(""), panelUrl:z.string().max(2000).default(""), panelUsername:z.string().max(250).default(""), panelPassword:z.string().max(1000).default(""), provider:z.string().max(160).default(""), catalogRef:z.string().max(160).default(""), clientName:z.string().max(160).default(""), clientWhatsapp:z.string().max(40).default(""), status:z.enum(["available","assigned","expiring","expired","client_replacement","provider_replacement"]).default("available"), acquiredOn:z.string().nullable().default(null), deliveredOn:z.string().nullable().default(null), expiresOn:z.string().nullable().default(null), notes:z.string().max(3000).default(""), cost:z.number().min(0).default(0), salePrice:z.number().min(0).default(0), relatedOrderId:z.string().max(200).default(""), renewalStatus:z.string().max(60).default(""), renewalNotifiedAt:z.string().nullable().default(null), protectedDeliveryId:z.string().default("") });
 async function adminGate(v:string){ const {requireAdminCode}=await import("@/lib/notify/notify.server"); await requireAdminCode(v); }
+export const stockAdminDeletedList=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code}).parse(d)).handler(async({data})=>{
+  await adminGate(data.code);
+  const {opsDB}=await import("@/lib/workspace/operations.server");
+  const result=await opsDB().rpc("ma2_deleted_stock_list");
+  if(result.error) throw new Error(result.error.message);
+  return result.data as {id:string;platform:string;deleted_at:string}[];
+});
+export const stockAdminRestoreDeleted=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code,id:z.string().uuid()}).parse(d)).handler(async({data})=>{
+  await adminGate(data.code);
+  const {opsDB}=await import("@/lib/workspace/operations.server");
+  const result=await opsDB().rpc("ma2_restore_deleted_stock",{p_version:data.id});
+  if(result.error) throw new Error(result.error.message);
+  return Number(result.data);
+});
 export const stockAdminList=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code}).parse(d)).handler(async({data}):Promise<StockItem[]>=>{await adminGate(data.code); return (await import("./stock.server")).listStock(null);});
 export const stockAdminRenewal=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code,id:z.string().uuid(),version:z.string().min(1).max(100),expiresOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()}).parse(d)).handler(async({data})=>{
   await adminGate(data.code);
