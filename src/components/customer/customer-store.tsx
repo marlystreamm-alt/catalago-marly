@@ -32,6 +32,7 @@ import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/comp
 import {useIsMobile} from "@/hooks/use-mobile";
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { Storefront } from "@/components/customer/storefront";
+import { prepareGalleryImage } from "@/lib/gallery/image";
 import { AccessLoading } from "@/components/customer/access-loading";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
@@ -100,6 +101,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     [reportTitle, setReportTitle] = useState(""),
     [reportMessage, setReportMessage] = useState(""),
     [reportOrder, setReportOrder] = useState(""),
+    [reportEvidence, setReportEvidence] = useState(""),
+    [evidenceLoading, setEvidenceLoading] = useState(false),
     [reportKind, setReportKind] = useState<"reports" | "questions" | "requests">("reports");
   const requests = useRef(new Map<string, string>());
   const load = useCallback(async () => {
@@ -273,6 +276,10 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     await customerSignOut();
                     setData(null);
                     setDelivery(null);
+                    setReportEvidence("");
+                    setReportMessage("");
+                    setReportTitle("");
+                    setReportOrder("");
                     setProducts([]);
                     setPassword("");
                     setShowLoginPassword(false);
@@ -594,13 +601,27 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             {tab === "compras" ? (
               <div className="space-y-3">
                 {data.webOrders.map(order => (
-                  <article key={order.id} className="seller-card space-y-2">
-                    <div className="flex justify-between gap-3"><h3 className="font-bold">{order.title}</h3><strong>{money(order.total)}</strong></div>
-                    <p className="text-sm text-muted-foreground">{({completed:"Entregado", in_process:"En proceso", cancelled:"Cancelado", rejected:"Rechazado"} as Record<string,string>)[order.status] || "Pagado · pendiente de entrega"}</p>
-                    {order.status === "completed" && <Button size="sm" disabled={busy} onClick={() => void action(async () => {
-                      setShowPassword(false);
-                      setDelivery(await customerWebDelivery({ data: { slug, orderId: order.id } }));
-                    })}>Ver entrega</Button>}
+                  <article key={order.id} className="seller-card space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <h3 className="font-bold break-words">{order.title}</h3>
+                        <p className="text-sm text-muted-foreground">{({completed:"Entregado", in_process:"En proceso", cancelled:"Cancelado", rejected:"Rechazado"} as Record<string,string>)[order.status] || "Pagado · pendiente de entrega"}</p>
+                      </div>
+                      <strong className="shrink-0">{money(order.total)}</strong>
+                    </div>
+                    {order.status === "completed" && <div className="grid gap-2 sm:flex">
+                      <Button size="sm" disabled={busy} onClick={() => void action(async () => {
+                        setShowPassword(false);
+                        setDelivery(await customerWebDelivery({ data: { slug, orderId: order.id } }));
+                      })}>Ver acceso y guía</Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setReportKind("reports");
+                        setReportOrder(order.id);
+                        setReportTitle(`Falla en ${order.title}`.slice(0,160));
+                        setTab("reportes");
+                        window.scrollTo({top:0});
+                      }}>Reportar falla</Button>
+                    </div>}
                   </article>
                 ))}{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
                 {data.records
@@ -696,13 +717,15 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                           title: reportTitle,
                           message: reportMessage,
                           ...(reportOrder ? { orderId: reportOrder } : {}),
+                          ...(reportKind === "reports" && reportEvidence ? { evidence: reportEvidence } : {}),
                         },
                       });
                       setReportTitle("");
                       setReportMessage("");
+                      setReportEvidence("");
                       setReportOrder("");
                       await load();
-                      toast.success("Solicitud enviada al negocio");
+                      toast.success(reportKind === "reports" ? "Reporte enviado. Puedes consultar la respuesta aquí." : "Solicitud enviada al negocio");
                     });
                   }}
                 >
@@ -711,7 +734,11 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     <select
                       className="buyer-select"
                       value={reportKind}
-                      onChange={(e) => setReportKind(e.target.value as typeof reportKind)}
+                      onChange={(e) => {
+                        const kind = e.target.value as typeof reportKind;
+                        setReportKind(kind);
+                        setTab(kind === "reports" ? "reportes" : "ayuda");
+                      }}
                     >
                       <option value="reports">Reportar falla</option>
                       <option value="questions">Pregunta / ayuda</option>
@@ -726,10 +753,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                       onChange={(e) => setReportOrder(e.target.value)}
                     >
                       <option value="">Sin compra relacionada</option>
-                      {data.orders.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.title}
-                        </option>
+                      {[...data.orders, ...data.webOrders.filter(o=>!["cancelled","rejected"].includes(o.status))].map((o) => (
+                        <option key={o.id} value={o.id}>{o.title}</option>
                       ))}
                     </select>
                   </label>
@@ -753,15 +778,30 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                       onChange={(e) => setReportMessage(e.target.value)}
                     />
                   </label>
-                  <Button disabled={busy}>Enviar solicitud</Button>
+                  {reportKind === "reports" && <div className="space-y-2">
+                    <label className="seller-field"><span>Captura de la falla (opcional)</span>
+                      <Input type="file" accept="image/*" disabled={busy || evidenceLoading} onChange={async event => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        if (!file) return;
+                        setEvidenceLoading(true);
+                        try { setReportEvidence((await prepareGalleryImage(file)).image); }
+                        catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo agregar la captura"); }
+                        finally { setEvidenceLoading(false); }
+                      }} />
+                    </label>
+                    {reportEvidence && <Button type="button" variant="ghost" size="sm" onClick={()=>setReportEvidence("")}>Quitar captura</Button>}
+                  </div>}
+                  <Button disabled={busy || evidenceLoading}>{reportKind === "reports" ? "Enviar reporte" : "Enviar solicitud"}</Button>
                 </form>
                 <div className="mt-4 space-y-3">
                   {data.records
-                    .filter((r) => ["reports", "questions", "requests"].includes(r.module))
+                    .filter((r) => tab === "reportes" ? r.module === "reports" : ["questions", "requests"].includes(r.module))
                     .map((r) => (
                       <article className="seller-card" key={r.id}>
                         <h3 className="font-bold">{r.title}</h3>
                         <span className="text-xs text-primary">{STATUS[r.status] || r.status}</span>
+                        {r.purchaseTitle && <p className="mt-2 text-xs text-muted-foreground">Compra: {r.purchaseTitle}</p>}
                         <p className="text-sm whitespace-pre-wrap mt-2">{r.message}</p>
                         {r.reply ? (
                           <p className="rounded-xl bg-primary/5 p-3 mt-3 text-sm whitespace-pre-wrap">
@@ -917,15 +957,15 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Tu entrega</DialogTitle>
+            <DialogTitle>{delivery?.title || "Tu entrega"}</DialogTitle>
             <DialogDescription>
-              {delivery?.title} · Consulta soporte si necesitas ayuda.
+              Acceso y guía de ingreso
             </DialogDescription>
           </DialogHeader>
           {delivery ? (
             <div className="space-y-4">
-              {delivery.link && <Button asChild><a href={delivery.link} target="_blank" rel="noopener noreferrer">Abrir acceso</a></Button>}
-              {delivery.notes && <p className="whitespace-pre-wrap break-words text-sm">{delivery.notes}</p>}
+              {delivery.link && <Button asChild className="w-full"><a href={delivery.link} target="_blank" rel="noopener noreferrer">Abrir acceso</a></Button>}
+              {delivery.notes && <div className="rounded-xl bg-muted px-4 py-3"><p className="font-semibold text-sm">Instrucciones</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{delivery.notes}</p></div>}
               {delivery.username && (<label className="seller-field">
                 <span>Usuario / correo</span>
                 <div className="flex gap-2">
@@ -976,13 +1016,21 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               {delivery.guides.map((g, i) => (
                 <figure className="space-y-2" key={i}>
                   <figcaption className="text-sm font-semibold">{g.title}</figcaption>
-                  <img src={g.image} alt={g.title} className="w-full rounded-xl" />
+                  <img src={g.image} alt={g.title} className="w-full rounded-xl border" loading="lazy" />
                 </figure>
               ))}
               {delivery.username && <p className="text-sm text-muted-foreground">
                 Ingresa con estos datos en la aplicación o sitio oficial de la plataforma. Respeta
                 los dispositivos y el tipo de cuenta que compraste.
               </p>}
+              <Button variant="outline" onClick={() => {
+                setReportKind("reports");
+                setReportOrder(delivery.id);
+                setReportTitle(`Falla en ${delivery.title}`.slice(0,160));
+                setDelivery(null);
+                setTab("reportes");
+                window.scrollTo({top:0});
+              }}>Reportar falla</Button>
               <Button asChild variant="outline">
                 <a href={support} target="_blank" rel="noopener noreferrer">
                   Soporte por WhatsApp
