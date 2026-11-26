@@ -118,9 +118,12 @@ export const salesCreateRequest = createServerFn({ method: "POST" })
   .validator((v: unknown) =>
     z
       .object({
-        customerName: z.string().min(2).max(100),
-        whatsapp: z.string().min(7).max(30),
-        businessName: z.string().min(2).max(120),
+        customerName: z.string().trim().min(2).max(100),
+        whatsapp: z.string().trim().min(7).max(30),
+        businessName: z.string().trim().min(2).max(120).refine(
+          (name) => /[\p{L}\p{N}]/u.test(name),
+          "Escribe el nombre de tu negocio",
+        ),
         planId: z.string().min(1),
         receiptDataUrl: z
           .string()
@@ -136,15 +139,19 @@ export const salesCreateRequest = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const c = await loadConfig();
     if (!c.enabled) throw new Error("Las contrataciones todavía no están habilitadas");
+    const { normalizeShopWhatsApp, shopRequestId } = await import("./shop-request-identity.server");
+    const whatsapp = normalizeShopWhatsApp(data.whatsapp);
+    if (whatsapp.length < 7 || whatsapp.length > 15)
+      throw new Error("Escribe un número de WhatsApp válido");
     await (
       await import("@/lib/customer/customer.server")
-    ).customerThrottle("sales", data.whatsapp, 5);
+    ).customerThrottle("sales", whatsapp, 5);
     const plan = c.plans.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Plan no disponible");
     const d = await db();
     const now = new Date().toISOString();
     const draft: SaleRequest = {
-      id: crypto.randomUUID(),
+      id: shopRequestId(data.businessName, whatsapp),
       createdAt: now,
       reference: ref(),
       customerName: data.customerName.trim(),
@@ -158,16 +165,18 @@ export const salesCreateRequest = createServerFn({ method: "POST" })
       notes: "",
     };
     const detail = await (await cryptoLib()).encryptPayload(draft);
-    const { data: row, error } = await d
-      .from("notification_log")
-      .insert({ channel: SALE_CHANNEL, kind: "request", attempt: 1, status: "pending", detail })
-      .select("id,created_at")
-      .single();
-    if (error) throw new Error(error.message);
-    draft.id = String(row.id);
-    draft.createdAt = String(row.created_at);
-    const fixed = await (await cryptoLib()).encryptPayload(draft);
-    await d.from("notification_log").update({ detail: fixed }).eq("id", draft.id);
+    const { error } = await d.from("notification_log").insert({
+      id: draft.id,
+      created_at: draft.createdAt,
+      channel: SALE_CHANNEL,
+      kind: "request",
+      attempt: 1,
+      status: "pending",
+      detail,
+    });
+    if (error?.code === "23505")
+      throw new Error("Ya hay una solicitud para este negocio. Usa tu referencia original o contacta a MA².");
+    if (error) throw new Error("No se pudo registrar la solicitud");
     return { request: draft, paymentInstructions: c.paymentInstructions };
   });
 
