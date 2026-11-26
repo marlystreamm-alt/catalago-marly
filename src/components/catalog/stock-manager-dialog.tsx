@@ -687,6 +687,7 @@ export function StockManagerDialog({
                 {toolsItem.username ? <p><b>Usuario/correo:</b> {toolsItem.username}</p> : null}
                 {toolsItem.profilePin ? <p><b>PIN:</b> {toolsItem.profilePin}</p> : null}
                 {toolsItem.clientName ? <p><b>Cliente:</b> {toolsItem.clientName}</p> : null}
+                {items.some(item => item.parentStockId === toolsItem.id) && <p>Cuenta dividida en perfiles. Cada perfil tiene su propia disponibilidad.</p>}
                 {toolsItem.expiresOn ? <p><b>Vence:</b> {toolsItem.expiresOn}</p> : null}
                 {toolsItem.renewalStatus ? <p><b>Renovación:</b> {toolsItem.renewalStatus}</p> : null}
                 {toolsItem.renewalNotifiedAt ? <p><b>Último aviso:</b> {new Date(toolsItem.renewalNotifiedAt).toLocaleString("es-MX")}</p> : null}

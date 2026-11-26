@@ -733,7 +733,7 @@ export function CyberDocsOrdersDialog({
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .filter(order => stage === "all" || orderStageStatuses[stage].some(status => status === order.status))
     .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
-    .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
+    .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName, order.whatsapp, order.whatsapp?.replace(/\D/g, "")].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
   const selectableVisibleIds = useMemo(
     () => visibleOrders.filter((order) => !terminal(order)).map((order) => order.id),
     [visibleOrders],
@@ -918,7 +918,7 @@ export function CyberDocsOrdersDialog({
         </details></DialogContent></Dialog>}
         </div>
 
-        <Input type="search" aria-label="Buscar pedidos" placeholder="Buscar por folio, servicio o cliente" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
+        <Input type="search" aria-label="Buscar pedidos" placeholder="Buscar por folio, servicio, nombre o número" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
         {!navigation && <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
           {stage!=="deliveries"&&<Button size="sm" variant="outline" className="shrink-0" onClick={() => { const target = orders.find(o => !terminal(o)); if (target) { setSelectedId(target.id); setDeliverySource("manual"); setManualPlatform(target.serviceName || ""); setManualType("full"); } else toast.info("No hay pedidos pendientes para entrega manual"); }}>Entrega manual</Button>}
           {[
@@ -1002,7 +1002,7 @@ export function CyberDocsOrdersDialog({
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{order.serviceName || "Pedido CyberDocs"}</p>
-                        <p className="truncate text-xs text-muted-foreground">{order.clientName || "Cliente sin nombre"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{order.clientName || order.whatsapp || "Cliente sin nombre"}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">{order.sourceLabel || "Telegram"} · {dateTime(order.createdAt)} · {order.cyberdocsOrderId}</p>
                         {order.expiresOn ? <p className="mt-1 text-[11px] font-medium text-amber-700">Vence {order.expiresOn}{renewalDays !== null ? ` · ${renewalDays < 0 ? "vencido" : renewalDays === 0 ? "hoy" : `en ${renewalDays} día(s)`}` : ""}</p> : null}
                       </div>
@@ -1034,7 +1034,7 @@ export function CyberDocsOrdersDialog({
                             <Button type="button" size="sm" variant="outline" onClick={() => void saveOrderWhatsApp()} disabled={busy}>Guardar</Button>
                             <Button type="button" size="sm" onClick={() => void openWhatsApp()} disabled={!normalizeWhatsApp(selectedWhatsApp)}><MessageCircle className="mr-1 size-4" />Abrir WhatsApp</Button>
                           </div>
-                          <p className="text-[11px] text-muted-foreground">Se guarda en Clientes para futuras renovaciones.</p>
+                          <p className="text-[11px] text-muted-foreground">{selected.sourceKey === "cyberdocsmx_bot" ? (selected.whatsapp ? `Recuerda guardar ${selected.whatsapp} en tu agenda como «${selected.clientName || selected.whatsapp} Cyberdoc».` : "Agrega su WhatsApp para reconocer al cliente en sus próximos pedidos.") : "Se guarda en Clientes para futuras renovaciones."}</p>
                         </div>
                       </div>
 
