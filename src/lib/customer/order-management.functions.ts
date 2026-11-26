@@ -24,6 +24,10 @@ export const webOrderList = createServerFn({ method: "POST" }).validator((v: unk
   const ids = (paid.data || []).map((r: any) => purchaseRecordId("notice", r.id));
   const notice = ids.length ? await db.from("orders").select("id,status").in("id", ids).eq("catalog_id", "wallet-main") : { data: [], error: null };
   if (notice.error) throw new Error("No se pudo consultar el estado de los avisos");
+  const requestIds = (requests.data || []).filter((r: any)=>r.catalog_id==="store-ma2").map((r: any)=>r.id);
+  const debits = requestIds.length ? await db.from("ma2_wallet_entries").select("request_id").eq("kind","purchase").in("request_id",requestIds) : { data: [], error: null };
+  if (debits.error) throw new Error("No se pudo consultar el pago de los pedidos");
+  const paidRequests = new Set((debits.data || []).map(r=>String(r.request_id)));
   return {
     paid: (paid.data || []).map((r: any) => {
       const c = clients.find(x => x.id === r.client_id);
@@ -31,7 +35,7 @@ export const webOrderList = createServerFn({ method: "POST" }).validator((v: unk
     }) as { id:string;title:string;total:number;createdAt:string;expiresOn:string|null;client:string;whatsapp:string;acknowledged:boolean }[],
     requests: (requests.data || []).map((row: Record<string, unknown>) => {
       const o = notify.rowToOrder(row), linked = (imported.data || []).find((r: any) => r.notification_order_id === o.id);
-      return { ...o, linkedId: linked?.id as string | undefined, linkedStatus: linked?.status as string | undefined };
+      return { ...o, paidWithBalance: paidRequests.has(o.id), linkedId: linked?.id as string | undefined, linkedStatus: linked?.status as string | undefined };
     }) as (CloudOrder & {linkedId?: string; linkedStatus?: string})[],
   };
 });
