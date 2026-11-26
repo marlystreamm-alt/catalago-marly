@@ -154,7 +154,7 @@ export const cyberdocsAssignStock = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string; completionError: string | null }> => {
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
-    return server.assignStockToOrder(data);
+    return server.assignStockToOrder({ ...data, prepareOnly: true });
   });
 
 
@@ -180,7 +180,7 @@ export const cyberdocsManualDelivery = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ order: CyberDocsOrder; token: string; platformMessage: string; passwordMessage: string; completionError: string | null }> => {
     await authorize(data.code);
     const server = await import("./cyberdocs.server");
-    return server.createManualDeliveryForOrder(data);
+    return server.createManualDeliveryForOrder({ ...data, prepareOnly: true });
   });
 
 export const cyberdocsReleaseStock = createServerFn({ method: "POST" })
