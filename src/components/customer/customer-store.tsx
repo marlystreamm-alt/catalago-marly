@@ -27,6 +27,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/components/ui/sheet";
+import {useIsMobile} from "@/hooks/use-mobile";
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { Storefront } from "@/components/customer/storefront";
 import { BusinessCover } from "@/components/catalog/business-cover";
@@ -58,12 +60,14 @@ const tabs = [
   ["tienda", "Tienda", ShoppingBag],
   ["saldo", "Recargar saldo", Wallet],
   ["compras", "Mis compras", Package],
-  ["reportes", "Reportes y soporte", LifeBuoy],
+  ["reportes", "Reportes", LifeBuoy],
+  ["ayuda", "Ayuda", LifeBuoy],
   ["avisos", "Avisos", Bell],
   ["movimientos", "Movimientos", History],
   ["cuenta", "Mi cuenta", User],
 ] as const;
 export function CustomerStore({ slug, initialView = "inicio", initialQuery = "", initialSku = "" }: { slug: string; initialView?: MainStoreView; initialQuery?: string; initialSku?:string }) {
+  const isMobile=useIsMobile();
   const [shop, setShop] = useState<Awaited<ReturnType<typeof customerShopInfo>> | null>(null),
     [data, setData] = useState<View | null>(null),
     [tab, setTab] = useState<string>(initialView),
@@ -73,6 +77,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [fatal, setFatal] = useState("");
+  const [showLoginPassword,setShowLoginPassword]=useState(false);
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [name, setName] = useState(""),
@@ -220,6 +225,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
         Abriendo tu tienda…
       </main>
     );
+  const renderClientMenu=()=>data?<nav className="ma2-client-menu space-y-1" aria-label="Panel de cliente"><div className="rounded-2xl bg-card border p-3 mb-4"><div className="flex items-center gap-2"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/15 font-bold text-primary">{data.name.slice(0,1).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate">{data.name}</strong><span className="block truncate text-xs text-muted-foreground">{data.email}</span></div></div><p className="mt-3 text-xs text-muted-foreground">Saldo disponible</p><strong className="text-xl text-primary">{money(data.balance)}</strong></div><p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mi cuenta</p>{tabs.map(([key,label,Icon])=><button key={key} className={tab===key?"active":""} aria-current={tab===key?"page":undefined} disabled={data.mustChange&&key!=="cuenta"} onClick={()=>{setTab(key);if(key==="tienda"){setSku("");setQuery("");setKind("all");}if(key==="reportes")setReportKind("reports");if(key==="ayuda")setReportKind("questions");setMenu(false);setError("");window.scrollTo({top:0,behavior:"instant"});}}><Icon className="size-4"/>{label}</button>)}<a href={support} target="_blank" rel="noopener noreferrer"><LifeBuoy className="size-4"/> Ayuda por WhatsApp</a>{shop.id&&<a href="/plataforma"><ShoppingBag className="size-4"/>Quiero mi propia tienda</a>}</nav>:null;
   return (
     <main
       className="buyer-app seller-app ma2-unified"
@@ -227,11 +233,12 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     >
       <header className="buyer-top">
         <div className="flex min-w-0 items-center gap-3">
-          {data ? (
+          {data && isMobile ? (
             <Button
               size="icon"
               variant="ghost"
               aria-label={menu ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={menu}
               onClick={() => setMenu(!menu)}
             >
               {menu ? <X /> : <Menu />}
@@ -270,6 +277,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     setDelivery(null);
                     setProducts([]);
                     setPassword("");
+                    setShowLoginPassword(false);
                     setError("");
                     setTab("inicio");
                   })
@@ -283,8 +291,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
         </div>
       </header>
       {!data ? (
-        <div className="buyer-auth">
-          <section className="space-y-4">
+        <div className="buyer-auth ma2-login-layout">
+          <section className="space-y-4 ma2-login-promo">
             <p className="buyer-eyebrow">TU TIENDA DIGITAL</p>
             <h2 className="text-3xl font-extrabold">
               Todo lo que compras,
@@ -296,13 +304,13 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               recibir soporte.
             </p>
             <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
-            {!shop.id&&<><div className="rounded-2xl bg-gradient-to-br from-indigo-950 to-cyan-800 p-5 text-white"><p className="text-xs font-bold uppercase tracking-wide text-cyan-200">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-white/90">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p><button type="button" onClick={()=>{setMode("register");setError("");}} className="mt-3 rounded-xl bg-cyan-200 px-4 py-2 font-bold text-slate-900">Crear mi cuenta</button></div><StoreNotices/></>}
+            {!shop.id&&<><div className="rounded-2xl bg-gradient-to-br from-indigo-950 to-cyan-800 p-5 text-white"><p className="text-xs font-bold uppercase tracking-wide text-cyan-200">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-white/90">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p></div><StoreNotices/></>}
             {shop.id&&<a className="text-sm text-primary underline" href="/plataforma">
               ¿Tienes un negocio? Contrata tu propia tienda
             </a>}
           </section>
           <form
-            className="seller-card space-y-4"
+            className="seller-card ma2-login-card space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               void action(async () => {
@@ -311,37 +319,17 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   await customerSignUp({ data: { slug, email, password, name, whatsapp: wa } });
                 } else await customerSignIn({ data: { slug, email, password } });
                 setPassword("");
+                setShowLoginPassword(false);
                 setConfirmation("");
                 if(!shop.id&&initialView==="cuenta")setTab("inicio");
                 await load();
               });
             }}
           >
-            <div className="seller-tabs">
-              <button
-                type="button"
-                className={mode === "login" ? "active" : ""}
-                onClick={() => {
-                  setMode("login");
-                  setError("");
-                }}
-              >
-                Iniciar sesión
-              </button>
-              <button
-                type="button"
-                className={mode === "register" ? "active" : ""}
-                onClick={() => {
-                  setMode("register");
-                  setError("");
-                }}
-              >
-                Crear mi cuenta
-              </button>
-            </div>
-            <h2 className="text-xl font-bold">
-              {mode === "register" ? "Crea tu cuenta de cliente" : "Qué gusto verte de nuevo"}
-            </h2>
+            <div className="flex items-center gap-3"><span className="seller-logo">MA²</span><div><p className="text-xs font-semibold text-primary">ACCESO MA²</p><h2 className="text-xl font-bold">{mode==="register"?"Crea tu cuenta":"Bienvenido de nuevo"}</h2></div></div>
+            <p className="text-sm text-muted-foreground">
+              {mode === "register" ? "Regístrate con tus datos para empezar." : "Ingresa con el correo y contraseña de tu cuenta."}
+            </p>
             {mode === "register" ? (
               <>
                 <label className="seller-field">
@@ -380,15 +368,16 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             </label>
             <label className="seller-field">
               <span>Contraseña</span>
-              <Input
+              <div className="relative"><Input
                 required
-                type="password"
+                className="pr-11"
+                type={showLoginPassword?"text":"password"}
                 minLength={mode === "register" ? 10 : 1}
                 maxLength={128}
                 autoComplete={mode === "register" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-              />
+              /><button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted-foreground" aria-label={showLoginPassword?"Ocultar contraseña":"Mostrar contraseña"} onClick={()=>setShowLoginPassword(v=>!v)}>{showLoginPassword?<EyeOff className="size-4"/>:<Eye className="size-4"/>}</button></div>
             </label>
             {mode === "register" ? (
               <>
@@ -418,12 +407,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 ? "Procesando…"
                 : mode === "register"
                   ? "Crear cuenta y entrar"
-                  : "Entrar a mi cuenta"}
+                  : "Entrar"}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Esta cuenta pertenece a {shop.name}. Si ya tienes saldo con el negocio, pide que te
-              habiliten el acceso para conservarlo.
-            </p>
+            <p className="text-center text-sm text-muted-foreground">{mode==="register"?"¿Ya tienes cuenta?":"¿Todavía no tienes cuenta?"} <button type="button" className="font-bold text-primary underline-offset-4 hover:underline" onClick={()=>{setMode(mode==="register"?"login":"register");setPassword("");setConfirmation("");setShowLoginPassword(false);setError("");}}>{mode==="register"?"Entrar":"Regístrate aquí"}</button></p>
             <a
               className="block text-sm text-primary underline"
               href={support}
@@ -437,29 +423,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
         </div>
       ) : (
         <div className="buyer-shell">
-          <nav className={`buyer-nav ${menu ? "open" : ""}`} aria-label="Panel de cliente">
-            {tabs.map(([key, label, Icon]) => (
-              <button
-                key={key}
-                className={tab === key ? "active" : ""}
-                disabled={data.mustChange && key !== "cuenta"}
-                onClick={() => {
-                  setTab(key);
-                  if(key==="tienda"){setSku("");setQuery("");setKind("all");}
-                  setMenu(false);
-                  setError("");
-                }}
-              >
-                <Icon className="size-4" />
-                {label}
-              </button>
-            ))}
-            <a href={support} target="_blank" rel="noopener noreferrer">
-              <LifeBuoy className="size-4" />
-              Ayuda por WhatsApp
-            </a>
-            {shop.id&&<a href="/plataforma"><ShoppingBag className="size-4"/>Quiero mi propia tienda</a>}
-          </nav>
+          {isMobile?<Sheet open={menu} onOpenChange={setMenu}><SheetContent side="left" className="ma2-client-drawer w-[85vw] max-w-sm overflow-y-auto p-4"><SheetHeader className="sr-only"><SheetTitle>Mi cuenta</SheetTitle><SheetDescription>Elige una sección de tu cuenta MA².</SheetDescription></SheetHeader>{renderClientMenu()}</SheetContent></Sheet>:<aside className="buyer-nav">{renderClientMenu()}</aside>}
           <section className="buyer-content">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -489,7 +453,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             ) : null}
             {tab === "inicio" ? (
               <>
-                <div className="buyer-metrics">
+                <div className="buyer-metrics ma2-client-metrics">
                   <article className="aqua">
                     <Wallet />
                     <span>Saldo disponible</span>
@@ -662,6 +626,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                         <Button
                           variant="outline"
                           onClick={() => {
+                            setReportKind("reports");
                             setReportOrder(o.id);
                             setReportTitle("Soporte · " + o.title);
                             setTab("reportes");
@@ -679,8 +644,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 )}
               </div>
             ) : null}
-            {tab === "reportes" ? (
+            {tab === "reportes" || tab === "ayuda" ? (
               <>
+                {tab==="ayuda"&&<div className="space-y-3 mb-4">{data.records.filter(r=>r.module==="faq").map(r=><article key={r.id} className="seller-card"><h3 className="font-bold">{r.title}</h3><p className="text-sm mt-2">{r.message}</p></article>)}</div>}
                 <form
                   className="seller-card space-y-3"
                   onSubmit={(e) => {
@@ -780,14 +746,14 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             {tab === "avisos" ? (
               <div className="space-y-3">
                 {data.records
-                  .filter((r) => ["notices", "faq"].includes(r.module))
+                  .filter((r) => r.module==="notices")
                   .map((r) => (
                     <article className="seller-card" key={r.id}>
                       <h3 className="font-bold">{r.title}</h3>
                       <p className="text-sm whitespace-pre-wrap mt-3">{r.message}</p>
                     </article>
                   ))}
-                {!data.records.some((r) => ["notices", "faq"].includes(r.module)) ? (
+                {!data.records.some((r) => r.module==="notices") ? (
                   <p className="seller-card text-muted-foreground">No hay avisos nuevos.</p>
                 ) : null}
               </div>

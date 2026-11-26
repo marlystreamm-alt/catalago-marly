@@ -15,3 +15,13 @@ test("MA² landing uses customer sign-in before showing products",async()=>{
  assert.match(server,/customerContext\("ma2"\)/);
  assert.doesNotMatch(server,/catch \{ return "retail"/);
 });
+test("sign-in shows one form and a discreet team entry without role selection",async()=>{
+ const [portal,admin]=await Promise.all(["src/components/customer/customer-store.tsx","src/components/customer/admin-entry.tsx"].map(read));
+ assert.doesNotMatch(admin,/Cliente \/ revendedor|>Administración<|seller-tabs/);
+ const entry=portal.split("{!data ? (")[1].split('<div className="buyer-shell">')[0];
+ assert.doesNotMatch(entry,/seller-tabs/);
+ assert.match(entry,/Regístrate aquí/);
+ assert.match(entry,/aria-label="Acceso del equipo"/);
+ assert.match(portal,/SheetContent side="left"/);
+ assert.match(portal,/<SheetTitle>Mi cuenta<\/SheetTitle>/);
+});

@@ -393,3 +393,13 @@ body.seller-mode { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0
 /* MA²: shared brand tokens for storefront, account and administration. */
 .seller-app.ma2-unified { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0 0); --ring:oklch(.73 .10 213); --radius:.75rem; }
 .ma2-unified .buyer-balance { background:color-mix(in oklch,var(--primary) 13%,var(--card)); color:var(--primary); border-color:color-mix(in oklch,var(--primary) 20%,var(--border)); }
+
+/* Compact MA² account entry and mobile navigation. */
+.ma2-login-card{max-width:480px;width:100%;justify-self:center;padding:clamp(20px,4vw,32px)}
+.ma2-client-menu button,.ma2-client-menu a{display:flex;width:100%;align-items:center;gap:10px;text-align:left;border-radius:12px;padding:11px 12px;font-size:14px;color:var(--muted-foreground)}
+.ma2-client-menu button.active{background:color-mix(in oklch,var(--primary) 13%,var(--card));color:var(--primary);font-weight:750}
+.ma2-client-menu button:disabled{opacity:.5;cursor:not-allowed}
+.ma2-client-drawer{--primary:oklch(.60 .105 216)}
+@media(max-width:760px){.ma2-login-layout{gap:18px;padding:20px 14px 40px}.ma2-login-layout .ma2-login-card{order:-1}.ma2-login-layout .ma2-login-promo>h2,.ma2-login-layout .ma2-login-promo>p{display:none}.ma2-login-card{padding:20px}.buyer-shell{display:block}}
+@media(min-width:761px){.buyer-nav:has(.ma2-client-menu){display:block}}
+@media(max-width:767px){.buyer-shell{display:block}.ma2-client-metrics article:first-child{grid-column:span 2;display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 12px}.ma2-client-metrics article:first-child button{grid-column:2;grid-row:2/4;padding:9px 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-weight:700}.ma2-client-metrics article:first-child strong{grid-column:1}.ma2-client-metrics article:last-child{grid-column:auto}}
