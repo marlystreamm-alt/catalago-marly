@@ -38,7 +38,7 @@ export const comboAssign=createServerFn({method:"POST"}).validator((v:unknown)=>
   document=await ds.encryptPayload(payload);url="https://martgor.shop/e/"+data.requestId+"?t="+encodeURIComponent(token);reply="Documento: "+url+"\nContraseña: "+accessPassword;
  }
  const payload=await ds.encryptPayload({clientId:client.id,platform:data.title,amount:String(total),message:stock.map(s=>s.platform).join(" · "),reply,deliveryUrl:url,comboStockIds:JSON.stringify(ids)});
- const {error:assignError}=await db.rpc("ma2_assign_stock_combo",{p_request:data.requestId,p_client:client.id,p_client_version:client.version,p_name:client.title,p_phone:phone,p_title:data.title,p_kind:data.kind,p_items:data.items,p_payload:payload,p_document:document});
+ const {error:assignError}=await db.rpc("ma2_assign_stock_combo_wallet",{p_request:data.requestId,p_client:client.id,p_client_version:client.version,p_name:client.title,p_phone:phone,p_title:data.title,p_kind:data.kind,p_items:data.items,p_payload:payload,p_document:document});
  if(assignError)throw new Error(assignError.message||"No se pudo asignar el combo");
  const saved=await ops.readRecord(data.requestId);
  return {id:saved.id,text:saved.data.reply||"",url:saved.data.deliveryUrl||""};

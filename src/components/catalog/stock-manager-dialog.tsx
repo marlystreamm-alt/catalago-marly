@@ -184,6 +184,7 @@ export function StockManagerDialog({
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
   const [deliverOrderRef, setDeliverOrderRef] = useState("");
+  const deliveryRequestId=useRef("");
   const [protect, setProtect] = useState(true);
   const [accessPassword, setAccessPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -482,6 +483,7 @@ export function StockManagerDialog({
   function openManualDelivery(item: StockItem) {
     if (busy || item.status !== "available" || !can("stock_assign")) return;
     setDeliver(item);
+    deliveryRequestId.current=crypto.randomUUID();
     setDeliveryImages([]);
     setDeliveryAttachment(null);
     setDeliverClient(initialClient?.name || "");
@@ -498,6 +500,7 @@ export function StockManagerDialog({
     if (!can("stock_assign")) return toast.error("No tienes permiso para entregar stock");
     if (!deliverClient.trim()) return toast.error("Escribe a quién se entrega el producto");
     if (protect && (accessPassword.length < 4 || accessPassword !== confirmPassword)) return toast.error("Revisa la contraseña de protección");
+    if(admin&&!deliverOrderRef){const price=Number(deliverSalePrice);if(!Number.isFinite(price)||price<=0)return toast.error("Escribe el precio que se descontará del saldo.");if(!confirm(`¿Asignar esta cuenta y descontar $${price.toFixed(2)} del saldo del cliente?`))return;}
     setBusy(true);
     try {
       const payload = {
@@ -506,7 +509,7 @@ export function StockManagerDialog({
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
       };
-      const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload } });
+      const res = ownerToken ? await stockOwnerDeliver({ data: { token: ownerToken, ...payload } }) : await stockAdminDeliver({ data: { code, ...payload, requestId:deliveryRequestId.current } });
       if ("completionError" in res && res.completionError) toast.warning(String(res.completionError));
       const link = `${window.location.origin}/e/${res.id}?t=${encodeURIComponent(res.token)}`;
       const ficha = renderDeliveryFicha(getPrimaryFichaTemplate(), { platform: deliver.platform, username: deliver.username, password: deliver.password, profilePin: deliver.profilePin, panelUrl: deliver.panelUrl, panelUsername: deliver.panelUsername, panelPassword: deliver.panelPassword });
@@ -661,7 +664,7 @@ export function StockManagerDialog({
                 <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverClient(e.target.value); }} /></div>
                 <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverWhatsapp(e.target.value); }} /></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
-                <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} /></div>
+                <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">{deliverOrderRef?"Pedido vinculado: no se realiza un segundo cobro.":"Entrega manual: este importe se descontará del saldo del cliente. Si es nuevo, se registrará con su WhatsApp y deberá recargar antes de recibir la cuenta."}</p>}</div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
                   <Select value={deliverOrderRef || "manual"} onValueChange={(value) => {
                     const selected = cyberdocOrders.find((order) => order.id === value);

@@ -114,7 +114,7 @@ export const opsSave = createServerFn({ method: "POST" })
         }
       }
       if(old.module==="config"&&old.data.storeAppearance)clean.storeAppearance=old.data.storeAppearance;
-      if(old.module==="requests"&&old.data.comboStockIds)throw new Error("El combo entregado se consulta en Entregas");
+      if(old.module==="requests"&&(old.data.comboStockIds||old.data.manualStockId))throw new Error("La entrega registrada se consulta en Entregas");
       const saved=await s.changeRecord(old, { title: data.title, status: data.status, data: clean });
       if(old.module==="requests"&&["completed","cancelled"].includes(saved.status)){
         await s.opsDB().from("orders").update({status:"atendido",attended_at:new Date().toISOString()}).eq("id",saved.id).eq("catalog_id","customer-request");
@@ -129,6 +129,7 @@ export const opsArchive = createServerFn({ method: "POST" })
     const s = await gate(data.code);
     const r = await s.readRecord(data.id);
     if (r.version !== data.version) throw new Error("Actualiza el registro antes de retirarlo");
+    if(r.module==="requests"&&(r.data.comboStockIds||r.data.manualStockId))throw new Error("La entrega y sus movimientos deben conservarse en el historial");
     if (r.module === "clients") {
       const totals = s.totals(await s.walletEntries(r.id));
       if (Math.round(totals.balance * 100) !== 0 || Math.round(totals.debt * 100) !== 0)
