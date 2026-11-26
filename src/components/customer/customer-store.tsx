@@ -32,6 +32,7 @@ import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/comp
 import {useIsMobile} from "@/hooks/use-mobile";
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { Storefront } from "@/components/customer/storefront";
+import { AccessLoading } from "@/components/customer/access-loading";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
@@ -220,12 +221,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
         </Button>
       </main>
     );
-  if (loading || !shop)
-    return (
-      <main className="p-8 text-center" role="status">
-        Abriendo tu tienda…
-      </main>
-    );
+  if (loading || !shop) return <AccessLoading/>;
   const renderClientMenu=()=>data?<nav className="ma2-client-menu space-y-1" aria-label="Panel de cliente"><div className="rounded-2xl bg-card border p-3 mb-4"><div className="flex items-center gap-2"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/15 font-bold text-primary">{data.name.slice(0,1).toUpperCase()}</span><div className="min-w-0"><strong className="block truncate">{data.name}</strong><span className="block truncate text-xs text-muted-foreground">{data.email}</span></div></div><p className="mt-3 text-xs text-muted-foreground">Saldo disponible</p><strong className="text-xl text-primary">{money(data.balance)}</strong></div><p className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mi cuenta</p>{tabs.map(([key,label,Icon])=><button key={key} className={tab===key?"active":""} aria-current={tab===key?"page":undefined} disabled={data.mustChange&&key!=="cuenta"} onClick={()=>{setTab(key);if(key==="tienda"){setSku("");setQuery("");setKind("all");}if(key==="reportes")setReportKind("reports");if(key==="ayuda")setReportKind("questions");setMenu(false);setError("");window.scrollTo({top:0,behavior:"instant"});}}><Icon className="size-4"/>{label}</button>)}<a href={support} target="_blank" rel="noopener noreferrer"><LifeBuoy className="size-4"/> Ayuda por WhatsApp</a>{shop.id&&<a href="/plataforma"><ShoppingBag className="size-4"/>Quiero mi propia tienda</a>}</nav>:null;
   return (
     <main

@@ -206,8 +206,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     setPrefsMap(loadPrefs());
     setClients(loadClients());
     const remembered = getRememberedAdminSession();
-    if (remembered)
-      void adminSessionValidate({ data: { token: remembered } })
+    const accessReady = remembered
+      ? adminSessionValidate({ data: { token: remembered } })
         .then((session) => {
           if (cancelled) return;
           setAdminToken(remembered);
@@ -215,9 +215,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
           setMustChangePassword(session.mustChangePassword);
         })
         .catch(() => {
+          if (cancelled) return;
           rememberAdminSession("");
           clearCode();
-        });
+        })
+      : Promise.resolve();
     void (async () => {
       try {
         const remote = await catalogSyncLoad();
@@ -229,6 +231,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         console.error("No se pudo cargar el catálogo compartido:", error);
         if (!cancelled) setState(local);
       } finally {
+        // A fast catalogue request must not render the customer login while the
+        // remembered administrator session is still being verified.
+        await accessReady;
         if (!cancelled) setHydrated(true);
       }
     })();

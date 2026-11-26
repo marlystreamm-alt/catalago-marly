@@ -26,3 +26,12 @@ test("sign-in shows one form with automatic role routing",async()=>{
  assert.match(portal,/SheetContent side="left"/);
  assert.match(portal,/<SheetTitle>Mi cuenta<\/SheetTitle>/);
 });
+test("initial entry waits for both catalogue and verified session without flashing old workspace",async()=>{
+ const [root,store,portal,loader]=await Promise.all(["src/routes/index.tsx","src/lib/catalog/store.tsx","src/components/customer/customer-store.tsx","src/components/customer/access-loading.tsx"].map(read));
+ assert.match(root,/if \(!hydrated\) return <AccessLoading\/>;\s*if \(hydrated && !isAdmin/);
+ assert.match(store,/const accessReady = remembered\s*\? adminSessionValidate/);
+ assert.match(store,/await accessReady;\s*if \(!cancelled\) setHydrated\(true\)/);
+ assert.match(portal,/if \(loading \|\| !shop\) return <AccessLoading\/>/);
+ assert.match(loader,/role="status"/);
+ assert.doesNotMatch(loader,/Contraseña|Administración|Catálogos/);
+});
