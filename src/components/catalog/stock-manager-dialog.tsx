@@ -3,9 +3,7 @@ import { MASTER_PLANS, masterPlan, masterProduct } from "@/lib/stock/master-prod
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
-import { inventoryLevels, inventoryTone, INVENTORY_DOT_CLASSES, daysRemaining } from '@/lib/stock/traffic-light';
-import { pricingKey, type PriceRow } from '@/lib/customer/pricing';
-import { pricingLoad } from '@/lib/customer/pricing.functions';
+import { daysRemaining } from '@/lib/stock/traffic-light';
 import { ToolFrame } from '@/components/workspace/tool-frame';
 import { GalleryDeliveryImages } from "./platform-gallery-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -145,9 +143,6 @@ export function StockManagerDialog({
   const admin = !ownerToken;
   const can = (key: string) => admin || Boolean(ownerFeatures?.[key]);
   const code = getSavedCode();
-  const [stockPrices,setStockPrices]=useState<PriceRow[]>([]);
-  const [stockGroup,setStockGroup]=useState("");
-  const [stockLevelError,setStockLevelError]=useState(false);
 
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
@@ -205,7 +200,6 @@ export function StockManagerDialog({
         : await stockAdminList({ data: { code } });
       setItems(next);
       if (admin) {
-        try{setStockPrices(await pricingLoad({data:{code}}));setStockLevelError(false);}catch{setStockPrices([]);setStockLevelError(true);}
         const orders = await cyberdocsListOrders({ data: { code } });
         setCyberdocOrders(orders);
       }
@@ -226,7 +220,6 @@ export function StockManagerDialog({
   }, [open, load, admin, whatsappTemplate]);
 
   const daysUntil = (value: string | null) => daysRemaining(value,businessToday());
-  const levels=useMemo(()=>inventoryLevels(items,businessToday(),stockPrices,pricingKey),[items,stockPrices]);
   const availableIds=useMemo(()=>{const parents=new Set(items.map(x=>x.parentStockId));return new Set(items.filter(x=>x.status==="available"&&x.accountType!=="split_parent"&&!parents.has(x.id)&&(!x.expiresOn||x.expiresOn>=businessToday())&&Boolean(x.username&&x.password)).map(x=>x.id));},[items]);
 
   const soldItems = useMemo(() => items.filter((x) => x.status !== "available" && x.status !== "expired"), [items]);
@@ -240,7 +233,6 @@ export function StockManagerDialog({
     let base = [...items];
     if (!admin) base = base.filter((x) => x.status !== "available");
     if (stockTab === "available") base = base.filter((x) => admin?availableIds.has(x.id):x.status==="available");
-    if(stockGroup)base=base.filter(x=>pricingKey(x.platform,x.stockKind,x.durationMonths||1)===stockGroup);
     if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "expired");
     if (stockTab === "expiring")
       base = base.filter((x) => x.status !== "available" && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7 && (daysUntil(x.expiresOn) ?? -1) >= 0);
@@ -254,7 +246,7 @@ export function StockManagerDialog({
         const bd = b.expiresOn ? new Date(b.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
-  }, [items, stockTab, q, admin, stockGroup, availableIds]);
+  }, [items, stockTab, q, admin, availableIds]);
 
   async function persist(item: StockItem, success = "Registro guardado") {
     const saved = ownerToken
@@ -567,41 +559,6 @@ export function StockManagerDialog({
               {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar stock</Button> : null}
             </div>
 
-            {admin && !initialClient && (
-              <section className="space-y-2" aria-label="Disponibilidad por plataforma">
-                {stockLevelError && <p className="text-xs text-muted-foreground">Solo se muestra el inventario conocido.</p>}
-                {busy ? (
-                  <p role="status" className="text-xs text-muted-foreground">Comprobando disponibilidad…</p>
-                ) : (
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {levels.map((product) => {
-                      const tone = inventoryTone(product.available);
-                      const selected = stockGroup === product.key;
-                      const availability = product.available ? `Disponibles: ${product.available}` : "Agotado";
-                      return (
-                        <button key={product.key} type="button" aria-pressed={selected} title={availability}
-                          className={`inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs hover:bg-muted ${selected ? "bg-muted font-semibold" : ""}`}
-                          onClick={() => {
-                            if (selected) {
-                              setStockGroup("");
-                              return;
-                            }
-                            setStockGroup(product.key);
-                            setStockTab("available");
-                            setQ("");
-                          }}>
-                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[tone]}`} />
-                          <span className="break-words">{product.platform} <span className="text-muted-foreground">· {product.kind === "profile" ? "Perfil" : "Completa"} · {product.months} m</span></span>
-                          <span className="sr-only">{availability}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {stockGroup && <Button size="sm" variant="ghost" onClick={() => setStockGroup("")}>Mostrar todas las plataformas</Button>}
-              </section>
-            )}
-
             <div className="flex flex-wrap gap-2">
               {([
                 ["all", "Todos"],
@@ -609,7 +566,7 @@ export function StockManagerDialog({
                 ["sold", "Vendidas"],
                 ["expiring", "Por vencer"],
                 ["expired", "Vencidas / bajas"],
-              ] as [StockTab, string][]).map(([key, label]) => <Button key={key} size="sm" variant={stockTab === key ? "default" : "outline"} onClick={() => {setStockGroup("");setStockTab(key);}}>{label} ({countTab(key)})</Button>)}
+              ] as [StockTab, string][]).map(([key, label]) => <Button key={key} size="sm" variant={stockTab === key ? "default" : "outline"} onClick={() => setStockTab(key)}>{label} ({countTab(key)})</Button>)}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
