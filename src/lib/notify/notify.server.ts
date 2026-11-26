@@ -210,6 +210,9 @@ export async function runPendingReminders() {
   try {
     renewals += await createPaidPurchaseRenewalAlerts(settings);
   } catch (error) { console.error("Alertas de compras con saldo fallaron:", error); }
+  try {
+    renewals += await createStockReviewAlert(settings);
+  } catch (error) { console.error("Aviso de revisión de stock falló:", error); }
 
   return { ok: true, sent, escalated, renewals };
 }
@@ -235,6 +238,35 @@ function daysBetweenDates(from: string, to: string) {
   const fromTime = Date.parse(`${from}T12:00:00Z`);
   const toTime = Date.parse(`${to}T12:00:00Z`);
   return Math.round((toTime - fromTime) / 86_400_000);
+}
+
+async function createStockReviewAlert(settings: NotifySettings) {
+  const today=dateInTimezone(settings.timezone);
+  const db=await admin();
+  const counts=new Map<string,number>();
+  const {opsDB}=await import("@/lib/workspace/operations.server");
+  const {data,error}=await opsDB().from("stock_items").select("platform,stock_kind")
+    .is("business_id",null).or(`expires_on.lte.${today},status.eq.expired`)
+    .in("status",["available","assigned","expiring","expired"]);
+  if(error) throw error;
+  for(const row of data||[]){
+    const label=String(row.platform).trim();
+    counts.set(label,(counts.get(label)||0)+1);
+  }
+  if(!counts.size) return 0;
+  const {purchaseRecordId}=await import("@/lib/customer/purchase-identity.server");
+  const id=purchaseRecordId("notice","stock-review",today);
+  const total=[...counts.values()].reduce((sum,count)=>sum+count,0);
+  const summary=[...counts].map(([name,count])=>`${name} (${count})`).join(", ");
+  const {data:row,error:insertError}=await db.from("orders").upsert({
+    id,catalog_id:`stock-review-${today}`,catalog_name:"Vigencias de inventario",
+    service_name:`${total} registros por revisar`,message:`${summary}. Revisa el acceso y actualiza la vigencia en inventario.`,
+    link:"/?panel=1",recipient:"",status:"atendido",items:[{name:summary,price:0}],
+  },{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
+  if(insertError) throw insertError;
+  if(!row) return 0;
+  await notifyOrder(rowToOrder(row as Row),settings,false,"evento");
+  return 1;
 }
 
 async function createPaidPurchaseRenewalAlerts(settings: NotifySettings) {
@@ -388,10 +420,12 @@ const money = (n: number) =>
   }).format(Number.isFinite(n) ? n : 0);
 
 export function orderTitle(order: CloudOrder, repeat: boolean) {
+  if(order.catalogId.startsWith("stock-review-")) return "MA² · Revisa las cuentas vencidas";
   return repeat ? "Pedido pendiente por atender" : "Tienes un pedido nuevo";
 }
 
 export function orderBody(order: CloudOrder) {
+  if(order.catalogId.startsWith("stock-review-")) return `${order.serviceName}. ${order.message}`;
   const items = order.items?.length ? order.items.map((i) => i.name).join(", ") : order.serviceName;
   return `${order.catalogName}: ${items} · ${money(order.total)}`;
 }
@@ -454,7 +488,7 @@ async function sendPush(order: CloudOrder, repeat: boolean) {
   const payload = JSON.stringify({
     title: orderTitle(order, repeat),
     body: orderBody(order),
-    url: "/?pedidos=1",
+    url: order.catalogId.startsWith("stock-review-") ? "/?panel=1" : "/?pedidos=1",
     tag: `pedido-${order.id}`,
   });
 
@@ -819,6 +853,9 @@ function renderAlexaOrderMessage(template: string, order: CloudOrder, repeat: bo
 }
 
 async function sendAlexa(order: CloudOrder, settings: NotifySettings, repeat: boolean) {
+  if(order.catalogId.startsWith("stock-review-")) {
+    return (await sendAlexaText(`${order.serviceName}. Revisa las cuentas vencidas en MA².`,alexaConfigFromSettings(settings,"order_reminder"))).message;
+  }
   const event: AlexaEventKey = repeat ? "order_reminder" : "order_new";
   if (!settings.alexaEvents[event]) return "Alexa omitida para este tipo de evento";
   const text = renderAlexaOrderMessage(
@@ -888,7 +925,7 @@ export async function sendByChannel(
   if (channel === "push") return sendPush(order, repeat);
   if (channel === "email") return sendEmail(order, settings, repeat);
   if (channel === "whatsapp") return sendWhatsapp(order, settings, repeat);
-  if (channel === "alexa_app") return settings.alexaEvents[repeat ? "order_reminder" : "order_new"] ? (await sendAlexaAppTrigger(settings)).message : "Alexa app omitida para este tipo de evento";
+  if (channel === "alexa_app") return !order.catalogId.startsWith("stock-review-") && settings.alexaEvents[repeat ? "order_reminder" : "order_new"] ? (await sendAlexaAppTrigger(settings)).message : "Alexa app omitida para este tipo de evento";
   return sendAlexa(order, settings, repeat);
 }
 

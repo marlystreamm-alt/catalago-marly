@@ -39,9 +39,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   const assigned = items
     .filter(
       (r) =>
-        !parents.has(r.id) && r.accountType!=="split_parent" &&
-        r.status !== "available" &&
-        (sales || Boolean(r.clientName || r.deliveredOn)) &&
+        (sales ? (!parents.has(r.id) && r.accountType!=="split_parent" && r.status!=="available") :
+          (Boolean(r.clientName || r.deliveredOn) || r.status==="expired" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
         `${r.platform} ${r.clientName} ${r.clientWhatsapp}`
           .toLowerCase()
           .includes(query.toLowerCase()),
@@ -137,7 +136,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 <h3 className="font-bold">{r.platform}</h3>
                 <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{color==="expired"?"Vencido":delta===null?"Sin fecha":delta===0?"Vence hoy":`${delta} día${delta===1?"":"s"}`}</span>
               </div>
-              <p className="text-sm">{r.clientName || "Sin nombre de cliente"} · {r.stockKind==="profile"?"Perfil":"Completa"}</p>
+              <p className="text-sm">{r.clientName || "Sin cliente · revisar acceso en inventario"} · {r.stockKind==="profile"?"Perfil":"Completa"}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {sales
                   ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}`
@@ -156,7 +155,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                     </a>
                   </Button>
                 ) : !sales?<span className="text-xs text-muted-foreground">Sin WhatsApp registrado</span>:null}
-                {!sales ? (
+                {!sales && Boolean(r.clientName || r.deliveredOn) && r.status!=="available" ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -166,7 +165,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                     Marcar avisado
                   </Button>
                 ) : null}
-                {!sales&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
+                {!sales&&Boolean(r.clientName || r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
               </div>
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
             </article>;

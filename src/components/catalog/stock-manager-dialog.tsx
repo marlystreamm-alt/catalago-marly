@@ -85,7 +85,7 @@ const blank = (): StockItem => ({
   clientName: "",
   clientWhatsapp: "",
   status: "available",
-  acquiredOn: null,
+  acquiredOn: businessToday(),
   deliveredOn: null,
   expiresOn: null,
   notes: "",
