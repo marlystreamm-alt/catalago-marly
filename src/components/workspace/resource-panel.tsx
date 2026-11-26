@@ -41,6 +41,7 @@ import {
   opsImportClients,
 } from "@/lib/workspace/operations.functions";
 import { getSavedCode } from "@/lib/notify/client";
+import { customerContactTier } from "@/lib/customer/manage.functions";
 import { copyText } from "@/lib/browser/clipboard";
 export const errorText = (e: unknown) =>
   e instanceof Error ? e.message : "No se pudo completar la operación";
@@ -291,6 +292,19 @@ export function ResourcePanel({
                 ) : null}
                 {module === "clients" ? (
                   <>
+                    {(!r.data.shopId || r.data.shopId === "main") && <label>Tipo de cliente <select
+                      disabled={busy} value={r.priceTier || "retail"}
+                      onChange={async (event)=>{
+                        const tier=event.target.value === "reseller" ? "reseller" : "retail";
+                        setBusy(true);
+                        try {
+                          await customerContactTier({data:{code:getSavedCode(),clientId:r.id,tier}});
+                          await reload();
+                          toast.success("Tipo de cliente guardado");
+                        } catch(e){toast.error(errorText(e));} finally {setBusy(false);}
+                      }}>
+                      <option value="retail">Cliente</option><option value="reseller">Revendedor</option>
+                    </select></label>}
                     {onAssign ? <Button size="sm" disabled={busy || r.status !== "active"} onClick={() => onAssign(r.id)}>Asignar cuenta</Button> : null}
                     <Button size="sm" variant="outline" onClick={() => onWallet?.(r.id)}>
                       Saldo / crédito

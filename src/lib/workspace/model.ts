@@ -20,6 +20,7 @@ export type OpsRecord = {
   title: string;
   status: string;
   data: Payload;
+  priceTier?: "retail" | "reseller";
   version: number;
   createdAt: string;
   updatedAt: string;

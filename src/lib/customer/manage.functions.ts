@@ -80,11 +80,24 @@ export const customerManageLoad = createServerFn({ method: "POST" })
         })),
     };
   });
+export const customerContactTier = createServerFn({method:"POST"})
+  .validator((v:unknown)=>auth.extend({clientId:z.string().uuid(),tier:z.enum(["retail","reseller"])}).parse(v))
+  .handler(async ({data})=>{
+    const ctx=await context(data);
+    if(ctx.business || data.ownerToken) throw new Error("Solo MA² puede cambiar esta tarifa");
+    const contact=await ctx.s.readRecord(data.clientId);
+    if(contact.module!=="clients" || (contact.data.shopId && contact.data.shopId!=="main")) throw new Error("Cliente no disponible");
+    await saveContactTier(ctx,contact.id,data.tier);
+    return {ok:true};
+  });
+async function saveContactTier(ctx:Awaited<ReturnType<typeof context>>,clientId:string,tier:"retail"|"reseller"){
+  const result=await ctx.s.opsDB().from("ma2_ops_records").update({price_tier:tier}).eq("id",clientId).eq("module","clients").is("archived_at",null).select("id").maybeSingle();
+  if(result.error || !result.data) throw new Error("No se pudo guardar el tipo de cliente");
+}
 export const customerManageTier = createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({accountId:z.string().uuid(),tier:z.enum(["retail","reseller"])}).parse(v)).handler(async({data})=>{
   const ctx=await context(data);if(ctx.business||data.ownerToken) throw new Error("Solo MA² puede administrar estas tarifas");
   const a=await account(ctx,data.accountId);
-  const r=await ctx.s.opsDB().from("ma2_customer_accounts").update({price_tier:data.tier}).eq("id",a.id).is("business_id",null).select("id").maybeSingle();
-  if(r.error||!r.data) throw new Error("No se pudo actualizar la categoría");return {ok:true};
+  await saveContactTier(ctx,a.client_id,data.tier);return {ok:true};
 });
 export const customerManageCredit = createServerFn({ method: "POST" })
   .validator((v: unknown) =>

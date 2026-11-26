@@ -27,6 +27,7 @@ export async function decode(row: any): Promise<OpsRecord> {
     title: row.title,
     status: row.status,
     data: await decryptPayload<Payload>(row.payload_cipher),
+    ...(row.module === "clients" ? { priceTier: row.price_tier ?? "retail" } : {}),
     version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
