@@ -49,8 +49,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { copyText } from "@/lib/browser/clipboard";
+import { prepareGalleryImage } from "@/lib/gallery/image";
 import {
   cyberdocsAssignStock,
+  cyberdocsSaveOrderGuide,
   cyberdocsClose,
   cyberdocsExportBackup,
   cyberdocsEditFinalNotes,
@@ -1056,6 +1058,26 @@ export function CyberDocsOrdersDialog({
                           {selected.expiresOn ? <p className="text-xs"><b>Recordatorio:</b> {daysUntilDate(selected.expiresOn) === 0 ? "vence hoy" : (daysUntilDate(selected.expiresOn) ?? 0) < 0 ? `venció hace ${Math.abs(daysUntilDate(selected.expiresOn) ?? 0)} día(s)` : `vence en ${daysUntilDate(selected.expiresOn)} día(s)`} · aviso {selected.renewalWarningDays} día(s) antes{selected.renewalStatus ? ` · ${selected.renewalStatus}` : ""}</p> : null}
                         </div>
                       ) : null}
+
+                      {selected.sourceKey === "web_catalog" && !["rejected", "cancelled"].includes(selected.status) && (
+                        <div className="rounded-xl border p-3 space-y-2">
+                          <Label htmlFor={`guide-${selected.id}`}>Guía de ingreso</Label>
+                          <Input id={`guide-${selected.id}`} type="file" accept="image/*" multiple disabled={busy} onChange={async event => {
+                            const files = Array.from(event.currentTarget.files || []);
+                            event.currentTarget.value = "";
+                            if (!files.length) return;
+                            if (files.length > 2) return toast.error("Selecciona hasta dos imágenes");
+                            setBusy(true);
+                            try {
+                              const images = (await Promise.all(files.map(prepareGalleryImage))).map(file => file.image);
+                              await cyberdocsSaveOrderGuide({data:{ code, orderId:selected.id, images }});
+                              toast.success("Guía guardada para el cliente");
+                            } catch (error) { toast.error(errorText(error)); }
+                            finally { setBusy(false); }
+                          }} />
+                          <p className="text-xs text-muted-foreground">Sube hasta dos capturas. Una nueva selección reemplaza la guía de este pedido.</p>
+                        </div>
+                      )}
 
                       {!terminal(selected) && !selected.protectedDeliveryId && !selected.stockItemId ? (
                         <div className="rounded-xl border p-3">
