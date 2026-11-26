@@ -108,6 +108,18 @@ export const customerLoad = createServerFn({ method: "POST" })
       c.customerRecords(ctx.client.id, !ctx.shop.id),
     ]);
     if (orders.error) throw new Error("No se pudieron cargar tus compras");
+    const webRequestIds = ctx.shop.id ? [] : entries.filter(entry=>entry.kind==="purchase" && entry.note.startsWith("Pedido web por encargo · ")).slice(0,100).map(entry=>entry.request_id);
+    const webOrders = [];
+    if (webRequestIds.length) {
+      const db = s.opsDB();
+      const [requests, fulfillment] = await Promise.all([
+        db.from("orders").select("id, service_name, total, status").eq("catalog_id","store-ma2").in("id",webRequestIds).order("created_at",{ascending:false}),
+        db.from("cyberdocs_orders").select("notification_order_id,status").eq("source_key","web_catalog").in("notification_order_id",webRequestIds),
+      ]);
+      if (requests.error || fulfillment.error) throw new Error("No se pudieron cargar tus pedidos por encargo");
+      const status = new Map((fulfillment.data || []).map(r=>[r.notification_order_id,r.status]));
+      webOrders.push(...(requests.data || []).map(r=>({id:String(r.id),title:String(r.service_name),total:Number(r.total),status:String(status.get(r.id) || (r.status==="atendido"?"completed":"new"))})));
+    }
     const now = Date.now();
     return {
       shop: ctx.shop,
@@ -117,6 +129,7 @@ export const customerLoad = createServerFn({ method: "POST" })
       mustChange: Boolean(ctx.account.must_change),
       ...s.totals(entries),
       entries: entries.slice(0, 100),
+      webOrders,
       orders: orders.data as {
         id: string;
         title: string;

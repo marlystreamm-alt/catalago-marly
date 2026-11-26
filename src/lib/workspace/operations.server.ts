@@ -93,6 +93,7 @@ export async function walletEntries(clientId?: string) {
     id: string;
     client_id: string;
     amount_cents: number;
+    request_id: string;
     kind: string;
     note: string;
     created_at: string;
