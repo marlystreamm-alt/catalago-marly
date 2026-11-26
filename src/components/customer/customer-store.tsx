@@ -27,6 +27,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { StoreNotices } from "@/components/workspace/store-notices";
+import { Storefront } from "@/components/customer/storefront";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
@@ -246,7 +248,6 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          {!shop.id && data && <Button variant="outline" size="sm" asChild><a href={mainStoreLink()}>Tienda web</a></Button>}
           {data ? (
             <>
               <button
@@ -270,6 +271,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     setProducts([]);
                     setPassword("");
                     setError("");
+                    setTab("inicio");
                   })
                 }
               >
@@ -277,13 +279,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 <span className="hidden sm:inline ml-1">Salir</span>
               </Button>
             </>
-          ) : (
-            <Button variant="ghost" size="sm" asChild>
-              <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
-                Ver tienda web
-              </a>
-            </Button>
-          )}
+          ) : null}
         </div>
       </header>
       {!data ? (
@@ -300,6 +296,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               recibir soporte.
             </p>
             <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
+            {!shop.id&&<><div className="rounded-2xl bg-gradient-to-br from-indigo-950 to-cyan-800 p-5 text-white"><p className="text-xs font-bold uppercase tracking-wide text-cyan-200">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-white/90">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p><button type="button" onClick={()=>{setMode("register");setError("");}} className="mt-3 rounded-xl bg-cyan-200 px-4 py-2 font-bold text-slate-900">Crear mi cuenta</button></div><StoreNotices/></>}
             {shop.id&&<a className="text-sm text-primary underline" href="/plataforma">
               ¿Tienes un negocio? Contrata tu propia tienda
             </a>}
@@ -315,6 +312,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 } else await customerSignIn({ data: { slug, email, password } });
                 setPassword("");
                 setConfirmation("");
+                if(!shop.id&&initialView==="cuenta")setTab("inicio");
                 await load();
               });
             }}
@@ -447,6 +445,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 disabled={data.mustChange && key !== "cuenta"}
                 onClick={() => {
                   setTab(key);
+                  if(key==="tienda"){setSku("");setQuery("");setKind("all");}
                   setMenu(false);
                   setError("");
                 }}
@@ -459,10 +458,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               <LifeBuoy className="size-4" />
               Ayuda por WhatsApp
             </a>
-            <a href="/plataforma">
-              <ShoppingBag className="size-4" />
-              Quiero mi propia tienda
-            </a>
+            {shop.id&&<a href="/plataforma"><ShoppingBag className="size-4"/>Quiero mi propia tienda</a>}
           </nav>
           <section className="buyer-content">
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -520,9 +516,10 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   </article>
                 </div>
                 <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
+                {!shop.id&&<><section className="seller-card space-y-3"><h3 className="font-bold text-lg">¿Qué necesitas hoy?</h3><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{([["tienda","Comprar servicios",ShoppingBag],["saldo","Recargar saldo",Wallet],["compras","Mis compras",Package],["reportes","Reportar una falla",LifeBuoy],["movimientos","Mis movimientos",History],["cuenta","Mi perfil",User]] as const).map(([v,label,Icon])=><button key={v} onClick={()=>{setTab(v);if(v==="tienda"){setSku("");setQuery("");}if(v==="reportes"){setReportKind("reports");setReportOrder("");setReportTitle("");setReportMessage("");}}} className="flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center text-sm font-semibold"><Icon className="size-6 text-primary"/>{label}</button>)}</div></section><StoreNotices/></>}
                 <div className="flex justify-between items-center my-5">
                   <h3 className="font-bold">Disponible en la tienda</h3>
-                  <button className="text-sm text-primary" onClick={() => setTab("tienda")}>
+                  <button className="text-sm text-primary" onClick={() => {setSku("");setQuery("");setTab("tienda");}}>
                     Ver todo →
                   </button>
                 </div>
@@ -532,17 +529,18 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   productGrid(products, 4)
                 ) : (
                   <p className="seller-card text-muted-foreground">
-                    Todavía no hay productos listos para compra con saldo. Consulta el catálogo o
+                    Todavía no hay productos listos para compra con saldo. Consulta la tienda o
                     pide ayuda por WhatsApp.
                   </p>
                 )}
               </>
             ) : null}
-            {tab === "tienda" ? (
+            {tab === "tienda" ? (!shop.id&&!sku?<Storefront embedded onSelect={(key,name)=>{setSku(key);setQuery(name);setKind("all");void loadProducts();}}/>:
               <>
                 <p className="mb-4 text-sm text-muted-foreground">
                   {data.priceTier === "reseller" ? "Estás viendo las tarifas de revendedor. Solo aparecen productos con precio de revendedor configurado." : "Precios para cliente normal."} Disponibilidad y precio comprobados al comprar. Recibe tus accesos aquí mismo.
                 </p>
+                {!shop.id&&<Button variant="outline" className="mb-3" onClick={()=>{setSku("");setQuery("");}}>Volver a todos los productos</Button>}
                 <Input
                   aria-label="Buscar producto"
                   placeholder="Buscar plataforma o producto…"
@@ -582,11 +580,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     con saldo.
                   </p>
                 ) : null}
-                <Button variant="outline" className="mt-5" asChild>
-                  <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
-                    Catálogo y pedidos por WhatsApp
-                  </a>
-                </Button>
+                {shop.id&&<Button variant="outline" className="mt-5" asChild><a href={`/${encodeURIComponent(shop.slug)}`}>Catálogo y pedidos por WhatsApp</a></Button>}
               </>
             ) : null}
             {tab === "saldo" ? (

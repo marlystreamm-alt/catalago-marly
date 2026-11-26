@@ -2,8 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 async function tier(){
-  try { const ctx=await (await import("./customer.server")).customerContext("ma2"); return ctx.account.price_tier==="reseller"?"reseller" as const:"retail" as const; }
-  catch { return "retail" as const; }
+  const ctx=await (await import("./customer.server")).customerContext("ma2");
+  if(ctx.account.must_change)throw new Error("Actualiza tu contraseña para continuar");
+  return ctx.account.price_tier==="reseller"?"reseller" as const:"retail" as const;
 }
 export const storefrontLoad=createServerFn({method:"POST"}).handler(async()=>{
   const role=await tier();
