@@ -219,7 +219,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     );
   return (
     <main
-      className="buyer-app seller-app"
+      className="buyer-app seller-app ma2-unified"
       style={appearanceStyle(normalizeAppearance(shop.appearance))}
     >
       <header className="buyer-top">
@@ -237,7 +237,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
           {shop.logoUrl ? (
             <img className="size-10 rounded-full object-cover" src={shop.logoUrl} alt="" />
           ) : (
-            <span className="buyer-logo">MA²</span>
+            <span className="seller-logo">MA²</span>
           )}
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">{data ? data.priceTier === "reseller" ? "MI CUENTA · REVENDEDOR" : "MI CUENTA" : "BIENVENIDO"}</p>
@@ -279,7 +279,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
           ) : (
             <Button variant="ghost" size="sm" asChild>
               <a href={shop.id ? `/${encodeURIComponent(shop.slug)}` : mainStoreLink()}>
-                Ver catálogo
+                Ver tienda web
               </a>
             </Button>
           )}
@@ -299,9 +299,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               recibir soporte.
             </p>
             <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
-            <a className="text-sm text-primary underline" href="/plataforma">
+            {shop.id&&<a className="text-sm text-primary underline" href="/plataforma">
               ¿Tienes un negocio? Contrata tu propia tienda
-            </a>
+            </a>}
           </section>
           <form
             className="seller-card space-y-4"
@@ -318,6 +318,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               });
             }}
           >
+            {!shop.id&&<div className="seller-tabs"><button type="button" className="active">Cliente / revendedor</button><a className="rounded-xl px-3 py-2 font-semibold" href="/?panel=1">Administración</a></div>}
             <div className="seller-tabs">
               <button
                 type="button"

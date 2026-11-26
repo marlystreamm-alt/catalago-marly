@@ -105,6 +105,7 @@ export const opsSave = createServerFn({ method: "POST" })
       if (old.module !== data.module || old.version !== data.version)
         throw new Error("El registro cambió. Actualiza antes de guardar.");
       if (old.data.portalHash) clean.portalHash = old.data.portalHash;
+      if(old.module==="config"&&old.data.storeAppearance)clean.storeAppearance=old.data.storeAppearance;
       return s.changeRecord(old, { title: data.title, status: data.status, data: clean });
     }
     return s.createRecord(data.module, data.title, data.status, clean);

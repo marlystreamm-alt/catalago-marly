@@ -8,7 +8,8 @@ async function tier(){
 export const storefrontLoad=createServerFn({method:"POST"}).handler(async()=>{
   const role=await tier();
   const rows=await (await import("./pricing.server")).listPricing();
-  return {role,products:rows.filter(r=>r.published===true&&(role==="reseller"?r.resellerCents:r.retailCents)!=null).map(r=>({key:r.key,name:r.name,kind:r.kind,months:r.months,priceCents:(role==="reseller"?r.resellerCents:r.retailCents)!,available:r.available,image:r.image||"",description:r.description||""}))};
+  const shop=await (await import("./customer.server")).customerShop("ma2");
+  return {role,appearance:shop.appearance,products:rows.filter(r=>r.published===true&&(role==="reseller"?r.resellerCents:r.retailCents)!=null).map(r=>({key:r.key,name:r.name,kind:r.kind,months:r.months,priceCents:(role==="reseller"?r.resellerCents:r.retailCents)!,available:r.available,image:r.image||"",description:r.description||""}))};
 });
 export const storefrontRequest=createServerFn({method:"POST"}).validator((v:unknown)=>z.object({key:z.string().max(240),name:z.string().trim().min(2).max(120),email:z.string().email().max(160),phone:z.string().regex(/^\+?[0-9 ()-]{10,20}$/),requestId:z.string().uuid()}).parse(v)).handler(async({data})=>{
   const role=await tier(), c=await import("./customer.server");

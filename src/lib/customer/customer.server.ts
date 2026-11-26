@@ -8,13 +8,16 @@ export async function customerShop(slug: string) {
       const digits = String(value || "").replace(/\D/g, "");
       return digits.length >= 10 && !["5500000000", "525500000000", "5215500000000"].includes(digits);
     });
+    const {normalizeAppearance}=await import("@/lib/appearance/theme");
+    let raw:unknown={};try{raw=JSON.parse(cfg?.data.storeAppearance||"{}");}catch{}
+    const appearance=normalizeAppearance(raw);
     return {
       id: null as string | null,
       slug: "ma2",
       name: "MA² · Tienda web",
       whatsapp: String(support || "528443852364"),
-      logoUrl: "",
-      appearance: {},
+      logoUrl: appearance.logoImage,
+      appearance,
     };
   }
   const { data, error } = await opsDB()

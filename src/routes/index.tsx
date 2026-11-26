@@ -1,5 +1,6 @@
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { SellerWorkspace } from "@/components/workspace/seller-workspace";
+import { AdminEntry } from "@/components/customer/admin-entry";
 import { Storefront } from "@/components/customer/storefront";
 import { CustomerStore } from "@/components/customer/customer-store";
 import { BusinessCover } from "@/components/catalog/business-cover";
@@ -66,6 +67,7 @@ import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/
 
 /** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
 const searchSchema = z.object({
+  admin_recovery: fallback(z.coerce.string(), "").default(""),
   panel: fallback(z.coerce.string(), "").default(""),
   cat: fallback(z.string(), "").default(""),
   vista: fallback(z.enum([...MAIN_STORE_VIEWS, ""]), "").default(""),
@@ -499,7 +501,8 @@ function CatalogPage() {
     setFormOpen(true);
   };
 
-  if (hydrated && !isAdmin && !isClient && !search.cat && !search.panel) return <Storefront/>;
+  if (hydrated && !isAdmin && search.panel && search.admin_recovery!=="1") return <AdminEntry/>;
+  if (hydrated && !isAdmin && !search.panel) return <Storefront/>;
   if (isAdmin && homeView) return <SellerWorkspace onCatalog={(id) => { if (id) setCatalogId(id); setHomeView(false); }} />;
 
   return (
