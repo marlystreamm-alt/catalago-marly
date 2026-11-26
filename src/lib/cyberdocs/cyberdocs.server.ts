@@ -557,12 +557,13 @@ export async function createManualDeliveryForOrder(input: {
   notes: string;
   attachment: { name: string; type: string; dataUrl: string } | null;
   actor?: string;
+  prepareOnly?: boolean;
 }) {
   const actor = input.actor || "Administradora";
   const order = await getCyberDocsOrder(input.orderId);
   if (order.protectedDeliveryId) {
     if (order.stockItemId) throw new Error("Este pedido ya tiene una cuenta de stock asignada");
-    return savedDeliveryResult(order, actor);
+    return savedDeliveryResult(order, actor, input.prepareOnly);
   }
   ensureEditable(order);
   if (order.stockItemId) throw new Error("Este pedido ya tiene una cuenta de stock asignada");
@@ -602,7 +603,7 @@ export async function createManualDeliveryForOrder(input: {
 
   const linked = await linkSavedDelivery(order.id, inserted.id, null, actor,
     `Entrega manual ${input.deliveryType} creada ${input.withPassword ? "con contraseña" : "sin contraseña"}`);
-  return savedDeliveryResult(linked, actor);
+  return savedDeliveryResult(linked, actor, input.prepareOnly);
 
 }
 
