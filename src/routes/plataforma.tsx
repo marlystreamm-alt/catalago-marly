@@ -4,6 +4,7 @@ import { Store, Package, Users, Wallet, Palette, ShieldCheck } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { salesGetPublicConfig } from "@/lib/sales/sales.functions";
 import { money } from "@/lib/workspace/model";
+import { mainStoreLink } from "@/lib/catalog/links";
 export const Route = createFileRoute("/plataforma")({
   head: () => ({
     meta: [
@@ -65,7 +66,7 @@ function Platform() {
               <a href="/acceso">Ya tengo una tienda</a>
             </Button>
             <Button variant="ghost" asChild>
-              <a href="/?cat=clientes">Soy comprador</a>
+              <a href={mainStoreLink("inicio")}>Volver a mi cuenta de comprador</a>
             </Button>
           </div>
         </nav>
@@ -79,6 +80,9 @@ function Platform() {
           <p className="text-muted-foreground my-6 text-lg">
             Contrata tu tienda digital por mensualidad. Personalízala y entrega a tus compradores un
             espacio propio para comprar, consultar sus accesos y recibir soporte.
+          </p>
+          <p className="mb-6 text-sm text-muted-foreground">
+            ¿Ya compras cuentas con MA²? Puedes solicitar tu tienda aquí y seguir usando tu cuenta de comprador.
           </p>
           <div className="flex justify-center flex-wrap gap-3">
             <Button size="lg" asChild>
