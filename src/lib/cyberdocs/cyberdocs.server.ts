@@ -10,7 +10,7 @@ import type {
   TelegramOrderBot,
 } from "./types";
 import { normalizeTelegramUsername, parseCyberDocsMessage } from "./parser";
-import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
+import { businessToday, expiresAfterMonths, orderSubscriptionMonths } from "@/lib/stock/duration";
 
 type Row = Record<string, unknown>;
 // Los tipos generados de v20.10 no incluyen aún la migración v20.11.
@@ -695,12 +695,19 @@ export async function finalizeCyberDocsOrder(
     const { error: stockDateError } = await db.from("stock_items").update({ delivered_on: before.deliveredOn || deliveredOn }).eq("id", completed.stockItemId).eq("related_order_id", completed.id);
     if (stockDateError) throw new Error("Pedido finalizado; no se pudo actualizar la fecha del stock.");
   }
-  if (completed.stockItemId && !completed.expiresOn) {
-    const { data: stock, error: stockError } = await db.from("stock_items").select("expires_on").eq("id", completed.stockItemId).maybeSingle();
-    if (stockError) throw new Error("Pedido finalizado; no se pudo consultar la vigencia del stock.");
-    if (stock?.expires_on) {
-      const { error: expiryError } = await db.from("cyberdocs_orders").update({ expires_on: stock.expires_on }).eq("id", completed.id).is("expires_on", null).eq("status", "completed");
-      if (expiryError) throw new Error("Pedido finalizado; no se pudo guardar la vigencia del stock.");
+  if (!completed.expiresOn) {
+    let expiry: string | null = null;
+    if (completed.stockItemId) {
+      const { data: stock, error: stockError } = await db.from("stock_items").select("expires_on,duration_months").eq("id", completed.stockItemId).maybeSingle();
+      if (stockError) throw new Error("Pedido finalizado; no se pudo consultar la vigencia del stock.");
+      if (stock) expiry = stock.expires_on || expiresAfterMonths(before.deliveredOn || deliveredOn, Number(stock.duration_months) || 1);
+    } else {
+      const months = orderSubscriptionMonths(completed.serviceName);
+      if (months) expiry = expiresAfterMonths(before.deliveredOn || deliveredOn, months);
+    }
+    if (expiry) {
+      const { error: expiryError } = await db.from("cyberdocs_orders").update({ expires_on: expiry }).eq("id", completed.id).is("expires_on", null).eq("status", "completed");
+      if (expiryError) throw new Error("Pedido finalizado; no se pudo guardar el vencimiento automático.");
     }
   }
   if (completed.whatsapp && completed.clientName) {
