@@ -5,7 +5,6 @@ import {
   Archive,
   Bot,
   CalendarDays,
-  CheckCircle2,
   ClipboardList,
   Copy,
   Database,
@@ -544,8 +543,12 @@ export function CyberDocsOrdersDialog({
     if (!confirm("¿Confirmas que ya entregaste los datos al cliente? Se guardará la fecha y se cerrará el aviso.")) return;
     setBusy(true);
     try {
-      replaceOrder(await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: selected.id } }));
-      toast.success("Pedido finalizado con el documento guardado");
+      const order = await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: selected.id } });
+      replaceOrder(order);
+      if (order.status === "completed") {
+        toast.success("Pedido finalizado con el documento guardado");
+        onStageChange?.(order.id, "deliveries");
+      }
       await refresh();
     } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
   };
@@ -564,10 +567,12 @@ export function CyberDocsOrdersDialog({
       return;
     setBusy(true);
     try {
-      replaceOrder(
-        await cyberdocsFinalize({ data: { code: pin, orderId: selected.id, pin, confirm: true, notes } }),
-      );
-      toast.success("Pedido finalizado manualmente");
+      const order = await cyberdocsFinalize({ data: { code: pin, orderId: selected.id, pin, confirm: true, notes } });
+      replaceOrder(order);
+      if (order.status === "completed") {
+        toast.success("Pedido finalizado");
+        onStageChange?.(order.id, "deliveries");
+      }
       await refresh();
     } catch (error) {
       toast.error(errorText(error));
@@ -1004,7 +1009,13 @@ export function CyberDocsOrdersDialog({
 
                   {expanded && selected ? (
                     <div className="grid gap-3 border-t p-3 sm:p-4">
-                      <div className="flex justify-end">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {!terminal(selected) && (
+                          <Button type="button" size="sm" className="mr-auto" disabled={busy}
+                            onClick={() => void (selected.protectedDeliveryId ? retryCompletion() : finalize())}>
+                            <PackageCheck className="mr-1 size-4" /> Finalizar pedido
+                          </Button>
+                        )}
                         <Button type="button" variant="ghost" size="icon" aria-label="Cerrar detalle del pedido" title="Cerrar detalle" onClick={() => setSelectedId(null)}>
                           <X className="size-4" />
                         </Button>
@@ -1164,7 +1175,6 @@ export function CyberDocsOrdersDialog({
                             </>
                           ) : null}
                           <div className="mt-2 flex flex-wrap gap-2">
-                            {selected.protectedDeliveryId && !terminal(selected) ? <Button size="sm" onClick={() => void retryCompletion()} disabled={busy}><CheckCircle2 className="mr-1 size-4" />Confirmar entrega</Button> : null}
                             {selected.stockItemId && !terminal(selected) ? <Button size="sm" variant="outline" onClick={() => void release()}><RotateCcw className="mr-1 size-4" />Liberar cuenta</Button> : null}
                             {selected.status === "completed" ? <>
                               {selected.protectedDeliveryId ? <Button size="sm" variant="outline" onClick={async () => { try { const r = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } }); window.open(`${window.location.origin}/e/${r.id}?t=${encodeURIComponent(r.token)}`, "_blank", "noopener,noreferrer"); } catch (e) { toast.error(errorText(e)); } }}><Link2 className="mr-1 size-4" />Abrir página</Button> : null}
@@ -1177,7 +1187,6 @@ export function CyberDocsOrdersDialog({
 
                       {!terminal(selected) ? (
                         <div className="grid gap-2 border-t pt-3 sm:flex sm:flex-wrap">
-                          <Button className="w-full sm:w-auto" onClick={() => void finalize()} disabled={busy}><PackageCheck className="mr-1 size-4" />Finalizar manualmente</Button>
                           <Button className="w-full sm:w-auto" variant="outline" onClick={() => void closeOrder("rejected")}>Rechazar</Button>
                           <Button className="w-full text-destructive sm:w-auto" variant="ghost" onClick={() => void closeOrder("cancelled")}>Cancelar</Button>
                         </div>
