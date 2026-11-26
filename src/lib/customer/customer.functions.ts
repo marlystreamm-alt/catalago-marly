@@ -154,6 +154,8 @@ export const customerLoad = createServerFn({ method: "POST" })
           message: r.data.message || "",
           reply: r.data.reply || "",
           deliveryUrl: r.data.deliveryUrl || "",
+          orderId: r.data.orderId || "",
+          purchaseTitle: r.data.purchaseTitle || "",
           value: r.module === "codes" ? r.data.value || "" : "",
           expiresAt: r.data.expiresAt || "",
         })),
@@ -339,6 +341,7 @@ export const customerSubmit = createServerFn({ method: "POST" })
         title: z.string().trim().min(2).max(160),
         message: z.string().trim().min(2).max(2000),
         orderId: z.string().uuid().optional(),
+        evidence: z.string().max(1_800_000).regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/).optional(),
       })
       .parse(v),
   )
@@ -346,15 +349,25 @@ export const customerSubmit = createServerFn({ method: "POST" })
     const c = await server(),
       ctx = await c.customerContext(data.slug),
       s = await ops();
+    let purchaseTitle = "";
     if (data.orderId) {
-      const o = await s
-        .opsDB()
-        .from("ma2_customer_orders")
-        .select("id")
-        .eq("id", data.orderId)
-        .eq("client_id", ctx.client.id)
-        .maybeSingle();
-      if (o.error || !o.data) throw new Error("Selecciona una compra de tu cuenta");
+      const db = s.opsDB();
+      const o = await db.from("ma2_customer_orders").select("title")
+        .eq("id", data.orderId).eq("client_id", ctx.client.id).maybeSingle();
+      if (o.error) throw new Error("No se pudo comprobar la compra");
+      if (o.data) purchaseTitle = String(o.data.title);
+      else if (!ctx.shop.id) {
+        const payment = await db.from("ma2_wallet_entries").select("note")
+          .eq("request_id", data.orderId).eq("client_id", ctx.client.id).eq("kind","purchase").maybeSingle();
+        if (payment.error) throw new Error("No se pudo comprobar el pago de la compra");
+        if (payment.data?.note.startsWith("Pedido web por encargo · ")) {
+          const request = await db.from("orders").select("service_name,status")
+            .eq("id",data.orderId).eq("catalog_id","store-ma2").maybeSingle();
+          if (request.error) throw new Error("No se pudo consultar el pedido");
+          if (request.data) purchaseTitle = String(request.data.service_name);
+        }
+      }
+      if (!purchaseTitle) throw new Error("Selecciona una compra de tu cuenta");
     }
     const records = await c.customerRecords(ctx.client.id);
     if (records.filter((r) => r.module === data.module && r.status === "pending").length >= 20)
@@ -365,6 +378,9 @@ export const customerSubmit = createServerFn({ method: "POST" })
       message: data.message,
       ...(data.module==="requests"?{platform:data.title}:{}),
       orderId: data.orderId || "",
+      purchaseTitle,
+      ...(data.module === "reports" ? { platform: purchaseTitle || data.title } : {}),
+      ...(data.module === "reports" && data.evidence ? { attachment: data.evidence, filename: "captura-de-falla.jpg", filetype: "image/jpeg" } : {}),
     });
     if(data.module==="requests"&&!ctx.shop.id){
       try{

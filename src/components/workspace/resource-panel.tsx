@@ -97,7 +97,7 @@ export function ResourcePanel({
 }) {
   const def = DEFINITIONS[module];
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(module === "reports" ? "pending" : "all");
   const [editing, setEditing] = useState<OpsRecord | null>(null);
   const [opened, setOpened] = useState(false);
   const [title, setTitle] = useState("");
@@ -112,8 +112,8 @@ export function ResourcePanel({
       records.filter(
         (r) =>
           r.module === module &&
-          (filter === "all" || r.status === filter) &&
-          `${r.title} ${Object.values(r.data).join(" ")}`
+          (filter === "all" || r.status === filter || (module === "reports" && filter === "pending" && r.status === "in_progress")) &&
+          `${r.title} ${records.find(c=>c.module==="clients" && c.id===r.data.clientId)?.title || ""} ${Object.values(r.data).join(" ")}`
             .toLowerCase()
             .includes(query.toLowerCase()),
       ),
@@ -133,7 +133,7 @@ export function ResourcePanel({
       setEditing(full);
       setTitle(full.title);
       setStatus(full.status);
-      setPayload(full.data);
+      setPayload(module === "reports" && !full.data.platform ? { ...full.data, platform: full.title } : full.data);
       setOpened(true);
     } catch (e) {
       toast.error(errorText(e));
@@ -143,6 +143,10 @@ export function ResourcePanel({
   };
   return (
     <div className="space-y-4">
+      {module === "reports" && <div className="grid grid-cols-2 gap-3">
+        <div className="seller-card"><p className="text-sm text-muted-foreground">Pendientes</p><strong>{records.filter(r=>r.module==="reports" && r.status!=="resolved").length}</strong></div>
+        <div className="seller-card"><p className="text-sm text-muted-foreground">Resueltos</p><strong>{records.filter(r=>r.module==="reports" && r.status==="resolved").length}</strong></div>
+      </div>}
       <div className="seller-actions">
         <Button onClick={fresh}>
           <Plus className="size-4" />
@@ -203,7 +207,10 @@ export function ResourcePanel({
           placeholder="Buscar por nombre, plataforma o cliente…"
         />
       </div>
-      <div className="seller-tabs">
+      {module === "reports" ? <div className="seller-tabs">
+        <button type="button" aria-pressed={filter === "pending"} className={filter === "pending" ? "active" : ""} onClick={()=>setFilter("pending")}>Pendientes</button>
+        <button type="button" aria-pressed={filter === "resolved"} className={filter === "resolved" ? "active" : ""} onClick={()=>setFilter("resolved")}>Resueltos</button>
+      </div> : <div className="seller-tabs">
         <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
           Todos ({records.filter((r) => r.module === module).length})
         </button>
@@ -212,7 +219,7 @@ export function ResourcePanel({
             {STATUS[s]}
           </button>
         ))}
-      </div>
+      </div>}
       {!rows.length ? (
         <EmptyState
           icon={def.icon}
@@ -232,6 +239,7 @@ export function ResourcePanel({
                   {STATUS[r.status] || r.status}
                 </span>
               </div>
+              {module === "reports" && <p className="mt-2 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString("es-MX")}{r.data.orderId ? ` · Folio de compra ${r.data.orderId.slice(0,8)}` : ""}</p>}
               {module === "clients" ? (
                 <div className="my-3 grid grid-cols-2 gap-2">
                   <div className="seller-mini-stat">
@@ -408,6 +416,17 @@ export function ResourcePanel({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </label>
+            {module === "reports" && <label className="seller-field">
+              <span>Respuesta rápida</span>
+              <select className="buyer-select" value="" onChange={event=>{
+                if (event.target.value) setPayload(p=>({...p,reply:event.target.value}));
+              }}>
+                <option value="">Elige una respuesta para editarla</option>
+                <option>Recibimos tu reporte. Estamos revisando el acceso y te avisaremos aquí.</option>
+                <option>Revisa los datos de acceso y sigue los pasos de la guía en Mis compras.</option>
+                <option>Ya revisamos el acceso. Intenta ingresar nuevamente y avísanos si la falla continúa.</option>
+              </select>
+            </label>}
             {def.fields.map((f) => (
               <label className="seller-field" key={f.key}>
                 <span>

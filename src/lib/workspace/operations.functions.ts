@@ -105,6 +105,14 @@ export const opsSave = createServerFn({ method: "POST" })
       if (old.module !== data.module || old.version !== data.version)
         throw new Error("El registro cambió. Actualiza antes de guardar.");
       if (old.data.portalHash) clean.portalHash = old.data.portalHash;
+      if (old.module === "reports") {
+        if (old.data.shopId) clean.shopId = old.data.shopId;
+        if (old.data.orderId) {
+          clean.orderId = old.data.orderId;
+          clean.purchaseTitle = old.data.purchaseTitle || old.data.platform || "";
+          clean.clientId = old.data.clientId;
+        }
+      }
       if(old.module==="config"&&old.data.storeAppearance)clean.storeAppearance=old.data.storeAppearance;
       if(old.module==="requests"&&old.data.comboStockIds)throw new Error("El combo entregado se consulta en Entregas");
       const saved=await s.changeRecord(old, { title: data.title, status: data.status, data: clean });
