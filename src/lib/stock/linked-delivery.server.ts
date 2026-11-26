@@ -7,6 +7,7 @@ export interface LinkedStockDelivery {
   expiresAt: string;
   maxViews: number | null;
   notes: string;
+  clientWhatsapp?: string;
   stockExpiresOn: string | null;
   salePrice: number;
   attachment: DeliveryAttachment | null;
@@ -19,7 +20,7 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
   const deliveries = await import("@/lib/deliveries/deliveries.server");
   const reference = input.relatedOrderId.trim();
   // Resolve against the authorized administrator's orders, never a client catalog.
-  const order = (await orders.listCyberDocsOrders()).find(
+  let order = (await orders.listCyberDocsOrders()).find(
     (row) => row.id === reference,
   );
   if (!order) throw new Error("No se encontró el pedido de Cyberdoc seleccionado");
@@ -28,6 +29,13 @@ export async function deliverLinkedOrder(input: LinkedStockDelivery) {
   }
   if (order.stockItemId && order.stockItemId !== input.itemId) {
     throw new Error("Este pedido ya tiene otra cuenta asignada");
+  }
+  if(!order.protectedDeliveryId && input.clientWhatsapp){
+    const {phoneNumber,validWhatsApp}=await import("@/lib/workspace/model");
+    const existingPhone=order.whatsapp || (order.contactLabel==="WhatsApp"?order.contactValue:"");
+    if(validWhatsApp(input.clientWhatsapp) && phoneNumber(input.clientWhatsapp)!==phoneNumber(existingPhone)){
+      order=await orders.updateOrderWhatsApp(order.id,phoneNumber(input.clientWhatsapp));
+    }
   }
 
   let deliveryId = order.protectedDeliveryId;

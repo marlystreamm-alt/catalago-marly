@@ -224,6 +224,9 @@ export const customerManageReply = createServerFn({ method: "POST" })
     if (a.error || !a.data || r.version !== data.version)
       throw new Error("Solicitud no disponible o modificada");
     await ctx.s.changeRecord(r, { status: data.status, data: { ...r.data, reply: data.reply } });
+    if(!ctx.business && ((r.module==="reports" && data.status==="resolved") || (r.module==="requests" && ["completed","cancelled"].includes(data.status)))){
+      await ctx.s.opsDB().from("orders").update({status:"atendido",attended_at:new Date().toISOString()}).eq("id",r.id).eq("catalog_id",r.module==="reports"?"customer-report":"customer-request");
+    }
     return { ok: true };
   });
 export const customerManageActive = createServerFn({ method: "POST" })

@@ -105,6 +105,7 @@ export const opsSave = createServerFn({ method: "POST" })
       if (old.module !== data.module || old.version !== data.version)
         throw new Error("El registro cambió. Actualiza antes de guardar.");
       if (old.data.portalHash) clean.portalHash = old.data.portalHash;
+      if(old.module==="clients" && old.data.shopId)clean.shopId=old.data.shopId;
       if (old.module === "reports") {
         if (old.data.shopId) clean.shopId = old.data.shopId;
         if (old.data.orderId) {
@@ -118,6 +119,9 @@ export const opsSave = createServerFn({ method: "POST" })
       const saved=await s.changeRecord(old, { title: data.title, status: data.status, data: clean });
       if(old.module==="requests"&&["completed","cancelled"].includes(saved.status)){
         await s.opsDB().from("orders").update({status:"atendido",attended_at:new Date().toISOString()}).eq("id",saved.id).eq("catalog_id","customer-request");
+      }
+      if(old.module==="reports"&&saved.status==="resolved"){
+        await s.opsDB().from("orders").update({status:"atendido",attended_at:new Date().toISOString()}).eq("id",saved.id).eq("catalog_id","customer-report");
       }
       return saved;
     }

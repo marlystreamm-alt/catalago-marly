@@ -420,11 +420,13 @@ const money = (n: number) =>
   }).format(Number.isFinite(n) ? n : 0);
 
 export function orderTitle(order: CloudOrder, repeat: boolean) {
+  if(order.catalogId==="customer-report")return repeat?"Reporte pendiente de atención":"MA² · Nuevo reporte de cliente";
   if(order.catalogId.startsWith("stock-review-")) return "MA² · Revisa las cuentas vencidas";
   return repeat ? "Pedido pendiente por atender" : "Tienes un pedido nuevo";
 }
 
 export function orderBody(order: CloudOrder) {
+  if(order.catalogId==="customer-report")return order.serviceName+". "+order.message;
   if(order.catalogId.startsWith("stock-review-")) return `${order.serviceName}. ${order.message}`;
   const items = order.items?.length ? order.items.map((i) => i.name).join(", ") : order.serviceName;
   return `${order.catalogName}: ${items} · ${money(order.total)}`;
@@ -488,7 +490,7 @@ async function sendPush(order: CloudOrder, repeat: boolean) {
   const payload = JSON.stringify({
     title: orderTitle(order, repeat),
     body: orderBody(order),
-    url: order.catalogId.startsWith("stock-review-") ? "/?panel=1" : "/?pedidos=1",
+    url: order.catalogId.startsWith("stock-review-") || order.catalogId==="customer-report" ? "/?panel=1" : "/?pedidos=1",
     tag: `pedido-${order.id}`,
   });
 

@@ -242,7 +242,7 @@ export function validatePayload(module: Module, data: Payload) {
     )
       throw new Error(`Revisa ${field.label}`);
   }
-  if (module === "clients" && !/^\+?[\d ()-]{10,25}$/.test(data.whatsapp || ""))
+  if (module === "clients" && !validWhatsApp(data.whatsapp || ""))
     throw new Error("Escribe el WhatsApp con lada");
   if(module==="config"){
     const red=Number(data.renewalRedDays||3),yellow=Number(data.renewalYellowDays||7);
@@ -272,4 +272,7 @@ export function phoneNumber(value: string) {
   if (digits.length === 10) digits = "52" + digits;
   if (digits.startsWith("521") && digits.length === 13) digits = "52" + digits.slice(3);
   return digits;
+}
+export function validWhatsApp(value:string){
+  return /^\+?[\d\s()-]{10,25}$/.test(value.trim()) && /^\d{11,15}$/.test(phoneNumber(value));
 }

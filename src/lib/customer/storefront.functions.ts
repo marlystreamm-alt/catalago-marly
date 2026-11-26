@@ -16,6 +16,8 @@ export const storefrontRequest=createServerFn({method:"POST"}).validator((v:unkn
   const c = await import("./customer.server");
   const ctx = await c.customerContext("ma2");
   if (ctx.account.must_change) throw new Error("Actualiza tu contraseña para continuar");
+  const {validWhatsApp,phoneNumber}=await import("@/lib/workspace/model");
+  if(!validWhatsApp(data.phone))throw new Error("Escribe un WhatsApp válido con lada");
   const role = ctx.account.price_tier === "reseller" ? "reseller" : "retail";
   await c.customerThrottle("store-manual",data.phone.replace(/\D/g,""),8);
   const {purchaseRecordId}=await import("./purchase-identity.server");
@@ -24,7 +26,7 @@ export const storefrontRequest=createServerFn({method:"POST"}).validator((v:unkn
   const id=purchaseRecordId("public-order",data.requestId,ctx.client.id);
   const {data:created,error}=await db.rpc("ma2_buy_on_request", {
     p_id:id,p_client:ctx.client.id,p_product:data.key,p_tier:role,
-    p_name:data.name,p_email:data.email,p_phone:data.phone,
+    p_name:data.name,p_email:data.email,p_phone:phoneNumber(data.phone),
   });
   if(error)throw new Error(error.message);
   if(created){

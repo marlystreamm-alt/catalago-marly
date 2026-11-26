@@ -20,6 +20,7 @@ export const comboAssign=createServerFn({method:"POST"}).validator((v:unknown)=>
  const ops=await import("@/lib/workspace/operations.server"),ds=await import("@/lib/deliveries/deliveries.server"),db=ops.opsDB();
  const client=await ops.readRecord(data.clientId);
  if(client.module!=="clients"||client.status!=="active"||(client.data.shopId&&client.data.shopId!=="main"))throw new Error("Cliente no disponible");
+ if(!(await import("@/lib/workspace/model")).validWhatsApp(client.data.whatsapp||""))throw new Error("Actualiza el WhatsApp del cliente antes de entregar el combo.");
  const ids=data.items.map(i=>i.id).sort();
  if(new Set(ids).size!==ids.length)throw new Error("No repitas una cuenta");
  const existing=await ops.readRecord(data.requestId).catch(()=>null);

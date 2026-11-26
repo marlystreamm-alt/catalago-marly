@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { stockAdminList, stockAdminRenewal } from "@/lib/stock/stock.functions";
+import { stockAdminList, stockAdminRenewal, stockAdminReactivate } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
 import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
@@ -20,6 +20,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   const [days, setDays] = useState("all");
   const [renewing,setRenewing]=useState<StockItem|null>(null);
   const [newDate,setNewDate]=useState("");
+  const [reactivating,setReactivating]=useState(false);
   const load = async () => {
     setBusy(true);
     setError("");
@@ -52,7 +53,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
   const saveRenewal=async(r:StockItem,date?:string)=>{
     setBusy(true);
-    try{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});setRenewing(null);await load();onChanged?.();toast.success(date?"Renovación guardada":"Marcado como avisado");}
+    try{if(reactivating&&date){await stockAdminReactivate({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}else{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}setRenewing(null);setReactivating(false);await load();onChanged?.();toast.success(reactivating?"Cuenta reactivada":date?"Renovación guardada":"Marcado como avisado");}
     catch(e){toast.error(errorText(e));}finally{setBusy(false);}
   };
   return (
@@ -165,7 +166,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                     Marcar avisado
                   </Button>
                 ) : null}
-                {!sales&&Boolean(r.clientName || r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
+                {!sales&&Boolean(r.clientName || r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setReactivating(false);setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
+                {!sales&&!r.clientName&&!r.deliveredOn&&!r.relatedOrderId&&!r.protectedDeliveryId&&!parents.has(r.id)&&r.accountType!=="split_parent"&&["available","expired"].includes(r.status)&&(r.status==="expired"||Boolean(r.expiresOn&&r.expiresOn<=today))&&<Button size="sm" disabled={busy} onClick={()=>{setReactivating(true);setRenewing(r);setNewDate(expiresAfterMonths(today,r.durationMonths||1));}}>Verifiqué acceso · Reactivar</Button>}
               </div>
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
             </article>;

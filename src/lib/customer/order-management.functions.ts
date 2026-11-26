@@ -15,7 +15,7 @@ export const webOrderList = createServerFn({ method: "POST" }).validator((v: unk
   const db = ops.opsDB();
   const [paid, requests, imported, clients] = await Promise.all([
     db.from("ma2_customer_orders").select("id,client_id,title,amount_cents,expires_on,created_at").is("business_id", null).order("created_at", { ascending: false }).limit(250),
-    db.from("orders").select("*").not("catalog_id", "like", "telegram-%").not("catalog_id", "like", "renewal-%").neq("catalog_id", "wallet-main").neq("catalog_id","customer-request").order("created_at", { ascending: false }).limit(250),
+    db.from("orders").select("*").not("catalog_id", "like", "telegram-%").not("catalog_id", "like", "renewal-%").not("catalog_id","like","stock-review-%").neq("catalog_id", "wallet-main").neq("catalog_id","customer-request").neq("catalog_id","customer-report").order("created_at", { ascending: false }).limit(250),
     db.from("cyberdocs_orders").select("id,notification_order_id,status").eq("source_key", "web_catalog"),
     ops.readRecords("clients"),
   ]);

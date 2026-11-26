@@ -11,6 +11,8 @@ export async function deliverManualWithWallet(input:Input){
  if(!clientId)throw new Error("Selecciona un cliente o registra su nombre y WhatsApp válido.");
  const client=await ops.readRecord(clientId);
  if(client.module!=="clients"||client.status!=="active"||(client.data.shopId&&client.data.shopId!=="main"))throw new Error("Cliente no disponible");
+ const {normalizedClientPhone}=await import("@/lib/customer/remember-client.server");
+ if(!normalizedClientPhone(client.data.whatsapp||""))throw new Error("Actualiza el WhatsApp del cliente antes de entregar.");
  const item=(await (await import("./stock.server")).listStock(null)).find(x=>x.id===input.itemId);
  if(!item)throw new Error("Registro no encontrado");
  const saved=async()=>{

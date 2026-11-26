@@ -41,6 +41,23 @@ export async function updateMainRenewal(id:string,version:string,expiresOn?:stri
  return {ok:true as const};
 }
 
+/** Return an unsold expired unit to inventory after the administrator verifies access. */
+export async function reactivateUnsoldStock(id:string,version:string,expiresOn:string){
+  const db=await admin();
+  const today=businessToday();
+  const date=new Date(expiresOn+"T12:00:00Z");
+  if(Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==expiresOn||expiresOn<=today) throw new Error("Indica una vigencia futura");
+  const row=await db.from("stock_items").select("id,status,account_type,client_name,delivered_on,related_order_id,protected_delivery_id,expires_on,updated_at").eq("id",id).is("business_id",null).maybeSingle();
+  if(row.error||!row.data||row.data.updated_at!==version||!["available","expired"].includes(row.data.status)||row.data.account_type==="split_parent"||row.data.client_name||row.data.delivered_on||row.data.related_order_id||row.data.protected_delivery_id||!(row.data.status==="expired"||row.data.expires_on&&row.data.expires_on<=today))
+    throw new Error("La cuenta cambió o tiene una entrega vinculada. Revisa el inventario.");
+  const children=await db.from("stock_items").select("id").eq("parent_stock_id",id).limit(1);
+  if(children.error||children.data?.length)throw new Error("Esta cuenta contiene perfiles. Revisa sus vigencias individuales.");
+  const result=await db.from("stock_items").update({status:"available",expires_on:expiresOn,updated_at:new Date().toISOString(),renewal_status:"Acceso verificado",renewal_notified_at:null}).eq("id",id).eq("updated_at",version).is("business_id",null).select("id").maybeSingle();
+  if(result.error||!result.data)throw new Error("La cuenta cambió. Actualiza e inténtalo de nuevo.");
+  await logStockHistory(id,null,"reactivado",`Acceso verificado · vence ${expiresOn}`);
+  return {ok:true};
+}
+
 export async function logStockHistory(stockId:string,businessId:string|null,action:string,detail:string){
  const db=await admin(); const {error}=await db.from("stock_history").insert({stock_id:stockId,business_id:businessId,action,detail}); if(error) throw new Error(error.message);
 }

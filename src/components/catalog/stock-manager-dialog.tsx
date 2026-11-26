@@ -1,4 +1,8 @@
 import { opsLoad } from "@/lib/workspace/operations.functions";
+import { ContactPhoneInput } from "@/components/workspace/contact-phone-input";
+import { phoneNumber, validWhatsApp } from "@/lib/workspace/model";
+import { pricingLoad } from "@/lib/customer/pricing.functions";
+import { pricingKey, type PriceRow } from "@/lib/customer/pricing";
 import { MASTER_PLANS, masterPlan, masterProduct } from "@/lib/stock/master-products";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
@@ -172,21 +176,42 @@ export function StockManagerDialog({
   const [deliver, setDeliver] = useState<StockItem | null>(null);
   const [deliveryResult, setDeliveryResult] = useState<{link:string; text:string; phone:string; item:StockItem; password:string; ficha:string} | null>(null);
   const [deliverClient, setDeliverClient] = useState("");
-  const [registeredClients, setRegisteredClients] = useState<{id:string; name:string; whatsapp:string}[]>([]);
+  const [registeredClients, setRegisteredClients] = useState<{id:string; name:string; whatsapp:string;priceTier?:"retail"|"reseller"}[]>([]);
+  const [clientSearch,setClientSearch]=useState("");
+  const [prices,setPrices]=useState<PriceRow[]>([]);
   const [clientChoice, setClientChoice] = useState("manual");
   const [clientLoadError, setClientLoadError] = useState(false);
   const deliveryOpen = Boolean(deliver);
   useEffect(() => {
     if (!deliveryOpen || !admin) return;
     let active = true;
-    setClientChoice(initialClient?.id || "manual"); setClientLoadError(false); setRegisteredClients(initialClient ? [initialClient] : []);
-    void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || ""}))); }).catch(() => { if (active) setClientLoadError(true); });
+    setClientChoice(initialClient?.id || "manual"); setClientSearch(""); setClientLoadError(false); setRegisteredClients(initialClient ? [initialClient] : []);
+    void opsLoad({data:{code}}).then(result => { if (active) setRegisteredClients(result.records.filter(r => r.module === "clients" && r.status === "active").map(r => ({id:r.id,name:r.title,whatsapp:r.data.whatsapp || "",priceTier:r.priceTier}))); }).catch(() => { if (active) setClientLoadError(true); });
     return () => { active = false; };
   }, [deliveryOpen, admin, code, initialClient]);
   const [deliverWhatsapp, setDeliverWhatsapp] = useState("");
   const [deliverStockExpires, setDeliverStockExpires] = useState("");
   const [deliverSalePrice, setDeliverSalePrice] = useState("");
   const [deliverOrderRef, setDeliverOrderRef] = useState("");
+  useEffect(()=>{
+    if(!admin || (!formOpen && !deliveryOpen))return;
+    let active=true;
+    void pricingLoad({data:{code}}).then(rows=>{if(active)setPrices(rows);}).catch(()=>{});
+    return ()=>{active=false;};
+  },[admin,formOpen,deliveryOpen,code]);
+  const formPrice=prices.find(row=>row.key===pricingKey(form.platform,form.stockKind,form.durationMonths));
+  useEffect(()=>{
+    if(!formOpen || form.id || !formPrice)return;
+    setForm(current=>({...current,cost:formPrice.costCents!=null?formPrice.costCents/100:current.cost,salePrice:formPrice.retailCents!=null?formPrice.retailCents/100:current.salePrice,provider:formPrice.provider||current.provider}));
+  },[formOpen,form.id,formPrice]);
+  const selectedClient=registeredClients.find(c=>c.id===clientChoice);
+  const deliveryPrice=deliver && prices.find(row=>row.key===pricingKey(deliver.platform,deliver.stockKind,deliver.durationMonths));
+  useEffect(()=>{
+    if(!deliver || deliverOrderRef || !deliveryPrice)return;
+    const cents=selectedClient?.priceTier==="reseller"?deliveryPrice.resellerCents:deliveryPrice.retailCents;
+    if(cents!=null)setDeliverSalePrice(String(cents/100));
+    else if(selectedClient?.priceTier==="reseller")setDeliverSalePrice("");
+  },[deliver,deliverOrderRef,deliveryPrice,selectedClient?.priceTier,clientChoice]);
   const deliveryRequestId=useRef("");
   const [protect, setProtect] = useState(true);
   const [accessPassword, setAccessPassword] = useState("");
@@ -502,12 +527,13 @@ export function StockManagerDialog({
     if (!deliver) return;
     if (!can("stock_assign")) return toast.error("No tienes permiso para entregar stock");
     if (!deliverClient.trim()) return toast.error("Escribe a quién se entrega el producto");
+    if (!validWhatsApp(deliverWhatsapp)) return toast.error("Escribe un número de WhatsApp válido con lada");
     if (protect && (accessPassword.length < 4 || accessPassword !== confirmPassword)) return toast.error("Revisa la contraseña de protección");
     if(admin&&!deliverOrderRef){const price=Number(deliverSalePrice);if(!Number.isFinite(price)||price<=0)return toast.error("Escribe el precio que se descontará del saldo.");if(!confirm(`¿Asignar esta cuenta y descontar $${price.toFixed(2)} del saldo del cliente?`))return;}
     setBusy(true);
     try {
       const payload = {
-        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim(), clientWhatsapp: deliverWhatsapp.trim(),
+        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim(), clientWhatsapp: phoneNumber(deliverWhatsapp),
         stockExpiresOn: deliverStockExpires || null, salePrice: Number(deliverSalePrice) || 0,
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
@@ -629,6 +655,7 @@ export function StockManagerDialog({
               <div className="sm:col-span-3 space-y-3"><Button type="button" variant="outline" className="w-full justify-between" aria-expanded={panelOpen} onClick={() => setPanelOpen(v => !v)}><span>＋ Agregar panel</span><span>{panelOpen ? "⌃" : "⌄"}</span></Button>{panelOpen ? <div className="grid gap-3 rounded-xl border p-3 sm:grid-cols-3"><div><Label>🔗 Link</Label><Input value={form.panelUrl} onChange={(e) => setForm({ ...form, panelUrl: e.target.value })} /></div><div><Label>👤 Usuario</Label><Input value={form.panelUsername} onChange={(e) => setForm({ ...form, panelUsername: e.target.value })} /></div><div><Label>🔑 Contraseña</Label><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.panelPassword} onChange={(e) => setForm({ ...form, panelPassword: e.target.value })} /></div></div> : null}</div>
               <div><Label>Costo</Label><Input type="number" min={0} step="0.01" value={form.cost || ""} onChange={(e) => setForm({ ...form, cost: Number(e.target.value) || 0 })} /></div>
               <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={form.salePrice || ""} onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) || 0 })} /></div>
+              {admin&&formPrice&&<p className="sm:col-span-3 text-xs text-muted-foreground">Tarifas guardadas · Público: {formPrice.retailCents==null?"Sin precio":`$${formPrice.retailCents/100}`} · Revendedor: {formPrice.resellerCents==null?"Sin precio":`$${formPrice.resellerCents/100}`}</p>}
               <div><Label>Fecha de compra</Label><Input type="date" value={form.acquiredOn || ""} onChange={(e) => setForm({ ...form, acquiredOn: e.target.value || null })} /></div>
               <div className="sm:col-span-3 rounded-2xl border bg-muted/20 p-3 space-y-3"><Label>¿De cuánto tiempo es la cuenta?</Label><div className="flex flex-wrap gap-2">{[1,2,3,6,12].map(months=><Button key={months} type="button" size="sm" variant={(form.durationMonths||1)===months?"default":"outline"} onClick={()=>setForm({...form,durationMonths:months})}>{months===12?"1 año":`${months} ${months===1?"mes":"meses"}`}</Button>)}</div><label className="flex items-center justify-between gap-3 text-sm"><span>Contar la vigencia desde la venta</span><Switch checked={form.startsOnSale!==false} onCheckedChange={v=>setForm({...form,startsOnSale:v})}/></label><p className="text-xs text-muted-foreground">{form.startsOnSale!==false?"Al entregar, se propondrá el vencimiento automáticamente. Puedes ajustarlo antes de confirmar.":"Si no indicas un vencimiento base, se calcula desde la fecha de compra."}</p></div><div><Label>Vencimiento base</Label><Input type="date" value={form.expiresOn || ""} onChange={(e) => setForm({ ...form, expiresOn: e.target.value || null })} /></div>
               {form.id && form.status !== "available" ? <><div><Label>Cliente</Label><Input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} /></div><div><Label>WhatsApp</Label><Input value={form.clientWhatsapp} onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })} /></div><div><Label>Pedido relacionado</Label><Input value={form.relatedOrderId} onChange={(e) => setForm({ ...form, relatedOrderId: e.target.value })} /></div></> : null}
@@ -686,9 +713,9 @@ export function StockManagerDialog({
             {deliver ? <>
               <DialogHeader><DialogTitle>Entregar · {deliver.platform}</DialogTitle><DialogDescription>Los datos de cliente se capturan aquí, nunca al agregar stock.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
-                {admin ? <div className="sm:col-span-2"><Label>Cliente registrado (opcional)</Label><Select value={clientChoice} disabled={Boolean(deliverOrderRef)} onValueChange={value => { setClientChoice(value); const client = registeredClients.find(c => c.id === value); if (client) { setDeliverClient(client.name); setDeliverWhatsapp(client.whatsapp); } }}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="manual">Capturar cliente manualmente</SelectItem>{registeredClients.map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.whatsapp}</SelectItem>)}</SelectContent></Select>{clientLoadError ? <p className="text-xs text-muted-foreground">No se pudo cargar el registro. Puedes capturar los datos manualmente.</p> : null}</div> : null}
+                {admin ? <div className="sm:col-span-2"><Label>Buscar cliente registrado</Label><Input placeholder="Nombre o WhatsApp" value={clientSearch} disabled={Boolean(deliverOrderRef)} onChange={e=>setClientSearch(e.target.value)}/><Select value={clientChoice} disabled={Boolean(deliverOrderRef)} onValueChange={value => { setClientChoice(value); const client = registeredClients.find(c => c.id === value); if (client) { setDeliverClient(client.name); setDeliverWhatsapp(client.whatsapp); } }}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="manual">Capturar cliente manualmente</SelectItem>{registeredClients.filter(c=>c.id===clientChoice||!clientSearch.trim()||`${c.name} ${c.whatsapp}`.toLowerCase().includes(clientSearch.toLowerCase())).map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.whatsapp}</SelectItem>)}</SelectContent></Select>{clientLoadError ? <p className="text-xs text-muted-foreground">No se pudo cargar el registro. Puedes capturar los datos manualmente.</p> : null}</div> : null}
                 <div><Label>Cliente</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverClient(e.target.value); }} /></div>
-                <div><Label>WhatsApp</Label><Input value={deliverWhatsapp} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setClientChoice("manual"); setDeliverWhatsapp(e.target.value); }} /></div>
+                <div><Label>WhatsApp (obligatorio)</Label><ContactPhoneInput value={deliverWhatsapp} onChange={value=>{setClientChoice("manual");setDeliverWhatsapp(value);}} onName={name=>{if(!deliverOrderRef&&!deliverClient.trim())setDeliverClient(name);}}/></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
                 <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">{deliverOrderRef?"Pedido vinculado: no se realiza un segundo cobro.":"Entrega manual: este importe se descontará del saldo del cliente. Si es nuevo, se registrará con su WhatsApp y deberá recargar antes de recibir la cuenta."}</p>}</div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>

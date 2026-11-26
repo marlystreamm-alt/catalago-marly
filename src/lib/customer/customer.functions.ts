@@ -34,13 +34,15 @@ export const customerSignUp = createServerFn({ method: "POST" })
     const c = await server(),
       s = await ops(),
       store = await c.customerShop(data.slug);
+    const {validWhatsApp,phoneNumber}=await import("@/lib/workspace/model");
+    if(!validWhatsApp(data.whatsapp)) throw new Error("Escribe un WhatsApp válido con lada");
     await c.customerThrottle("signup", store.slug + ":" + data.email, 5);
     if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail())throw new Error("No se pudo crear la cuenta. Si ya tienes acceso, inicia sesión.");
     const p = await import("./password.server"),
       salt = p.customerSalt();
     const payload = await (
       await import("@/lib/deliveries/deliveries.server")
-    ).encryptPayload({ email: data.email, whatsapp: data.whatsapp, shopId: store.id || "main" });
+    ).encryptPayload({ email: data.email, whatsapp: phoneNumber(data.whatsapp), shopId: store.id || "main" });
     const r = await s.opsDB().rpc("ma2_customer_register", {
       p_business: store.id,
       p_email: data.email,
@@ -372,6 +374,8 @@ export const customerSubmit = createServerFn({ method: "POST" })
     const records = await c.customerRecords(ctx.client.id);
     if (records.filter((r) => r.module === data.module && r.status === "pending").length >= 20)
       throw new Error("Espera la atención de tus solicitudes pendientes");
+    if(data.module==="reports" && data.orderId && records.some(r=>r.module==="reports" && r.data.orderId===data.orderId && ["pending","in_progress"].includes(r.status)))
+      throw new Error("Esta compra ya tiene un reporte pendiente. Consulta su seguimiento en Mis reportes.");
     const record=await s.createRecord(data.module, data.title, "pending", {
       clientId: ctx.client.id,
       shopId: ctx.shop.id || "main",
@@ -382,10 +386,11 @@ export const customerSubmit = createServerFn({ method: "POST" })
       ...(data.module === "reports" ? { platform: purchaseTitle || data.title } : {}),
       ...(data.module === "reports" && data.evidence ? { attachment: data.evidence, filename: "captura-de-falla.jpg", filetype: "image/jpeg" } : {}),
     });
-    if(data.module==="requests"&&!ctx.shop.id){
+    if((data.module==="requests"||data.module==="reports")&&!ctx.shop.id){
       try{
         const notify=await import("@/lib/notify/notify.server"),db=await notify.admin();
-        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:"customer-request",catalog_name:"Página web MA² · Por encargo",service_name:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\nSolicitud por encargo: "+data.message,link:"/?panel=1",recipient:""},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
+        const isReport=data.module==="reports";
+        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:isReport?"customer-report":"customer-request",catalog_name:isReport?"Página web MA² · Reportes":"Página web MA² · Por encargo",service_name:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\n"+(isReport?"Reporte de falla: ":"Solicitud por encargo: ")+data.message,link:"/?panel=1",recipient:""},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
         if(error)throw error;
         if(row){const settings=await notify.loadSettings();if(settings.enabled&&notify.withinSchedule(settings))await notify.notifyOrder(notify.rowToOrder(row as Record<string,unknown>),settings);}
       }catch{/* La solicitud está guardada; no volver a crearla por un fallo de aviso. */}

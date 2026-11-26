@@ -42,6 +42,7 @@ import {
 } from "@/lib/workspace/operations.functions";
 import { getSavedCode } from "@/lib/notify/client";
 import { customerContactTier } from "@/lib/customer/manage.functions";
+import { ContactPhoneInput } from "./contact-phone-input";
 import { copyText } from "@/lib/browser/clipboard";
 export const errorText = (e: unknown) =>
   e instanceof Error ? e.message : "No se pudo completar la operación";
@@ -447,7 +448,9 @@ export function ResourcePanel({
                   {f.label}
                   {f.required ? " *" : ""}
                 </span>
-                {f.type === "textarea" ? (
+                {module==="clients" && f.key==="whatsapp" ? (
+                  <ContactPhoneInput value={payload.whatsapp||""} onChange={whatsapp=>setPayload(p=>({...p,whatsapp}))} onName={name=>{if(!title.trim())setTitle(name);}}/>
+                ) : f.type === "textarea" ? (
                   <Textarea
                     value={payload[f.key] || ""}
                     maxLength={10000}
