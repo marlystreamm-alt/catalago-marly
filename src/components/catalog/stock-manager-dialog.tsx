@@ -67,7 +67,7 @@ type StockTab = "all" | "available" | "sold" | "expiring" | "expired";
 
 const blank = (): StockItem => ({
   durationMonths: 1,
-  startsOnSale: true,
+  startsOnSale: false,
   id: "",
   businessId: null,
   platform: "",
