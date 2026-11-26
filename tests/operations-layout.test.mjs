@@ -5,8 +5,11 @@ const read=p=>readFile(new URL("../"+p,import.meta.url),"utf8");
 test("the three order stages share navigation and hide the duplicate filters",async()=>{
  const [workspace,cyber,web,notices]=await Promise.all(["src/components/workspace/seller-workspace.tsx","src/components/catalog/cyberdocs-orders-dialog.tsx","src/components/customer/web-orders.tsx","src/components/catalog/notifications-dialog.tsx"].map(read));
  assert.match(workspace,/\["main", "Pedidos"\], \["processing", "En proceso"\], \["delivered", "Entregadas"\]/);
- assert.match(cyber,/stage==="processing" \? order.status==="in_process"/);
- assert.match(cyber,/order.status!=="completed" && order.status!=="in_process"/);
+ assert.match(workspace,/\["closed", "Cancelados \/ rechazados"\]/);
+ assert.match(cyber,/orders: \["new", "error"\]/);
+ assert.match(cyber,/processing: \["in_process"\]/);
+ assert.match(cyber,/closed: \["cancelled", "rejected"\]/);
+ assert.match(cyber,/onStageChange\(order.id, "closed"\)/);
  assert.match(cyber,/\{!navigation && <div className="-mx-3/);
  assert.match(cyber,/\{navigation\}[\s\S]*?size="icon"[\s\S]*?aria-label="Ajustes de pedidos"/);
  assert.match(web,/stage==="orders"\?!r.linkedId/);
