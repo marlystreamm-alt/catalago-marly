@@ -97,6 +97,13 @@ const dateTime = (value: string | null) =>
         new Date(value),
       )
     : "Sin registro";
+const orderStageStatuses = {
+  orders: ["new", "error"],
+  processing: ["in_process"],
+  deliveries: ["completed"],
+  closed: ["cancelled", "rejected"],
+} satisfies Record<string, CyberDocsOrder["status"][]>;
+
 const terminal = (order: CyberDocsOrder) =>
   ["completed", "rejected", "cancelled"].includes(order.status);
 const normalizeWhatsApp = (value: string) => {
@@ -144,9 +151,9 @@ export function CyberDocsOrdersDialog({
 }: {
   embedded?: boolean;
   initialSelectedId?: string | null;
-  stage?: "all" | "orders" | "processing" | "deliveries";
+  stage?: "all" | keyof typeof orderStageStatuses;
   navigation?: ReactNode;
-  onStageChange?: (id: string, stage: "processing" | "deliveries") => void;
+  onStageChange?: (id: string, stage: "processing" | "deliveries" | "closed") => void;
 } = {}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(embedded);
@@ -614,13 +621,13 @@ export function CyberDocsOrdersDialog({
       return;
     setBusy(true);
     try {
-      replaceOrder(
-        await cyberdocsClose({
-          data: { code, orderId: selected.id, status: kind, reason, confirm: true },
-        }),
-      );
+      const order = await cyberdocsClose({
+        data: { code, orderId: selected.id, status: kind, reason, confirm: true },
+      });
+      replaceOrder(order);
       toast.success(kind === "rejected" ? "Pedido rechazado" : "Pedido cancelado");
-      await refresh();
+      if (onStageChange) onStageChange(order.id, "closed");
+      else await refresh();
     } catch (error) {
       toast.error(errorText(error));
     } finally {
@@ -715,7 +722,7 @@ export function CyberDocsOrdersDialog({
   const pending = orders.filter((order) => !terminal(order)).length;
   const visibleOrders = useMemo(() => [...orders]
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .filter(order=>stage==="all"||(stage==="deliveries" ? order.status==="completed" : stage==="processing" ? order.status==="in_process" : order.status!=="completed" && order.status!=="in_process"))
+    .filter(order => stage === "all" || orderStageStatuses[stage].some(status => status === order.status))
     .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
     .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
   const selectableVisibleIds = useMemo(
@@ -922,7 +929,7 @@ export function CyberDocsOrdersDialog({
 
         <section className="grid gap-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregadas":stage==="processing"?"En proceso":"Pedidos"} ({visibleOrders.length})</p>
+            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregadas":stage==="processing"?"En proceso":stage==="closed"?"Cancelados / rechazados":"Pedidos"} ({visibleOrders.length})</p>
             {!navigation && stage!=="deliveries"&&<Badge variant="outline">Pendientes {pending}</Badge>}
           </div>
           {selectableVisibleIds.length ? (
