@@ -25,6 +25,7 @@ import {
   Settings2,
   Smartphone,
   Webhook,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -996,6 +997,11 @@ export function CyberDocsOrdersDialog({
 
                   {expanded && selected ? (
                     <div className="grid gap-3 border-t p-3 sm:p-4">
+                      <div className="flex justify-end">
+                        <Button type="button" variant="ghost" size="icon" aria-label="Cerrar detalle del pedido" title="Cerrar detalle" onClick={() => setSelectedId(null)}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
                       <div className="grid gap-2 rounded-xl bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         {selected.contactValue && selected.contactLabel !== "WhatsApp" && !extraOrderDetails(selected.parsedPayload || {}).some(([,v]) => v === selected.contactValue) ? <p><b>{selected.contactLabel || "Contacto"}:</b> {selected.contactValue}</p> : null}
                         {extraOrderDetails(selected.parsedPayload || {}).map(([k,v]) => <p key={k}><b>{k.replaceAll("_", " ")}:</b> {String(v)}</p>)}
