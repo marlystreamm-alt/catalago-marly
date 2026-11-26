@@ -596,6 +596,10 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   <article key={order.id} className="seller-card space-y-2">
                     <div className="flex justify-between gap-3"><h3 className="font-bold">{order.title}</h3><strong>{money(order.total)}</strong></div>
                     <p className="text-sm text-muted-foreground">{({completed:"Entregado", in_process:"En proceso", cancelled:"Cancelado", rejected:"Rechazado"} as Record<string,string>)[order.status] || "Pagado · pendiente de entrega"}</p>
+                    {order.status === "completed" && <Button size="sm" disabled={busy} onClick={() => void action(async () => {
+                      setShowPassword(false);
+                      setDelivery(await customerDelivery({ data: { slug, orderId: order.id } }));
+                    })}>Ver entrega</Button>}
                   </article>
                 ))}{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
                 {data.records
@@ -919,7 +923,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
           </DialogHeader>
           {delivery ? (
             <div className="space-y-4">
-              <label className="seller-field">
+              {delivery.link && <Button asChild><a href={delivery.link} target="_blank" rel="noopener noreferrer">Abrir acceso</a></Button>}
+              {delivery.notes && <p className="whitespace-pre-wrap break-words text-sm">{delivery.notes}</p>}
+              {delivery.username && (<label className="seller-field">
                 <span>Usuario / correo</span>
                 <div className="flex gap-2">
                   <Input readOnly value={delivery.username} />
@@ -932,8 +938,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     <Copy className="size-4" />
                   </Button>
                 </div>
-              </label>
-              <label className="seller-field">
+              </label>)}
+              {delivery.password && (<label className="seller-field">
                 <span>Contraseña de la plataforma</span>
                 <div className="flex gap-2">
                   <Input
@@ -958,23 +964,24 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     <Copy className="size-4" />
                   </Button>
                 </div>
-              </label>
+              </label>)}
               {delivery.profilePin ? (
                 <p className="text-sm">
                   Perfil / PIN: <b>{delivery.profilePin}</b>
                 </p>
               ) : null}
               {delivery.expiresOn ? <p className="text-sm">Vence: {delivery.expiresOn}</p> : null}
+              {delivery.guides.length > 0 && <h3 className="font-semibold">Guía de ingreso</h3>}
               {delivery.guides.map((g, i) => (
                 <figure className="space-y-2" key={i}>
                   <figcaption className="text-sm font-semibold">{g.title}</figcaption>
                   <img src={g.image} alt={g.title} className="w-full rounded-xl" />
                 </figure>
               ))}
-              <p className="text-sm text-muted-foreground">
+              {delivery.username && <p className="text-sm text-muted-foreground">
                 Ingresa con estos datos en la aplicación o sitio oficial de la plataforma. Respeta
                 los dispositivos y el tipo de cuenta que compraste.
-              </p>
+              </p>}
               <Button asChild variant="outline">
                 <a href={support} target="_blank" rel="noopener noreferrer">
                   Soporte por WhatsApp
