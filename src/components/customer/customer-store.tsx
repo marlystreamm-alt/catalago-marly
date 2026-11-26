@@ -14,6 +14,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -318,7 +319,6 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               });
             }}
           >
-            {!shop.id&&<div className="seller-tabs"><button type="button" className="active">Cliente / revendedor</button><a className="rounded-xl px-3 py-2 font-semibold" href="/?panel=1">Administración</a></div>}
             <div className="seller-tabs">
               <button
                 type="button"
@@ -434,6 +434,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             >
               Olvidé mi contraseña · Recuperar con soporte
             </a>
+            {!shop.id && <div className="flex justify-end border-t pt-2"><a href="/?panel=1" aria-label="Acceso del equipo" title="Acceso del equipo" className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><Settings2 className="size-4" aria-hidden="true"/></a></div>}
           </form>
         </div>
       ) : (
