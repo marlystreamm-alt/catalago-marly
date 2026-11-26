@@ -20,3 +20,16 @@ export function businessToday() {
     day: "2-digit",
   }).format(new Date());
 }
+
+/** Orders without a subscription term do not get a renewal date. */
+export function orderSubscriptionMonths(serviceName: string): number | null {
+  const name = serviceName.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const term = /\b(\d{1,2})\s*(mes(?:es)?|anos?)\b/.exec(name);
+  if (term) {
+    const months = Number(term[1]) * (term[2].startsWith("ano") ? 12 : 1);
+    return months >= 1 && months <= 36 ? months : null;
+  }
+  if (/\banual(?:es)?\b/.test(name)) return 12;
+  if (/\b(?:netflix|disney|hbo|max(?:\s+(?:premium|platino|estandar|bug|hulu)|$)|paramount|crunchyroll|vix|mubi|kocowa|spotify|fox one|prime video|apple tv)\b/.test(name)) return 1;
+  return null;
+}

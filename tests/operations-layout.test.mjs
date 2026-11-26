@@ -35,3 +35,15 @@ test("manual preparation remains in process until a successful clipboard action"
  assert.match(copy,/onStageChange\?\.\(completed.id, "deliveries"\)/);
  assert.match(customer,/\.rpc\("ma2_customer_buy"/);
 });
+
+test("finalizing a subscription calculates the renewal date and manual edits are optional", async()=>{
+ const [server,dialog,dates]=await Promise.all(["src/lib/cyberdocs/cyberdocs.server.ts","src/components/catalog/cyberdocs-orders-dialog.tsx","src/lib/stock/duration.ts"].map(read));
+ assert.match(server,/orderSubscriptionMonths\(completed.serviceName\)/);
+ assert.match(server,/\.is\("expires_on", null\)/);
+ assert.match(dialog,/<summary[^>]*>Editar fechas<\/summary>/);
+ const { orderSubscriptionMonths, expiresAfterMonths }=await import("../src/lib/stock/duration.ts");
+ assert.equal(expiresAfterMonths("2026-01-31", orderSubscriptionMonths("HBO 1 mes")), "2026-02-28");
+ assert.equal(orderSubscriptionMonths("ViX anual"), 12);
+ assert.equal(orderSubscriptionMonths("Disney 3 meses"), 3);
+ assert.equal(orderSubscriptionMonths("Acta de nacimiento"), null);
+});
