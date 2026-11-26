@@ -8,8 +8,8 @@ const master=url(await compile("src/lib/stock/master-products.ts"));
 const {pricingKey,catalogPriceVariant}=await import(url((await compile("src/lib/customer/pricing.ts")).replaceAll('"@/lib/stock/master-products"',JSON.stringify(master))));
 const pricingModule=url((await compile("src/lib/customer/pricing.ts")).replaceAll('"@/lib/stock/master-products"',JSON.stringify(master)));
 test("store prices do not overlay or read legacy catalogs",async()=>{
- const [pricing,sync,editor,storefront]=await Promise.all(["src/lib/customer/pricing.server.ts","src/lib/catalog/sync.functions.ts","src/components/customer/product-pricing.tsx","src/lib/customer/storefront.functions.ts"].map(p=>readFile(new URL("../"+p,import.meta.url),"utf8")));
- assert.ok(!pricing.includes("catalog_app_state"));assert.ok(!sync.includes("overlayPrices"));assert.ok(!editor.includes("applyCentralPrice"));assert.match(storefront,/published===true/);assert.match(storefront,/priceCents:/);assert.ok(!storefront.includes("costCents"));assert.match(storefront,/catalog_id:"store-ma2"/);
+ const [pricing,sync,editor,storefront,checkout]=await Promise.all(["src/lib/customer/pricing.server.ts","src/lib/catalog/sync.functions.ts","src/components/customer/product-pricing.tsx","src/lib/customer/storefront.functions.ts","supabase/migrations/20261126064935_ma2_on_request_wallet_purchase.sql"].map(p=>readFile(new URL("../"+p,import.meta.url),"utf8")));
+ assert.ok(!pricing.includes("catalog_app_state"));assert.ok(!sync.includes("overlayPrices"));assert.ok(!editor.includes("applyCentralPrice"));assert.match(storefront,/published===true/);assert.match(storefront,/priceCents:/);assert.ok(!storefront.includes("costCents"));assert.match(storefront,/\.rpc\("ma2_buy_on_request"/);assert.match(checkout,/values \(p_id, 'store-ma2'/);assert.match(checkout,/ma2_wallet_post\(p_client, -cents, 'purchase'/);
 });
 test("same master plan aliases share prices but different variants and validity do not",()=>{
  assert.equal(pricingKey("Disney Premium","profile",1),pricingKey("Disney+ Premium","profile",1));
