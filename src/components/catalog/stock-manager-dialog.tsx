@@ -3,7 +3,7 @@ import { MASTER_PLANS, masterPlan, masterProduct } from "@/lib/stock/master-prod
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
-import { inventoryLevels, inventoryTone, daysRemaining } from '@/lib/stock/traffic-light';
+import { inventoryLevels, inventoryTone, INVENTORY_DOT_CLASSES, daysRemaining } from '@/lib/stock/traffic-light';
 import { pricingKey, type PriceRow } from '@/lib/customer/pricing';
 import { pricingLoad } from '@/lib/customer/pricing.functions';
 import { ToolFrame } from '@/components/workspace/tool-frame';
@@ -578,7 +578,6 @@ export function StockManagerDialog({
                       const tone = inventoryTone(product.available);
                       const selected = stockGroup === product.key;
                       const availability = product.available ? `Disponibles: ${product.available}` : "Agotado";
-                      const dots = { red: "bg-red-500", yellow: "bg-amber-500", green: "bg-emerald-500" };
                       return (
                         <button key={product.key} type="button" aria-pressed={selected} title={availability}
                           className={`inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs hover:bg-muted ${selected ? "bg-muted font-semibold" : ""}`}
@@ -591,7 +590,7 @@ export function StockManagerDialog({
                             setStockTab("available");
                             setQ("");
                           }}>
-                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${dots[tone]}`} />
+                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[tone]}`} />
                           <span className="break-words">{product.platform} <span className="text-muted-foreground">· {product.kind === "profile" ? "Perfil" : "Completa"} · {product.months} m</span></span>
                           <span className="sr-only">{availability}</span>
                         </button>
