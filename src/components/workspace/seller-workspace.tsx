@@ -90,6 +90,16 @@ const SECTIONS = [
   ["catalogs", "🏪", "Catálogos de negocios"],
 ] as const;
 export type Section = (typeof SECTIONS)[number][0];
+const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
+  {main:"home",children:[]},
+  {main:"orders",label:"Pedidos y entregas",children:["deliveries","codes"]},
+  {main:"inventory",children:["expiry","combos","providers","gallery"]},
+  {main:"clients",children:["reports","questions","referrals"]},
+  {main:"finance",children:["sales","wallet","credit"]},
+  {main:"shop",label:"Tienda y catálogos",children:["ownCatalogs","catalogs"]},
+  {main:"settings",label:"Ajustes",children:["appearance","notices","helpers","subscription","documents"]},
+  {main:"assistant",label:"Herramientas",children:["songs","games","memory"]},
+];
 type Summary = Awaited<ReturnType<typeof adminDashboard>>;
 export function SellerLayout({
   section,
@@ -117,10 +127,20 @@ export function SellerLayout({
   const [open, setOpen] = useState(false);
   const [qr, setQr] = useState(false);
   const [qrData, setQrData] = useState("");
+  const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
+  const go=(id:Section)=>{onSection(id);setOpen(false);};
+  const navButton=(id:Section,label?:string)=>{const item=SECTIONS.find(s=>s[0]===id)!;return <button key={id} onClick={()=>go(id)} className={`w-full ${id===section?"active":""}`} aria-current={id===section?"page":undefined}><span aria-hidden="true">{item[1]}</span>{label||item[2]}</button>;};
   const nav = (
     <>
-      <div className="seller-share">
+      <p className="seller-nav-caption">PANEL</p>
+      <nav aria-label="Panel de tu negocio">
+        {NAV_GROUPS.map(group=>{const active=group.main===section||group.children.includes(section),show=expanded===group.main;return <div key={group.main} className="min-w-0">
+          <div className={`flex items-center gap-1 rounded-xl ${active&&group.main!==section?"bg-primary/5":""}`}><div className="min-w-0 flex-1">{navButton(group.main,group.label)}</div>{group.children.length>0&&<button type="button" aria-label={`${show?"Ocultar":"Mostrar"} opciones de ${group.label||SECTIONS.find(s=>s[0]===group.main)?.[2]}`} aria-expanded={show} onClick={()=>setExpanded(show?null:group.main)} className="!w-9 !shrink-0 !justify-center !px-1"><span aria-hidden="true">{show?"▴":"▾"}</span></button>}</div>
+          {show&&<div className="ml-3 border-l border-border pl-2">{group.children.map(id=>navButton(id))}</div>}
+        </div>;})}
+      </nav>
+      <div className="seller-share mt-4">
         <p>🔗 Enlace de mi tienda web</p>
         <strong className="break-all">{shareUrl.replace(/^https?:\/\//, "")}</strong>
         <div className="seller-share-actions">
@@ -142,23 +162,6 @@ export function SellerLayout({
         </div>
         <p>Compártelo en tu grupo y tus estados.</p>
       </div>
-      <p className="seller-nav-caption">PANEL</p>
-      <nav aria-label="Panel de tu negocio">
-        {SECTIONS.map(([id, icon, label]) => (
-          <button
-            key={id}
-            onClick={() => {
-              onSection(id);
-              setOpen(false);
-            }}
-            className={id === section ? "active" : ""}
-            aria-current={id === section ? "page" : undefined}
-          >
-            <span aria-hidden="true">{icon}</span>
-            {label}
-          </button>
-        ))}
-      </nav>
     </>
   );
   return (
@@ -607,8 +610,9 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
           <button className={tab === "requests" ? "active" : ""} onClick={() => setTab("requests")}>
             Por encargo
           </button>
+          <button className={tab === "protected" ? "active" : ""} onClick={() => setTab("protected")}>Entregas protegidas</button>
         </div>
-        {tab === "main" ? <CyberDocsOrdersDialog key={selectedOrderId || "all"} embedded initialSelectedId={selectedOrderId} /> : tab === "web" ? <WebOrders key="web" onOpenOrder={id => { setSelectedOrderId(id); setTab("main"); }} /> : <div className="space-y-4"><WebOrders key="encargo" onRequestOnly onOpenOrder={id => {setSelectedOrderId(id);setTab("main");}}/><details className="seller-card"><summary className="cursor-pointer font-semibold">Historial de encargos manuales</summary><div className="mt-3">{resource("requests")}</div></details></div>}
+        {tab === "main" ? <CyberDocsOrdersDialog key={selectedOrderId || "all"} embedded initialSelectedId={selectedOrderId} /> : tab === "web" ? <WebOrders key="web" onOpenOrder={id => { setSelectedOrderId(id); setTab("main"); }} /> : tab === "protected" ? <ProtectedDeliveriesDialog embedded/> : <div className="space-y-4"><WebOrders key="encargo" onRequestOnly onOpenOrder={id => {setSelectedOrderId(id);setTab("main");}}/><details className="seller-card"><summary className="cursor-pointer font-semibold">Historial de encargos manuales</summary><div className="mt-3">{resource("requests")}</div></details></div>}
       </>
     );
   else if (section === "questions")
