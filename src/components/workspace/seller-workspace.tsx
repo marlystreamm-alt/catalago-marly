@@ -60,7 +60,7 @@ import { comboCopyCredentials } from "@/lib/stock/combo.functions";
 import { StockComboPlanner } from "@/components/workspace/stock-combo-planner";
 import { mainAppearanceLoad, mainAppearanceSave } from "@/lib/appearance/main-store.functions";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
-import { renewalLimits, TONE_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
+import { renewalLimits, INVENTORY_DOT_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
   ["finance", "💰", "Finanzas"],
@@ -448,10 +448,11 @@ export function SellerHome({
                   <button
                     key={p.platform}
                     onClick={() => onNavigate("inventory")}
-                    className="flex w-full items-center justify-between text-left text-sm"
+                    className="flex w-full items-center gap-2 text-left text-sm"
                   >
+                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(p.available)]}`} />
                     <span>{p.platform}</span>
-                    <b className={`rounded-full border px-2 py-1 text-xs ${TONE_CLASSES[inventoryTone(p.available)]}`}>{p.available===0?"Agotado":p.available}</b>
+                    <span className="sr-only">{p.available ? `Disponibles: ${p.available}` : "Agotado"}</span>
                   </button>
                 ))}
             </div>
