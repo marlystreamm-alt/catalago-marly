@@ -620,10 +620,10 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         key={tab + ":" + (selectedOrderId || "all")}
         embedded
         initialSelectedId={selectedOrderId}
-        stage={tab === "delivered" ? "deliveries" : tab === "processing" ? "processing" : "orders"}
+        stage={tab === "delivered" ? "deliveries" : tab === "processing" || tab === "closed" ? tab : "orders"}
         navigation={
           <div className="seller-tabs min-w-0 flex-1" aria-label="Estado de pedidos">
-            {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"]] as const).map(([key, label]) => (
+            {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"], ["closed", "Cancelados / rechazados"]] as const).map(([key, label]) => (
               <button key={key} type="button" className={tab === key ? "active" : ""} aria-pressed={tab === key}
                 onClick={() => { setSelectedOrderId(null); setTab(key); }}>{label}</button>
             ))}
@@ -631,10 +631,10 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         }
         onStageChange={(id, stage) => {
           setSelectedOrderId(id);
-          setTab(stage === "deliveries" ? "delivered" : "processing");
+          setTab(stage === "deliveries" ? "delivered" : stage);
         }}
       />
-      {tab !== "processing" && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
+      {(tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
         onOpenOrder={(id, delivered, processing) => {
           setSelectedOrderId(id);
           setTab(delivered ? "delivered" : processing ? "processing" : "main");
