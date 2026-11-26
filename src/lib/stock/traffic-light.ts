@@ -14,6 +14,11 @@ export function renewalTone(days: number | null, limits = DEFAULT_RENEWAL_LIMITS
   return days == null ? "unknown" : days < 0 ? "expired" : days <= limits.red ? "red" : days <= limits.yellow ? "yellow" : "green";
 }
 export function inventoryTone(count: number) { return count === 0 ? "red" : count <= 2 ? "yellow" : "green"; }
+export const INVENTORY_DOT_CLASSES = {
+  red: "bg-red-500",
+  yellow: "bg-amber-500",
+  green: "bg-emerald-500",
+};
 export const TONE_CLASSES = {
   red: "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200",
   yellow: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",

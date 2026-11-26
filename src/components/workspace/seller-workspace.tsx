@@ -3,6 +3,7 @@ import { WebOrders } from "@/components/customer/web-orders";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
+  ArrowLeft,
   Bell,
   Menu,
   Moon,
@@ -59,7 +60,7 @@ import { comboCopyCredentials } from "@/lib/stock/combo.functions";
 import { StockComboPlanner } from "@/components/workspace/stock-combo-planner";
 import { mainAppearanceLoad, mainAppearanceSave } from "@/lib/appearance/main-store.functions";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
-import { renewalLimits, TONE_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
+import { renewalLimits, INVENTORY_DOT_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
   ["finance", "💰", "Finanzas"],
@@ -142,6 +143,7 @@ export function SellerLayout({
   const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
   const go=(id:Section)=>{onSection(id);setOpen(false);};
+  const parent = NAV_GROUPS.find((group) => group.children.includes(section))?.main ?? "home";
   const navButton=(id:Section,label?:string)=>{const item=SECTIONS.find(s=>s[0]===id)!;return <button key={id} onClick={()=>go(id)} className={`w-full ${id===section?"active":""}`} aria-current={id===section?"page":undefined}><span aria-hidden="true">{item[1]}</span>{label||item[2]}</button>;};
   const nav = (
     <>
@@ -245,7 +247,15 @@ export function SellerLayout({
       <main className="seller-main" id="seller-main">
         <div className="seller-page-heading">
           <div>
-            <h1>{section === "home" ? `Resumen de ${name}` : selected[2]}</h1>
+            <div className="flex items-center gap-2">
+              {section !== "home" && (
+                <Button type="button" variant="ghost" size="icon" className="shrink-0"
+                  aria-label="Regresar" title="Regresar" onClick={() => go(parent)}>
+                  <ArrowLeft className="size-5" />
+                </Button>
+              )}
+              <h1>{section === "home" ? `Resumen de ${name}` : selected[2]}</h1>
+            </div>
             <p>
               {section === "home"
                 ? "Tu stock, tus clientes y tus entregas, en un solo lugar."
@@ -438,10 +448,11 @@ export function SellerHome({
                   <button
                     key={p.platform}
                     onClick={() => onNavigate("inventory")}
-                    className="flex w-full items-center justify-between text-left text-sm"
+                    className="flex w-full items-center gap-2 text-left text-sm"
                   >
+                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(p.available)]}`} />
                     <span>{p.platform}</span>
-                    <b className={`rounded-full border px-2 py-1 text-xs ${TONE_CLASSES[inventoryTone(p.available)]}`}>{p.available===0?"Agotado":p.available}</b>
+                    <span className="sr-only">{p.available ? `Disponibles: ${p.available}` : "Agotado"}</span>
                   </button>
                 ))}
             </div>
@@ -605,9 +616,30 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
     );
   else if (section === "orders")
     content = <div className="space-y-4">
-      <div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>{setSelectedOrderId(null);setTab("main");}}>Pedidos</button><button className={tab==="delivered"?"active":""} onClick={()=>{setSelectedOrderId(null);setTab("delivered");}}>Entregas</button></div>
-      <CyberDocsOrdersDialog key={tab+":"+(selectedOrderId||"all")} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":"orders"}/>
-      <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} onOpenOrder={(id,delivered)=>{setSelectedOrderId(id);setTab(delivered?"delivered":"main");}}/>
+      <CyberDocsOrdersDialog
+        key={tab + ":" + (selectedOrderId || "all")}
+        embedded
+        initialSelectedId={selectedOrderId}
+        stage={tab === "delivered" ? "deliveries" : tab === "processing" ? "processing" : "orders"}
+        navigation={
+          <div className="seller-tabs min-w-0 flex-1" aria-label="Estado de pedidos">
+            {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"]] as const).map(([key, label]) => (
+              <button key={key} type="button" className={tab === key ? "active" : ""} aria-pressed={tab === key}
+                onClick={() => { setSelectedOrderId(null); setTab(key); }}>{label}</button>
+            ))}
+          </div>
+        }
+        onStageChange={(id, stage) => {
+          setSelectedOrderId(id);
+          setTab(stage === "deliveries" ? "delivered" : "processing");
+        }}
+      />
+      {tab !== "processing" && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
+        onOpenOrder={(id, delivered, processing) => {
+          setSelectedOrderId(id);
+          setTab(delivered ? "delivered" : processing ? "processing" : "main");
+        }}
+      />}
       {tab==="delivered"&&<><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas protegidas</summary><ProtectedDeliveriesDialog embedded/></details><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details></>}
       {tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Encargos registrados manualmente</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status!=="completed"))}</details>}{tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
     </div>;

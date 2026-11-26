@@ -3,7 +3,7 @@ import { MASTER_PLANS, masterPlan, masterProduct } from "@/lib/stock/master-prod
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
-import { inventoryLevels, inventoryTone, TONE_CLASSES, daysRemaining } from '@/lib/stock/traffic-light';
+import { inventoryLevels, inventoryTone, INVENTORY_DOT_CLASSES, daysRemaining } from '@/lib/stock/traffic-light';
 import { pricingKey, type PriceRow } from '@/lib/customer/pricing';
 import { pricingLoad } from '@/lib/customer/pricing.functions';
 import { ToolFrame } from '@/components/workspace/tool-frame';
@@ -567,7 +567,40 @@ export function StockManagerDialog({
               {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar stock</Button> : null}
             </div>
 
-            {admin&&!initialClient&&<section className="seller-card space-y-3"><div><h3 className="font-bold">Semáforo de stock</h3><p className="text-xs text-muted-foreground">🔴 Agotado · 🟡 1–2 unidades · 🟢 3 o más</p></div>{stockLevelError&&<p className="text-xs text-muted-foreground">No se pudieron comprobar los precios y productos publicados. Se muestra solo el inventario conocido.</p>}{busy?<p role="status" className="text-sm text-muted-foreground">Comprobando disponibilidad…</p>:<div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">{levels.map(p=><button type="button" key={p.key} className={`rounded-xl border p-3 text-left ${TONE_CLASSES[inventoryTone(p.available)]} ${stockGroup===p.key?"ring-2 ring-primary":""}`} onClick={()=>{if(stockGroup===p.key){setStockGroup("");return;}setStockGroup(p.key);setStockTab("available");setQ("");}}><strong className="block text-sm break-words">{p.platform}</strong><span className="block text-xs">{p.kind==="profile"?"Perfil":"Completa"} · {p.months} mes(es)</span><span className="mt-1 block text-sm font-bold">{p.available===0?"Agotado":`${p.available} disponible${p.available===1?"":"s"}`}</span></button>)}</div>}{!busy&&!levels.length&&<p className="text-sm text-muted-foreground">Agrega un producto o stock para ver su disponibilidad.</p>}{stockGroup&&<Button size="sm" variant="outline" onClick={()=>setStockGroup("")}>Mostrar todas las plataformas</Button>}</section>}
+            {admin && !initialClient && (
+              <section className="space-y-2" aria-label="Disponibilidad por plataforma">
+                {stockLevelError && <p className="text-xs text-muted-foreground">Solo se muestra el inventario conocido.</p>}
+                {busy ? (
+                  <p role="status" className="text-xs text-muted-foreground">Comprobando disponibilidad…</p>
+                ) : (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {levels.map((product) => {
+                      const tone = inventoryTone(product.available);
+                      const selected = stockGroup === product.key;
+                      const availability = product.available ? `Disponibles: ${product.available}` : "Agotado";
+                      return (
+                        <button key={product.key} type="button" aria-pressed={selected} title={availability}
+                          className={`inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs hover:bg-muted ${selected ? "bg-muted font-semibold" : ""}`}
+                          onClick={() => {
+                            if (selected) {
+                              setStockGroup("");
+                              return;
+                            }
+                            setStockGroup(product.key);
+                            setStockTab("available");
+                            setQ("");
+                          }}>
+                          <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[tone]}`} />
+                          <span className="break-words">{product.platform} <span className="text-muted-foreground">· {product.kind === "profile" ? "Perfil" : "Completa"} · {product.months} m</span></span>
+                          <span className="sr-only">{availability}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {stockGroup && <Button size="sm" variant="ghost" onClick={() => setStockGroup("")}>Mostrar todas las plataformas</Button>}
+              </section>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {([

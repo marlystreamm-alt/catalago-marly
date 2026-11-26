@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 const read=p=>readFile(new URL("../"+p,import.meta.url),"utf8");
-test("orders and deliveries use disjoint stages with shared origins",async()=>{
+test("the three order stages share navigation and hide the duplicate filters",async()=>{
  const [workspace,cyber,web,notices]=await Promise.all(["src/components/workspace/seller-workspace.tsx","src/components/catalog/cyberdocs-orders-dialog.tsx","src/components/customer/web-orders.tsx","src/components/catalog/notifications-dialog.tsx"].map(read));
- assert.match(workspace,/stage=\{tab==="delivered"\?"deliveries":"orders"\}/);
- assert.match(cyber,/stage==="deliveries"\?order.status==="completed":order.status!=="completed"/);
+ assert.match(workspace,/\["main", "Pedidos"\], \["processing", "En proceso"\], \["delivered", "Entregadas"\]/);
+ assert.match(cyber,/stage==="processing" \? order.status==="in_process"/);
+ assert.match(cyber,/order.status!=="completed" && order.status!=="in_process"/);
+ assert.match(cyber,/\{!navigation && <div className="-mx-3/);
+ assert.match(cyber,/\{navigation\}[\s\S]*?size="icon"[\s\S]*?aria-label="Ajustes de pedidos"/);
  assert.match(web,/stage==="orders"\?!r.linkedId/);
  assert.match(cyber,/aria-label="Ajustes de pedidos"/);
  assert.doesNotMatch(notices,/<TabsTrigger value="pedidos"/);
@@ -18,4 +21,14 @@ test("combo assignment checks administrator, locks all units and persists one de
  assert.match(sql,/status<>'available'/);
  assert.match(sql,/status='assigned'/);
  assert.match(sql,/from public,anon,authenticated/);
+});
+
+test("manual preparation remains in process until a successful clipboard action", async()=>{
+ const [cyber, api, customer]=await Promise.all(["src/components/catalog/cyberdocs-orders-dialog.tsx","src/lib/cyberdocs/cyberdocs.functions.ts","src/lib/customer/customer.functions.ts"].map(read));
+ assert.match(api,/assignStockToOrder\(\{ \.\.\.data, prepareOnly: true \}\)/);
+ assert.match(api,/createManualDeliveryForOrder\(\{ \.\.\.data, prepareOnly: true \}\)/);
+ const copy=cyber.split("const copyAndComplete")[1].split("const shareDeliveryMessage")[0];
+ assert.match(copy,/await copyText\(text\);[\s\S]*?await cyberdocsRetryDeliveryCompletion/);
+ assert.match(copy,/onStageChange\?\.\(completed.id, "deliveries"\)/);
+ assert.match(customer,/\.rpc\("ma2_customer_buy"/);
 });

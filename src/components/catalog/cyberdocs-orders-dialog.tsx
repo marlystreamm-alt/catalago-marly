@@ -1,5 +1,5 @@
 import { ToolFrame } from '@/components/workspace/tool-frame';
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Archive,
@@ -21,9 +21,11 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Settings,
   Settings2,
   Smartphone,
   Webhook,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -137,7 +139,15 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
   return { name: file.name, type: file.type || "application/octet-stream", dataUrl };
 }
 
-export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,stage="all"}:{embedded?:boolean; initialSelectedId?:string|null;stage?:"all"|"orders"|"deliveries"}={}) {
+export function CyberDocsOrdersDialog({
+  embedded = false, initialSelectedId = null, stage = "all", navigation, onStageChange,
+}: {
+  embedded?: boolean;
+  initialSelectedId?: string | null;
+  stage?: "all" | "orders" | "processing" | "deliveries";
+  navigation?: ReactNode;
+  onStageChange?: (id: string, stage: "processing" | "deliveries") => void;
+} = {}) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(embedded);
   const [busy, setBusy] = useState(false);
@@ -329,6 +339,27 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
     }
   };
 
+  const copyAndComplete = async (text: string, order: CyberDocsOrder) => {
+    await copyText(text);
+    if (terminal(order)) {
+      toast.success("Datos de entrega copiados");
+      return;
+    }
+    try {
+      const completed = await cyberdocsRetryDeliveryCompletion({ data: { code, orderId: order.id } });
+      replaceOrder(completed);
+      if (completed.status === "completed") {
+        toast.success("Datos copiados · pedido movido a Entregadas");
+        onStageChange?.(completed.id, "deliveries");
+      } else {
+        toast.info("Datos copiados. El pedido cambió de estado.");
+      }
+    } catch (error) {
+      toast.error(`Datos copiados. No se pudo confirmar el estado: ${errorText(error)}`);
+      await refresh();
+    }
+  };
+
   const shareDeliveryMessage = async (kind: DeliveryMessageKind, whatsapp = false) => {
     if (!selected) return;
     try {
@@ -343,7 +374,8 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
       );
       if (!message) return toast.info("Este documento no tiene contraseña de protección");
       if (whatsapp) await openWhatsApp(message);
-      else { await copyText(message); toast.success("Mensaje completo copiado"); }
+      else if (kind === "password") { await copyText(message); toast.success("Mensaje copiado"); }
+      else await copyAndComplete(message, selected);
     } catch (error) { toast.error(errorText(error)); }
   };
 
@@ -415,7 +447,8 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
       }});
       replaceOrder(result.order);
       if (result.completionError) toast.warning(result.completionError);
-      else toast.success(selected.sourceKey === "web_catalog" ? "Entrega preparada · copia y envía los datos, después confirma la entrega" : "Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
+      else toast.success("Entrega preparada · copia las credenciales o el enlace para finalizar");
+      if (result.order.status === "in_process") onStageChange?.(result.order.id, "processing");
       setAccessPassword(""); setConfirmPassword(""); setStockItemId(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       await refresh();
     } catch (error) { toast.error(errorText(error)); } finally { setBusy(false); }
@@ -440,7 +473,8 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
       }});
       replaceOrder(result.order);
       if (result.completionError) toast.warning(result.completionError);
-      else toast.success(selected.sourceKey === "web_catalog" ? "Entrega preparada · copia y envía los datos, después confirma la entrega" : "Documento guardado · pedido finalizado · ya puedes copiar tu mensaje");
+      else toast.success("Entrega preparada · copia las credenciales o el enlace para finalizar");
+      if (result.order.status === "in_process") onStageChange?.(result.order.id, "processing");
       setAccessPassword(""); setConfirmPassword(""); setDeliveryNotes(""); setDeliveryAttachment(null); setDeliverySource("");
       setManualUsername(""); setManualPassword(""); setManualPin(""); setManualLink(""); setManualPanelUsername(""); setManualPanelPassword("");
       await refresh();
@@ -489,13 +523,9 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
     if (!selected) return;
     try {
       const result = await cyberdocsGetDeliveryLink({ data: { code, orderId: selected.id } });
-      await copyText(
+      await copyAndComplete(
         `${window.location.origin}/e/${result.id}?t=${encodeURIComponent(result.token)}`,
-      );
-      toast.success(
-        result.status === "active"
-          ? "Enlace protegido copiado"
-          : `Enlace copiado; estado: ${result.status}`,
+        selected,
       );
     } catch (error) {
       toast.error(errorText(error));
@@ -685,7 +715,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
   const pending = orders.filter((order) => !terminal(order)).length;
   const visibleOrders = useMemo(() => [...orders]
     .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .filter(order=>stage==="all"||(stage==="deliveries"?order.status==="completed":order.status!=="completed"))
+    .filter(order=>stage==="all"||(stage==="deliveries" ? order.status==="completed" : stage==="processing" ? order.status==="in_process" : order.status!=="completed" && order.status!=="in_process"))
     .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
     .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
   const selectableVisibleIds = useMemo(
@@ -708,7 +738,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
     <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl">
           <ClipboardList className="mr-1.5 size-4" /> Pedidos {pending ? `(${pending})` : ""}
         </Button>} className="h-[100dvh] w-screen max-w-none gap-3 overflow-y-auto rounded-none p-3 sm:h-[94vh] sm:w-[calc(100vw-1.5rem)] sm:max-w-6xl sm:rounded-3xl sm:p-6">
-        <DialogHeader className="sticky top-0 z-20 -mx-3 -mt-3 border-b bg-background/95 px-4 py-3 text-left backdrop-blur sm:static sm:mx-0 sm:mt-0 sm:border-0 sm:bg-transparent sm:p-0">
+        {!navigation && <DialogHeader className="sticky top-0 z-20 -mx-3 -mt-3 border-b bg-background/95 px-4 py-3 text-left backdrop-blur sm:static sm:mx-0 sm:mt-0 sm:border-0 sm:bg-transparent sm:p-0">
           <div className="flex items-center justify-between gap-2 pr-8 sm:pr-0">
             <Button type="button" size="sm" variant="outline" className="shrink-0 rounded-full" onClick={() => setOpen(false)} hidden={embedded}>
               <ArrowLeft className="mr-1 size-4" />Regresar
@@ -722,9 +752,11 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
           <DialogDescription>
             {stage==="deliveries"?"Pedidos completados de CyberDocs y la web.":"Ordenados por fecha y origen."}
           </DialogDescription>
-        </DialogHeader>
+        </DialogHeader>}
 
-        {stage!=="deliveries"&&<Dialog><DialogTrigger asChild><Button size="sm" variant="outline" className="w-fit" aria-label="Ajustes de pedidos"><Settings2 className="size-4"/> Ajustes de pedidos</Button></DialogTrigger><DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Ajustes de pedidos</DialogTitle><DialogDescription>Conexiones, avisos y mensajes de entrega.</DialogDescription></DialogHeader><section className="rounded-2xl border bg-muted/20 p-3 space-y-3">
+        <div className="flex items-center gap-2">
+        {navigation}
+        {(navigation || stage !== "deliveries") && <Dialog><DialogTrigger asChild><Button size="icon" variant="ghost" className="shrink-0" aria-label="Ajustes de pedidos" title="Ajustes de pedidos"><Settings className="size-4"/></Button></DialogTrigger><DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Ajustes de pedidos</DialogTitle><DialogDescription>Conexiones, avisos y mensajes de entrega.</DialogDescription></DialogHeader><section className="rounded-2xl border bg-muted/20 p-3 space-y-3">
           <h3 className="font-semibold flex items-center gap-2"><Bot className="size-4"/> CyberDocs y Alexa</h3>
           <div className="flex flex-wrap gap-2"><Badge variant={ready ? "default" : "secondary"}>Telegram: {status ? ready ? "Conectado" : "Revisar conexión" : "Consultando"}</Badge><Badge variant="secondary">Alexa: {alexaStatus ? alexaStatus.enabled && alexaStatus.newOrders && (alexaStatus.echo || alexaStatus.app) ? "Avisos activos" : "Avisos desactivados" : "Sin verificar"}</Badge></div>
           <p className="text-xs text-muted-foreground">Último pedido: {dateTime(status?.lastOrderAt || null)}. {alexaStatus && !alexaStatus.inSchedule ? "Fuera del horario de avisos automáticos." : ""}</p>
@@ -868,9 +900,10 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
           ) : null}
           </section>
         </details></DialogContent></Dialog>}
+        </div>
 
         <Input type="search" aria-label="Buscar pedidos" placeholder="Buscar por folio, servicio o cliente" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
-        <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+        {!navigation && <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
           {stage!=="deliveries"&&<Button size="sm" variant="outline" className="shrink-0" onClick={() => { const target = orders.find(o => !terminal(o)); if (target) { setSelectedId(target.id); setDeliverySource("manual"); setManualPlatform(target.serviceName || ""); setManualType("full"); } else toast.info("No hay pedidos pendientes para entrega manual"); }}>Entrega manual</Button>}
           {[
             ["all","Todos"],
@@ -878,7 +911,7 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
             ["in_process",`En proceso (${orders.filter(o=>o.status==="in_process").length})`],
             ["completed",`Entregadas (${orders.filter(o=>o.status==="completed").length})`],
           ].filter(([key])=>stage==="all"||(stage==="orders"?key!=="completed":key==="all")).map(([key,label])=><Button key={key} size="sm" className="shrink-0" variant={orderFilter===key?"default":"outline"} onClick={()=>setOrderFilter(key as typeof orderFilter)}>{label}</Button>)}
-        </div>
+        </div>}
 
         {busy ? (
           <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
@@ -889,8 +922,8 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
 
         <section className="grid gap-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregas":"Pedidos"} ({visibleOrders.length})</p>
-            {stage!=="deliveries"&&<Badge variant="outline">Pendientes {pending}</Badge>}
+            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregadas":stage==="processing"?"En proceso":"Pedidos"} ({visibleOrders.length})</p>
+            {!navigation && stage!=="deliveries"&&<Badge variant="outline">Pendientes {pending}</Badge>}
           </div>
           {selectableVisibleIds.length ? (
             <div className="sticky top-[68px] z-10 grid gap-2 rounded-2xl border border-primary/30 bg-background/95 p-3 shadow-sm backdrop-blur sm:static sm:flex sm:items-center">
@@ -964,6 +997,11 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
 
                   {expanded && selected ? (
                     <div className="grid gap-3 border-t p-3 sm:p-4">
+                      <div className="flex justify-end">
+                        <Button type="button" variant="ghost" size="icon" aria-label="Cerrar detalle del pedido" title="Cerrar detalle" onClick={() => setSelectedId(null)}>
+                          <X className="size-4" />
+                        </Button>
+                      </div>
                       <div className="grid gap-2 rounded-xl bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         {selected.contactValue && selected.contactLabel !== "WhatsApp" && !extraOrderDetails(selected.parsedPayload || {}).some(([,v]) => v === selected.contactValue) ? <p><b>{selected.contactLabel || "Contacto"}:</b> {selected.contactValue}</p> : null}
                         {extraOrderDetails(selected.parsedPayload || {}).map(([k,v]) => <p key={k}><b>{k.replaceAll("_", " ")}:</b> {String(v)}</p>)}
@@ -1092,12 +1130,12 @@ export function CyberDocsOrdersDialog({embedded=false, initialSelectedId=null,st
                       {selected.protectedDeliveryId || selected.status === "completed" ? (
                         <div className="rounded-xl border border-emerald-300/50 bg-emerald-50 p-3 text-emerald-950">
                           <p className="text-sm font-semibold">{selected.status === "completed" ? "Entrega finalizada" : "Entrega preparada · pendiente de enviar"}</p>
-                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Copia el mensaje o los datos y confirma cuando hayas realizado la entrega."}</p>
+                          <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Al copiar el enlace o las credenciales, el pedido pasa a Entregadas."}</p>
                           {selected.protectedDeliveryId ? (
                             <>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <Button size="sm" onClick={() => void shareDeliveryMessage("combined")}><Copy className="mr-1 size-4" />Copiar mensaje</Button>
-                                <Button size="sm" variant="outline" onClick={async () => { try { await copyText(await cyberdocsCopyCredentials({data:{code,orderId:selected.id}})); toast.success("Credenciales copiadas"); } catch(e) { toast.error(errorText(e)); } }}><Copy className="mr-1 size-4" />Copiar credenciales</Button>
+                                <Button size="sm" variant="outline" onClick={async () => { try { await copyAndComplete(await cyberdocsCopyCredentials({data:{code,orderId:selected.id}}), selected); } catch(e) { toast.error(errorText(e)); } }}><Copy className="mr-1 size-4" />Copiar credenciales</Button>
                                 <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("combined", true)}><MessageCircle className="mr-1 size-4" />WhatsApp</Button>
                               </div>
                               <p className="mt-2 text-xs">Usa tu mensaje de LINK + CONTRASEÑA; si el documento no tiene contraseña, usa tu mensaje de LINK.</p>
