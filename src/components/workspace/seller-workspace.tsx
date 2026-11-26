@@ -59,6 +59,7 @@ import { comboCopyCredentials } from "@/lib/stock/combo.functions";
 import { StockComboPlanner } from "@/components/workspace/stock-combo-planner";
 import { mainAppearanceLoad, mainAppearanceSave } from "@/lib/appearance/main-store.functions";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
+import { renewalLimits, TONE_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
   ["finance", "💰", "Finanzas"],
@@ -66,8 +67,7 @@ const SECTIONS = [
   ["ownCatalogs", "📚", "Mis catálogos"],
   ["reports", "🛠️", "Reportes"],
   ["questions", "💬", "Dudas de clientes"],
-  ["expiry", "⏰", "Por vencer"],
-  ["sales", "🧾", "Ventas"],
+  ["expiry", "⏰", "Vigencias y renovaciones"],
   ["clients", "👥", "Clientes"],
   ["wallet", "💸", "Recargas"],
   ["credit", "💳", "Créditos"],
@@ -95,7 +95,7 @@ const SECTIONS = [
 export type Section = (typeof SECTIONS)[number][0];
 const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"home",children:[]},
-  {main:"sales",label:"Ventas y vigencias",children:["expiry"]},
+  {main:"expiry",children:[]},
   {main:"orders",label:"Pedidos y entregas",children:[]},
   {main:"inventory",children:["shop","combos"]},
   {main:"clients",children:[]},
@@ -289,7 +289,6 @@ const DESCRIPTIONS: Partial<Record<Section, string>> = {
   finance: "Entradas, salidas, cuentas de efectivo y control de pagos.",
   ownCatalogs: "Tus listas anteriores, independientes de la tienda web.",
   expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
-  sales: "Entregas e importes registrados en tu inventario.",
   wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
   credit: "Registra crédito otorgado y sus abonos, con historial.",
   inventory: "Cuentas completas y perfiles. Agrega stock, copia credenciales y entrega.",
@@ -313,6 +312,7 @@ export function SellerHome({
   clients: number;
   onNavigate: (section: Section) => void;
 }) {
+  const [salesOpen,setSalesOpen]=useState(false);
   const daily = summary.daily;
   const weekTotal = daily.reduce((s, d) => s + d.total, 0);
   const max = Math.max(100, ...daily.map((d) => d.total));
@@ -321,14 +321,28 @@ export function SellerHome({
       label: "💰 Vendido hoy",
       value: money(daily.at(-1)?.total || 0),
       detail: `${daily.at(-1)?.count || 0} entregas registradas`,
-      section: "sales",
+      section: "home",
       tone: "aqua",
     },
     {
       label: "📈 Últimos 7 días",
       value: money(weekTotal),
       detail: `${daily.reduce((s, d) => s + d.count, 0)} entregas registradas`,
-      section: "sales",
+      section: "home",
+      tone: "",
+    },
+    {
+      label: "🧾 Ventas del mes",
+      value: money(summary.revenue),
+      detail: `${summary.sales} entregas registradas · ${summary.salesWithoutPrice} sin precio`,
+      section: "home",
+      tone: "",
+    },
+    {
+      label: "💵 Ganancia estimada del mes",
+      value: summary.marginSales ? money(summary.margin) : "Sin datos",
+      detail: `${summary.marginSales} ventas con costo y precio · no incluye gastos`,
+      section: "finance",
       tone: "",
     },
     {
@@ -427,7 +441,7 @@ export function SellerHome({
                     className="flex w-full items-center justify-between text-left text-sm"
                   >
                     <span>{p.platform}</span>
-                    <b className="seller-badge">{p.available}</b>
+                    <b className={`rounded-full border px-2 py-1 text-xs ${TONE_CLASSES[inventoryTone(p.available)]}`}>{p.available===0?"Agotado":p.available}</b>
                   </button>
                 ))}
             </div>
@@ -460,15 +474,6 @@ export function SellerHome({
       </div>
       <div className="seller-grid">
         <article className="seller-card">
-          <p className="seller-caption">Ganancia estimada del mes</p>
-          <strong className="text-2xl">
-            {summary.marginSales ? money(summary.margin) : "Sin datos completos"}
-          </strong>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {summary.marginSales} ventas con costo y precio válidos. No incluye gastos operativos.
-          </p>
-        </article>
-        <article className="seller-card">
           <p className="seller-caption">Vencidas / bajas</p>
           <strong className="text-2xl">{summary.expired}</strong>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -477,6 +482,7 @@ export function SellerHome({
           </p>
         </article>
       </div>
+      <details className="seller-card" onToggle={e=>setSalesOpen(e.currentTarget.open)}><summary className="font-semibold cursor-pointer">Consultar ventas registradas</summary>{salesOpen&&<div className="mt-3"><StockInsights sales showSummary={false}/></div>}</details>
     </div>
   );
 }
@@ -566,8 +572,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   else if (section === "shop") content = <ProductPricing/>;
   else if (section === "ownCatalogs") content = <section className="seller-card space-y-3"><h2 className="font-bold">Archivo histórico de catálogos</h2><p className="text-sm text-muted-foreground">Conservados sin editar. No forman parte de la tienda web.</p>{Object.values(store.state.catalogs).map(c=><div key={c.id} className="rounded-xl border p-3"><strong>{c.name}</strong><p className="text-xs text-muted-foreground">{c.services.length} servicios archivados</p></div>)}</section>;
   else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || ""} : undefined} /></div>;
-  else if (section === "expiry") content = <StockInsights />;
-  else if (section === "sales") content = <div className="space-y-3"><div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>setTab("main")}>Ventas y ganancias</button><button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>Vigencias y renovaciones</button></div><StockInsights key={tab} sales={tab==="main"}/></div>;
+  else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
   else if (section === "finance") content = <FinancePanel/>;
   else if (section === "wallet")
     content = (
@@ -603,7 +608,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       <div className="seller-tabs"><button className={tab==="main"?"active":""} onClick={()=>{setSelectedOrderId(null);setTab("main");}}>Pedidos</button><button className={tab==="delivered"?"active":""} onClick={()=>{setSelectedOrderId(null);setTab("delivered");}}>Entregas</button></div>
       <CyberDocsOrdersDialog key={tab+":"+(selectedOrderId||"all")} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":"orders"}/>
       <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} onOpenOrder={(id,delivered)=>{setSelectedOrderId(id);setTab(delivered?"delivered":"main");}}/>
-      {tab==="delivered"&&<><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas protegidas</summary><ProtectedDeliveriesDialog embedded/></details><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario y vigencias</summary><StockInsights sales/></details></>}
+      {tab==="delivered"&&<><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas protegidas</summary><ProtectedDeliveriesDialog embedded/></details><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details></>}
       {tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Encargos registrados manualmente</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status!=="completed"))}</details>}{tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
     </div>;
   else if (section === "questions")
@@ -673,7 +678,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
             <AdminBar />
             <SystemStatusDialog />
             <MethodsDialog />
-            <details className="seller-card"><summary className="font-semibold cursor-pointer">Datos de contacto y mensajes</summary>{resource("config")}</details>
+            <details className="seller-card"><summary className="font-semibold cursor-pointer">Contacto, mensajes y semáforo de vigencias</summary>{resource("config")}</details>
           </div>
         )}
       </>

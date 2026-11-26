@@ -183,6 +183,8 @@ export const DEFINITIONS: Record<
       { key: "instagram", label: "Instagram", type: "url" },
       { key: "telegram", label: "Telegram", type: "url" },
       { key: "message", label: "Mensaje de bienvenida", type: "textarea" },
+      { key: "renewalRedDays", label: "Vigencias: rojo hasta (días, por defecto 3)", type: "number" },
+      { key: "renewalYellowDays", label: "Vigencias: amarillo hasta (días, por defecto 7)", type: "number" },
       {
         key: "renewal",
         label: "Plantilla de renovación ({cliente}, {plataforma}, {fecha})",
@@ -241,6 +243,10 @@ export function validatePayload(module: Module, data: Payload) {
   }
   if (module === "clients" && !/^\+?[\d ()-]{10,25}$/.test(data.whatsapp || ""))
     throw new Error("Escribe el WhatsApp con lada");
+  if(module==="config"){
+    const red=Number(data.renewalRedDays||3),yellow=Number(data.renewalYellowDays||7);
+    if(!Number.isInteger(red)||!Number.isInteger(yellow)||red<0||yellow<=red||yellow>365)throw new Error("El límite amarillo debe ser mayor al rojo (entre 0 y 365 días).");
+  }
   if (module === "songs" && !youtubeId(data.url || ""))
     throw new Error("Usa un enlace de video de YouTube válido");
 }

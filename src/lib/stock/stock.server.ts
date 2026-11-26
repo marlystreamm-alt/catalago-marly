@@ -21,6 +21,25 @@ export async function saveStock(item: Omit<StockItem,"createdAt"|"updatedAt">){
 }
 export async function removeStock(id:string,businessId:string|null){ const db=await admin(); let q=db.from("stock_items").delete().eq("id",id); q=businessId?q.eq("business_id",businessId):q.is("business_id",null); const {data,error}=await q.select("id"); if(error) throw new Error(error.message); if(!data?.length) throw new Error("No se encontró el registro de stock para eliminar"); }
 
+/** Change only renewal metadata, never overwrite credentials, price or assignment from an old UI snapshot. */
+export async function updateMainRenewal(id:string,version:string,expiresOn?:string){
+ const db=await admin();
+ const row=await db.from("stock_items").select("id,status,client_name,delivered_on,expires_on,updated_at").eq("id",id).is("business_id",null).maybeSingle();
+ if(row.error||!row.data||row.data.updated_at!==version||row.data.status==="available"||(!row.data.client_name&&!row.data.delivered_on))throw new Error("El servicio cambió o ya no está asignado. Actualiza la lista.");
+ const now=new Date().toISOString();
+ let changes:{renewal_notified_at:string|null;updated_at:string;expires_on?:string;status?:string;renewal_status?:string}={renewal_notified_at:now,updated_at:now};
+ if(expiresOn!==undefined){
+   const date=new Date(`${expiresOn}T12:00:00Z`);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(expiresOn)||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==expiresOn||expiresOn<=businessToday()||(row.data.expires_on&&expiresOn<=row.data.expires_on))throw new Error("Elige una fecha posterior a hoy y al vencimiento actual.");
+   if(!["assigned","expiring","expired"].includes(row.data.status))throw new Error("Resuelve la reposición antes de renovar el servicio.");
+   changes={expires_on:expiresOn,status:"assigned",renewal_status:"Renovado",renewal_notified_at:null,updated_at:now};
+ }
+ const result=await db.from("stock_items").update(changes).eq("id",id).eq("updated_at",version).is("business_id",null).select("id").maybeSingle();
+ if(result.error||!result.data)throw new Error("El servicio cambió. Actualiza la lista e inténtalo de nuevo.");
+ await logStockHistory(id,null,expiresOn?"renovado":"avisado",expiresOn?`Vence: ${expiresOn}`:"Recordatorio marcado como enviado");
+ return {ok:true as const};
+}
+
 export async function logStockHistory(stockId:string,businessId:string|null,action:string,detail:string){
  const db=await admin(); const {error}=await db.from("stock_history").insert({stock_id:stockId,business_id:businessId,action,detail}); if(error) throw new Error(error.message);
 }

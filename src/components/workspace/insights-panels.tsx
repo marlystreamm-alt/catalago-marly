@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { stockAdminList, stockAdminSave } from "@/lib/stock/stock.functions";
+import { stockAdminList, stockAdminRenewal } from "@/lib/stock/stock.functions";
+import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
+import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
 import type { StockItem } from "@/lib/stock/types";
 import { money, phoneNumber, type OpsRecord } from "@/lib/workspace/model";
@@ -10,12 +12,14 @@ import { EmptyState, errorText, exportRows } from "./resource-panel";
 import { BusinessTools } from "@/components/catalog/business-tools";
 import { menusList } from "@/lib/menus/menus.functions";
 import type { MenuBusiness } from "@/lib/menus/types";
-export function StockInsights({ sales = false }: { sales?: boolean }) {
+export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void }) {
   const [items, setItems] = useState<StockItem[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
-  const [days, setDays] = useState("7");
+  const [days, setDays] = useState("all");
+  const [renewing,setRenewing]=useState<StockItem|null>(null);
+  const [newDate,setNewDate]=useState("");
   const load = async () => {
     setBusy(true);
     setError("");
@@ -30,34 +34,28 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
   useEffect(() => {
     void load();
   }, []);
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Monterrey",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  const today = businessToday();
   const parents = new Set(items.map((i) => i.parentStockId));
-  const rows = items
+  const assigned = items
     .filter(
       (r) =>
-        !parents.has(r.id) &&
+        !parents.has(r.id) && r.accountType!=="split_parent" &&
         r.status !== "available" &&
+        (sales || Boolean(r.clientName || r.deliveredOn)) &&
         `${r.platform} ${r.clientName} ${r.clientWhatsapp}`
           .toLowerCase()
           .includes(query.toLowerCase()),
-    )
-    .filter((r) => {
+    );
+  const tone=(r:StockItem)=>r.status==="expired"?"expired":renewalTone(daysRemaining(r.expiresOn,today),limits);
+  const rows = assigned.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
-      if (!r.expiresOn) return days === "unassigned";
-      const delta = Math.round(
-        (Date.parse(r.expiresOn + "T12:00:00Z") - Date.parse(today + "T12:00:00Z")) / 86400000,
-      );
-      return days === "expired"
-        ? delta < 0
-        : days === "notified"
-          ? Boolean(r.renewalNotifiedAt)
-          : days !== "unassigned" && delta >= 0 && delta <= Number(days);
-    });
+      return days==="all" || tone(r)===days;
+    }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
+  const saveRenewal=async(r:StockItem,date?:string)=>{
+    setBusy(true);
+    try{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});setRenewing(null);await load();onChanged?.();toast.success(date?"Renovación guardada":"Marcado como avisado");}
+    catch(e){toast.error(errorText(e));}finally{setBusy(false);}
+  };
   return (
     <div className="space-y-4">
       <div className="seller-actions">
@@ -94,20 +92,19 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
       {!sales ? (
         <div className="seller-tabs">
           {[
-            ["expired", "⛔ Ya vencieron"],
-            ["3", "Hoy a 3 días"],
-            ["7", "7 días"],
-            ["15", "15 días"],
-            ["30", "30 días"],
-            ["notified", "✅ Ya avisados"],
-            ["unassigned", "Sin fecha"],
+            ["all", "Todos"],
+            ["expired", "⚫ Vencidos"],
+            ["red", `🔴 0–${limits.red} días`],
+            ["yellow", `🟡 ${limits.red+1}–${limits.yellow} días`],
+            ["green", `🟢 ${limits.yellow+1}+ días`],
+            ["unknown", "Sin fecha"],
           ].map(([v, l]) => (
             <button key={v} className={days === v ? "active" : ""} onClick={() => setDays(v)}>
-              {l}
+              {l} ({v==="all"?assigned.length:assigned.filter(r=>tone(r)===v).length})
             </button>
           ))}
         </div>
-      ) : (
+      ) : showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
             <p>Ventas registradas</p>
@@ -122,7 +119,7 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
           </article>
           <article className="seller-card"><p>Ganancia estimada</p><strong className="text-3xl">{money(rows.filter(r=>r.cost>0&&r.salePrice>0&&!r.parentStockId).reduce((n,r)=>n+r.salePrice-r.cost,0))}</strong><p className="text-xs text-muted-foreground">Solo ventas con costo individual registrado; no incluye gastos.</p></article>
         </div>
-      )}
+      ) : null}
       {busy ? (
         <p role="status">Cargando registros…</p>
       ) : !rows.length ? (
@@ -133,18 +130,20 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
         />
       ) : (
         <div className="seller-record-grid">
-          {rows.map((r) => (
-            <article className="seller-card" key={r.id}>
+          {rows.map((r) => {
+            const delta=daysRemaining(r.expiresOn,today), color=tone(r);
+            return <article className="seller-card" key={r.id}>
               <div className="flex justify-between gap-2">
                 <h3 className="font-bold">{r.platform}</h3>
-                <span className="seller-badge">{r.expiresOn || "Sin fecha"}</span>
+                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{color==="expired"?"Vencido":delta===null?"Sin fecha":delta===0?"Vence hoy":`${delta} día${delta===1?"":"s"}`}</span>
               </div>
-              <p className="text-sm">{r.clientName || "Sin nombre de cliente"}</p>
+              <p className="text-sm">{r.clientName || "Sin nombre de cliente"} · {r.stockKind==="profile"?"Perfil":"Completa"}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {sales
                   ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}`
                   : `Vencimiento: ${r.expiresOn || "Sin asignar"}`}
               </p>
+              {!sales&&r.renewalNotifiedAt&&<p className="mt-1 text-xs text-muted-foreground">✓ Avisado el {r.renewalNotifiedAt.slice(0,10)}</p>}
               <div className="seller-actions mt-3">
                 {r.clientWhatsapp ? (
                   <Button asChild size="sm">
@@ -156,36 +155,22 @@ export function StockInsights({ sales = false }: { sales?: boolean }) {
                       WhatsApp
                     </a>
                   </Button>
-                ) : null}
+                ) : !sales?<span className="text-xs text-muted-foreground">Sin WhatsApp registrado</span>:null}
                 {!sales ? (
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      try {
-                        await stockAdminSave({
-                          data: {
-                            code: getSavedCode(),
-                            item: { ...r, renewalNotifiedAt: new Date().toISOString() },
-                          },
-                        });
-                        await load();
-                        toast.success("Marcado como avisado");
-                      } catch (e) {
-                        toast.error(errorText(e));
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
+                    onClick={() => void saveRenewal(r)}
                   >
                     Marcar avisado
                   </Button>
                 ) : null}
+                {!sales&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
               </div>
-            </article>
-          ))}
+              {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
+            </article>;
+          })}
         </div>
       )}
     </div>
