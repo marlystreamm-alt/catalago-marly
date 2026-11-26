@@ -30,7 +30,7 @@ const ctx = url(
   `export const customerContext=async slug=>{if(!globalThis.__customer.allowed)throw new Error('Denied');return globalThis.__customer.context;};export const customerRecords=async()=>globalThis.__customer.records;export const customerShop=async()=>globalThis.__customer.context.shop;export const customerThrottle=async()=>{};export const customerOwner=async token=>{if(token!=='owner_valid')throw new Error('Unauthorized owner');return{business:{id:globalThis.__customer.context.shop.id}}};export const customerLogoutSession=async()=>{};`,
 );
 const ops = url(
-  `export const opsDB=()=>({from:table=>{const calls=globalThis.__customer.calls;calls.push({table});const q={select:()=>q,eq:(key,value)=>{calls.push({key,value});return q;},is:(key,value)=>{calls.push({key,value});return q;},not:()=>q,neq:()=>q,gt:()=>q,order:()=>q,limit:()=>q,update:value=>{calls.push({update:value});return q;},in:()=>q,maybeSingle:async()=>({data:globalThis.__customer.single,error:null}),single:async()=>({data:globalThis.__customer.single,error:null}),then:(resolve,reject)=>Promise.resolve({data:table==='stock_items'?globalThis.__customer.stock:[],error:null}).then(resolve,reject)};return q;},rpc:async(name,data)=>{globalThis.__customer.calls.push({name,data});if(name==='ma2_customer_prices')return{data:globalThis.__customer.stock.map(v=>({stock_id:v.id,price_cents:globalThis.__customer.context.account.price_tier==='reseller'?v.reseller_cents:Math.round(v.sale_price*100)})),error:null};return{data:'request-id',error:null}}});export const walletEntries=async()=>[];export const readRecords=async()=>globalThis.__customer.records;export const readRecord=async()=>globalThis.__customer.record;export const totals=()=>({balance:0,debt:0});export const createRecord=async(module,title,status,data)=>{globalThis.__customer.calls.push({module,title,status,data})};`,
+  `export const opsDB=()=>({from:table=>{const calls=globalThis.__customer.calls;calls.push({table});const q={select:()=>q,eq:(key,value)=>{calls.push({key,value});return q;},is:(key,value)=>{calls.push({key,value});return q;},not:()=>q,neq:()=>q,gt:()=>q,order:()=>q,limit:()=>q,update:value=>{calls.push({update:value});return q;},in:()=>q,maybeSingle:async()=>({data:globalThis.__customer.byTable?.[table] ?? globalThis.__customer.single,error:null}),single:async()=>({data:globalThis.__customer.single,error:null}),then:(resolve,reject)=>Promise.resolve({data:table==='stock_items'?globalThis.__customer.stock:[],error:null}).then(resolve,reject)};return q;},rpc:async(name,data)=>{globalThis.__customer.calls.push({name,data});if(name==='ma2_customer_prices')return{data:globalThis.__customer.stock.map(v=>({stock_id:v.id,price_cents:globalThis.__customer.context.account.price_tier==='reseller'?v.reseller_cents:Math.round(v.sale_price*100)})),error:null};return{data:'request-id',error:null}}});export const walletEntries=async()=>[];export const readRecords=async()=>globalThis.__customer.records;export const readRecord=async()=>globalThis.__customer.record;export const totals=()=>({balance:0,debt:0});export const createRecord=async(module,title,status,data)=>{globalThis.__customer.calls.push({module,title,status,data})};`,
 );
 const decrypt = url(`export const decryptPayload=async()=>({password:'fixture-password'});`);
 const date = url(`export const businessToday=()=>new Date().toISOString().slice(0,10);`);
@@ -330,3 +330,18 @@ test('an active customer session resolves the server-side account and client',as
 
 test("main shop recovery ignores the original template phone number",async()=>{const s=sessionFixture();s.config=[{status:"active",data:{whatsapp:"5215500000000"}}];assert.equal((await sessionAPI.customerShop("ma2")).whatsapp,"528443852364");s.config=[{status:"active",data:{whatsapp:"844 385 2364"}}];assert.equal((await sessionAPI.customerShop("ma2")).whatsapp,"844 385 2364");});
 test("main store uses independent validated appearance",async()=>{const s=sessionFixture();s.config=[{status:"active",data:{storeAppearance:JSON.stringify({logoImage:"https://example.invalid/logo.png",pageImage:"javascript:bad",cardOpacity:60})}}];const shop=await sessionAPI.customerShop("ma2");assert.equal(shop.logoUrl,"https://example.invalid/logo.png");assert.equal(shop.appearance.pageImage,"");assert.equal(shop.appearance.cardOpacity,60);});
+
+test("reports link paid web purchases to the verified customer and reject missing payment", async () => {
+  const state = fixture(), orderId = crypto.randomUUID();
+  const data = { slug: "ma2", module: "reports", title: "No abre", message: "Necesito ayuda", orderId };
+  state.byTable = { orders: { service_name: "Canva por invitación · 1 mes", status: "atendido" } };
+  await assert.rejects(api.customerSubmit({data}), /compra de tu cuenta/);
+  state.byTable.ma2_wallet_entries = { note: "Pedido web por encargo · Canva" };
+  state.calls.length = 0;
+  await api.customerSubmit({data});
+  assert.ok(state.calls.some(call=>call.key==="client_id" && call.value===state.context.client.id));
+  const saved = state.calls.find(call=>call.module==="reports");
+  assert.equal(saved.data.orderId, orderId);
+  assert.equal(saved.data.purchaseTitle, "Canva por invitación · 1 mes");
+  assert.equal(saved.data.platform, saved.data.purchaseTitle);
+});
