@@ -47,3 +47,10 @@ test('on-request products retain their delivery modality after catalog synchroni
  const state=createSeedState();state.catalogs.clientes.services[0].onRequest='both';state.catalogs.clientes.services[1].onRequest='invalid';
  const reloaded=normalizeState(JSON.parse(JSON.stringify(state)));assert.equal(reloaded.catalogs.clientes.services[0].onRequest,'both');assert.equal(reloaded.catalogs.clientes.services[1].onRequest,undefined);
 });
+test('shared palette is validated and changes the workspace theme tokens',()=>{
+ const original=theme.appearanceStyle(theme.DEFAULT_APPEARANCE),pink=theme.appearanceStyle({palette:'rosa'}),violet=theme.appearanceStyle({palette:'lavanda'});
+ assert.equal(theme.normalizeAppearance({palette:'invalid'}).palette,'ma2');
+ assert.notEqual(original['--ma2-accent'],pink['--ma2-accent']);
+ assert.notEqual(pink['--ma2-wash-one'],violet['--ma2-wash-one']);
+ assert.equal(theme.normalizeAppearance(JSON.parse(JSON.stringify({palette:'rosa'}))).palette,'rosa');
+});

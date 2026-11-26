@@ -14,6 +14,8 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminSessionLogout } from "@/lib/admin-session.functions";
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from "@/components/ui/sheet";
 import {useIsMobile} from "@/hooks/use-mobile";
+import {useMa2Appearance} from "@/hooks/use-ma2-appearance";
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { Storefront } from "@/components/customer/storefront";
 import { prepareGalleryImage } from "@/lib/gallery/image";
@@ -72,6 +75,10 @@ const tabs = [
 ] as const;
 export function CustomerStore({ slug, initialView = "inicio", initialQuery = "", initialSku = "" }: { slug: string; initialView?: MainStoreView; initialQuery?: string; initialSku?:string }) {
   const isMobile=useIsMobile();
+  const [dark,setDark]=useState(false);
+  useEffect(()=>{try{setDark(window.localStorage.getItem("ma2-buyer-theme")==="dark");}catch{}},[]);
+  useEffect(()=>{const root=document.documentElement;const previous=root.classList.contains("dark");root.classList.toggle("dark",dark);return()=>{root.classList.toggle("dark",previous);};},[dark]);
+  const toggleTheme=()=>{const next=!dark;setDark(next);try{window.localStorage.setItem("ma2-buyer-theme",next?"dark":"light");}catch{}};
   const [shop, setShop] = useState<Awaited<ReturnType<typeof customerShopInfo>> | null>(null),
     [data, setData] = useState<View | null>(null),
     [tab, setTab] = useState<string>(initialView),
@@ -105,6 +112,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     [evidenceLoading, setEvidenceLoading] = useState(false),
     [reportKind, setReportKind] = useState<"reports" | "questions" | "requests">("reports");
   const requests = useRef(new Map<string, string>());
+  useMa2Appearance(shop?.appearance);
   const load = useCallback(async () => {
     try {
       const d = await customerLoad({ data: { slug } });
@@ -231,31 +239,32 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     <main
       className="buyer-app seller-app ma2-unified"
       style={appearanceStyle(normalizeAppearance(shop.appearance))}
+      data-season={normalizeAppearance(shop.appearance).season}
     >
       <header className="buyer-top">
         <div className="flex min-w-0 items-center gap-3">
           {data && isMobile ? (
-            <Button
-              size="icon"
-              variant="ghost"
+            <button
+              className="seller-icon-button shrink-0"
               aria-label={menu ? "Cerrar menú" : "Abrir menú"}
               aria-expanded={menu}
               onClick={() => setMenu(!menu)}
             >
               {menu ? <X /> : <Menu />}
-            </Button>
+            </button>
           ) : null}
           {shop.logoUrl ? (
-            <img className="size-10 rounded-full object-cover" src={shop.logoUrl} alt="" />
+            <span className="seller-logo"><img className="h-full w-full object-contain" src={shop.logoUrl} alt="" /></span>
           ) : (
             <span className="seller-logo">MA²</span>
           )}
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{data ? data.priceTier === "reseller" ? "MI CUENTA · REVENDEDOR" : "MI CUENTA" : "BIENVENIDO"}</p>
+            <p className="buyer-header-label text-xs text-muted-foreground">{data ? data.priceTier === "reseller" ? "MI CUENTA · REVENDEDOR" : "MI CUENTA" : "BIENVENIDO"}</p>
             <h1 className="font-bold truncate">{shop.name}</h1>
           </div>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex shrink-0 gap-1 items-center">
+          <button type="button" className="seller-icon-button" aria-label={dark?"Activar modo claro":"Activar modo oscuro"} onClick={toggleTheme}>{dark?<Sun className="size-4"/>:<Moon className="size-4"/>}</button>
           {data ? (
             <>
               <button
@@ -267,9 +276,10 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               >
                 {money(data.balance)}
               </button>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                type="button"
+                className="seller-exit"
+                aria-label="Salir"
                 disabled={busy}
                 onClick={() =>
                   void action(async () => {
@@ -290,7 +300,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               >
                 <LogOut className="size-4" />
                 <span className="hidden sm:inline ml-1">Salir</span>
-              </Button>
+              </button>
             </>
           ) : null}
         </div>
@@ -309,7 +319,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               recibir soporte.
             </p>
             <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
-            {!shop.id&&<><div className="rounded-2xl bg-gradient-to-br from-indigo-950 to-cyan-800 p-5 text-white"><p className="text-xs font-bold uppercase tracking-wide text-cyan-200">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-white/90">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p></div><StoreNotices/></>}
+            {!shop.id&&<><div className="ma2-brand-promo p-5"><p className="text-xs font-bold uppercase tracking-wide text-primary">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-muted-foreground">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p></div><StoreNotices/></>}
             {shop.id&&<a className="text-sm text-primary underline" href="/plataforma">
               ¿Tienes un negocio? Contrata tu propia tienda
             </a>}
@@ -351,7 +361,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               });
             }}
           >
-            <div className="flex items-center gap-3"><span className="seller-logo">MA²</span><div><p className="text-xs font-semibold text-primary">ACCESO MA²</p><h2 className="text-xl font-bold">{mode==="register"?"Crea tu cuenta":"Bienvenido de nuevo"}</h2></div></div>
+            <div className="flex items-center gap-3"><span className="seller-logo">{shop.logoUrl?<img className="h-full w-full object-contain" src={shop.logoUrl} alt=""/>:"MA²"}</span><div><p className="text-xs font-semibold text-primary">ACCESO MA²</p><h2 className="text-xl font-bold">{mode==="register"?"Crea tu cuenta":"Bienvenido de nuevo"}</h2></div></div>
             <p className="text-sm text-muted-foreground">
               {mode === "register" ? "Regístrate con tus datos para empezar." : "Ingresa con el correo y contraseña de tu cuenta."}
             </p>

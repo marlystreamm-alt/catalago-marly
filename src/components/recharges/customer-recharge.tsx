@@ -65,7 +65,7 @@ export function CustomerRecharge({
       ) : null}
       {s?.enabled ? (
         <>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Genera tu referencia y transfiere el importe exacto antes de que venza. El abono se
             comprueba por correo cada 5 minutos; puede tardar más si el aviso bancario se retrasa.
           </p>
@@ -102,7 +102,7 @@ export function CustomerRecharge({
             />
             <Button disabled={busy}>Generar referencia</Button>
           </form>
-          <div className="rounded-xl bg-cyan-50 p-3 text-sm space-y-1">
+          <div className="ma2-brand-promo p-3 text-sm space-y-1">
             <p>
               <b>Banco:</b> {s.bank}
             </p>
@@ -122,7 +122,7 @@ export function CustomerRecharge({
           </div>
         </>
       ) : (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Las recargas automáticas no están activas. Puedes pedir una recarga mediante el botón de
           soporte.
         </p>
@@ -148,7 +148,7 @@ export function CustomerRecharge({
             <p className="text-sm">
               Referencia: <b className="tracking-widest">{r.reference}</b>
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               Vence: {new Date(r.expires_at).toLocaleString("es-MX")}
             </p>
             {r.status === "pending" && !expired ? (

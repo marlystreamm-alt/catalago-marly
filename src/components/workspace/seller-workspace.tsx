@@ -59,6 +59,7 @@ import { comboCopyCredentials } from "@/lib/stock/combo.functions";
 import { StockComboPlanner } from "@/components/workspace/stock-combo-planner";
 import { mainAppearanceLoad, mainAppearanceSave } from "@/lib/appearance/main-store.functions";
 import { normalizeAppearance, appearanceStyle, type Appearance } from "@/lib/appearance/theme";
+import {useMa2Appearance} from "@/hooks/use-ma2-appearance";
 import { renewalLimits, INVENTORY_DOT_CLASSES, inventoryTone } from "@/lib/stock/traffic-light";
 const SECTIONS = [
   ["home", "📊", "Inicio"],
@@ -136,6 +137,7 @@ export function SellerLayout({
   onNotifications?: () => void;
   appearance?: Appearance;
 }) {
+  useMa2Appearance(appearance);
   const [open, setOpen] = useState(false);
   const [qr, setQr] = useState(false);
   const [qrData, setQrData] = useState("");
@@ -234,7 +236,7 @@ export function SellerLayout({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="left"
-          className="seller-drawer w-[78vw] max-w-[290px] overflow-y-auto p-4"
+          className="seller-drawer ma2-themed-drawer w-[78vw] max-w-[290px] overflow-y-auto p-4"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Panel de {name}</SheetTitle>

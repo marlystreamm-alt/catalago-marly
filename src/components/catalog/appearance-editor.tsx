@@ -47,9 +47,15 @@ export function AppearanceEditor({
       <div>
         <h3 className="text-sm font-semibold">Portada y diseño de temporada</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Los cambios se aplican solo a este catálogo y también se ven en su
-          enlace público.
+          Los cambios se aplican a este negocio, su ingreso y el panel de compradores.
         </p>
+      </div>
+      <div>
+        <Label>Paleta de colores</Label>
+        <Select value={a.palette||"ma2"} onValueChange={(palette)=>patch({palette:palette as Appearance["palette"]})}>
+          <SelectTrigger><SelectValue/></SelectTrigger>
+          <SelectContent><SelectItem value="ma2">Turquesa y lavanda · MA²</SelectItem><SelectItem value="rosa">Rosa pastel</SelectItem><SelectItem value="lavanda">Lavanda y azul</SelectItem></SelectContent>
+        </Select>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {(
@@ -183,7 +189,7 @@ export function AppearanceEditor({
         />
       </div>
       <div
-        className="rounded-xl border p-3"
+        className="ma2-palette-preview rounded-xl border p-3"
         style={appearanceStyle(a)}
         data-season={a.season}
       >
@@ -193,6 +199,7 @@ export function AppearanceEditor({
           <p className="text-sm">
             El nombre, el precio y los botones siguen visibles.
           </p>
+          <Button type="button" className="mt-3">Vista previa de botón</Button>
         </div>
       </div>
       <Button

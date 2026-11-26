@@ -62,6 +62,7 @@ export const businessSaveAppearance = createServerFn({ method: "POST" })
         businessId: z.string().uuid(),
         appearance: z.object({
           coverImage: z.string().max(2000),
+          palette: z.enum(["ma2","rosa","lavanda"]).optional(),
           logoImage: z.string().max(2000),
           cardImage: z.string().max(2000),
           pageImage: z.string().max(2000),
