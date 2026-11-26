@@ -3,6 +3,7 @@ import { WebOrders } from "@/components/customer/web-orders";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
+  ArrowLeft,
   Bell,
   Menu,
   Moon,
@@ -142,6 +143,7 @@ export function SellerLayout({
   const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
   const go=(id:Section)=>{onSection(id);setOpen(false);};
+  const parent = NAV_GROUPS.find((group) => group.children.includes(section))?.main ?? "home";
   const navButton=(id:Section,label?:string)=>{const item=SECTIONS.find(s=>s[0]===id)!;return <button key={id} onClick={()=>go(id)} className={`w-full ${id===section?"active":""}`} aria-current={id===section?"page":undefined}><span aria-hidden="true">{item[1]}</span>{label||item[2]}</button>;};
   const nav = (
     <>
@@ -245,7 +247,15 @@ export function SellerLayout({
       <main className="seller-main" id="seller-main">
         <div className="seller-page-heading">
           <div>
-            <h1>{section === "home" ? `Resumen de ${name}` : selected[2]}</h1>
+            <div className="flex items-center gap-2">
+              {section !== "home" && (
+                <Button type="button" variant="ghost" size="icon" className="shrink-0"
+                  aria-label="Regresar" title="Regresar" onClick={() => go(parent)}>
+                  <ArrowLeft className="size-5" />
+                </Button>
+              )}
+              <h1>{section === "home" ? `Resumen de ${name}` : selected[2]}</h1>
+            </div>
             <p>
               {section === "home"
                 ? "Tu stock, tus clientes y tus entregas, en un solo lugar."
