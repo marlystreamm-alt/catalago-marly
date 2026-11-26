@@ -1,6 +1,5 @@
 import { StoreNotices } from "@/components/workspace/store-notices";
 import { SellerWorkspace } from "@/components/workspace/seller-workspace";
-import { AdminEntry } from "@/components/customer/admin-entry";
 import { CustomerStore } from "@/components/customer/customer-store";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
@@ -500,7 +499,7 @@ function CatalogPage() {
     setFormOpen(true);
   };
 
-  if (hydrated && !isAdmin && search.panel && search.admin_recovery!=="1") return <AdminEntry/>;
+  if (hydrated && !isAdmin && search.panel && search.admin_recovery!=="1") return <CustomerStore slug="ma2" initialView="inicio"/>;
   if (hydrated && !isAdmin && !search.panel) return <CustomerStore slug="ma2" initialView="inicio"/>;
   if (isAdmin && homeView) return <SellerWorkspace onCatalog={(id) => { if (id) setCatalogId(id); setHomeView(false); }} />;
 

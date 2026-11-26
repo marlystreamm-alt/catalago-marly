@@ -35,6 +35,7 @@ export const customerSignUp = createServerFn({ method: "POST" })
       s = await ops(),
       store = await c.customerShop(data.slug);
     await c.customerThrottle("signup", store.slug + ":" + data.email, 5);
+    if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail())throw new Error("No se pudo crear la cuenta. Si ya tienes acceso, inicia sesión.");
     const p = await import("./password.server"),
       salt = p.customerSalt();
     const payload = await (
@@ -62,6 +63,13 @@ export const customerSignIn = createServerFn({ method: "POST" })
       s = await ops(),
       store = await c.customerShop(data.slug);
     await c.customerThrottle("login", store.slug + ":" + data.email, 10);
+    if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail()){
+      try{
+        const session=await (await import("./main-admin.server")).mainAdminSignIn(data.password);
+        await c.customerLogoutSession();
+        return {ok:true as const,role:"admin" as const,token:session.token,mustChangePassword:session.mustChangePassword};
+      }catch{throw new Error("Correo o contraseña incorrectos");}
+    }
     let q = s.opsDB().from("ma2_customer_accounts").select("*").eq("email", data.email);
     q = store.id ? q.eq("business_id", store.id) : q.is("business_id", null);
     const { data: a, error } = await q.maybeSingle();
@@ -73,8 +81,10 @@ export const customerSignIn = createServerFn({ method: "POST" })
       a?.password_hash || "0".repeat(64),
     );
     if (!a || !a.active || !matches) throw new Error("Correo o contraseña incorrectos");
+    const client=await s.readRecord(a.client_id);
+    if(client.module!=="clients"||client.status!=="active")throw new Error("Correo o contraseña incorrectos");
     await c.customerSession(a.id);
-    return { ok: true };
+    return {ok:true as const,role:(!store.id&&a.price_tier==="reseller"?"reseller":"customer") as "reseller"|"customer"};
   });
 export const customerSignOut = createServerFn({ method: "POST" }).handler(async () => {
   await (await server()).customerLogoutSession();

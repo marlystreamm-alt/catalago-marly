@@ -41,6 +41,7 @@ async function moduleAt(path) {
     "@tanstack/react-start": factory,
     zod: import.meta.resolve("zod"),
     "./customer.server": ctx,
+    "./main-admin.server": url(`export const mainAdminEmail=()=>"owner@example.com";export const mainAdminSignIn=async password=>{if(password!=="fixture-admin-password")throw Error("Denied");return {token:"ma2s_fixture_admin_token",mustChangePassword:false}};`),
     "@/lib/workspace/operations.server": ops,
     "@/lib/notify/notify.server": auth,
     "@/lib/deliveries/deliveries.server": decrypt,
@@ -54,6 +55,13 @@ async function moduleAt(path) {
 }
 const api = await moduleAt("src/lib/customer/customer.functions.ts"),
   manage = await moduleAt("src/lib/customer/manage.functions.ts");
+test("only the configured main owner can sign in as administrator, with the existing password", async()=>{
+  const s=fixture();
+  const data={slug:"ma2",email:"OWNER@example.com",password:"fixture-admin-password"};
+  assert.equal((await api.customerSignIn({data})).role,"admin");
+  await assert.rejects(api.customerSignIn({data:{...data,password:"wrong"}}),/Correo o contraseña incorrectos/);
+  assert.equal(s.calls.length,0);
+});
 function fixture() {
   const id = crypto.randomUUID();
   return (globalThis.__customer = {

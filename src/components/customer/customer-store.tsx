@@ -14,9 +14,10 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { adminSessionLogout } from "@/lib/admin-session.functions";
+import { clearCode } from "@/lib/notify/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -317,7 +318,27 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 if (mode === "register") {
                   if (password !== confirmation) throw new Error("Las contraseñas no coinciden");
                   await customerSignUp({ data: { slug, email, password, name, whatsapp: wa } });
-                } else await customerSignIn({ data: { slug, email, password } });
+                } else {
+                  const result = await customerSignIn({ data: { slug, email, password } });
+                  if (result.role === "admin") {
+                    try {
+                      clearCode();
+                      window.localStorage.setItem("ma2-admin-session-v2", result.token);
+                    } catch {
+                      await adminSessionLogout({ data: { token: result.token } });
+                      throw new Error("Permite el almacenamiento del navegador para iniciar sesión.");
+                    }
+                    setPassword("");
+                    window.location.assign("/?panel=1");
+                    return;
+                  }
+                }
+                if (!shop.id) {
+                  const previous = window.localStorage.getItem("ma2-admin-session-v2");
+                  window.localStorage.removeItem("ma2-admin-session-v2");
+                  clearCode();
+                  if (previous) await adminSessionLogout({ data: { token: previous } }).catch(() => undefined);
+                }
                 setPassword("");
                 setShowLoginPassword(false);
                 setConfirmation("");
@@ -418,7 +439,6 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             >
               Olvidé mi contraseña · Recuperar con soporte
             </a>
-            {!shop.id && <div className="flex justify-end border-t pt-2"><a href="/?panel=1" aria-label="Acceso del equipo" title="Acceso del equipo" className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"><Settings2 className="size-4" aria-hidden="true"/></a></div>}
           </form>
         </div>
       ) : (
