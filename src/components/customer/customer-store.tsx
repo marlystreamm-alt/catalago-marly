@@ -50,6 +50,7 @@ import {
   customerProducts,
   customerBuy,
   customerDelivery,
+  customerWebDelivery,
   customerSubmit,
   customerChangePassword,
   customerDocument,
@@ -598,7 +599,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     <p className="text-sm text-muted-foreground">{({completed:"Entregado", in_process:"En proceso", cancelled:"Cancelado", rejected:"Rechazado"} as Record<string,string>)[order.status] || "Pagado · pendiente de entrega"}</p>
                     {order.status === "completed" && <Button size="sm" disabled={busy} onClick={() => void action(async () => {
                       setShowPassword(false);
-                      setDelivery(await customerDelivery({ data: { slug, orderId: order.id } }));
+                      setDelivery(await customerWebDelivery({ data: { slug, orderId: order.id } }));
                     })}>Ver entrega</Button>}
                   </article>
                 ))}{data.records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article key={r.id} className="seller-card space-y-2"><h3 className="font-bold">{r.title}</h3><p className="text-sm text-muted-foreground">Entrega registrada</p>{r.deliveryUrl&&<Button asChild size="sm"><a href={r.deliveryUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a></Button>}{r.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.reply)}>Copiar datos de entrega</Button>}</article>)}
