@@ -86,8 +86,20 @@ function Contratar() {
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
-            <Label>WhatsApp</Label>
-            <Input value={wa} onChange={(e) => setWa(e.target.value)} inputMode="tel" />
+            <Label htmlFor="shop-whatsapp">WhatsApp del propietario</Label>
+            <Input
+              id="shop-whatsapp"
+              type="tel"
+              autoComplete="tel"
+              aria-describedby="shop-whatsapp-format"
+              placeholder="+52 844 123 4567"
+              value={wa}
+              onChange={(e) => setWa(e.target.value)}
+            />
+            <p id="shop-whatsapp-format" className="mt-1 text-xs text-muted-foreground">
+              Incluye el código de tu país. En México, escribe +52 seguido de tu número de 10 dígitos.
+              Ejemplo: +52 844 123 4567.
+            </p>
           </div>
           <div>
             <Label>Nombre del negocio</Label>
