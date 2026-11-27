@@ -108,3 +108,28 @@ export async function convertStockProfiles(id:string,businessId:string|null,coun
  if(error)throw new Error(error.message);
  return {count:Number(data)};
 }
+
+export async function verifyStockFamily(root: string, members: {id:string;version:string}[], active: boolean, expiry?: string) {
+  const db = await admin();
+  const {data, error} = await db.from("stock_items").select("id,protected_delivery_id")
+    .in("id", members.map(row => row.id)).is("business_id", null);
+  if (error || data.length !== members.length) throw new Error("La lista de perfiles cambió. Actualiza la lista.");
+  const ds = await import("@/lib/deliveries/deliveries.server");
+  const documents = new Map<string,string>();
+  for (const {protected_delivery_id:id} of data) {
+    if (!id || documents.has(id)) continue;
+    const row = await ds.getDeliveryRow(id);
+    if (!row) continue;
+    const payload = await ds.decryptPayload<ProtectedDeliveryPrivate>(String(row.detail));
+    const now = new Date().toISOString();
+    documents.set(id, await ds.encryptPayload({...payload,status:"revoked",updatedAt:now,
+      history:[...payload.history,{at:now,kind:"revoked",detail:"Cuenta revisada tras vencer"}].slice(-100)}));
+  }
+  const {opsDB} = await import("@/lib/workspace/operations.server");
+  const result = await opsDB().rpc("ma2_verify_stock_family", {
+    p_root:root,p_members:members.map(row=>({...row,document:documents.get(data.find(item=>item.id===row.id)?.protected_delivery_id||"")})),
+    p_action:active?"verified_release":"verified_invalid",p_expiry:expiry||null,
+  });
+  if (result.error) throw new Error(result.error.message);
+  return {ok:true};
+}
