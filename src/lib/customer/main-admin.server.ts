@@ -2,7 +2,7 @@
 export function mainAdminEmail(){return (process.env.MA2_ADMIN_EMAIL?.trim()||"marlystreamm@gmail.com").toLowerCase();}
 export async function mainAdminSignIn(password:string){
  const {requireAdminPassword}=await import("@/lib/notify/notify.server");
- const {createServerSession}=await import("@/lib/sessions.server");
+ const {createServerSession, ADMIN_SESSION_HOURS}=await import("@/lib/sessions.server");
  const verification=await requireAdminPassword(password);
  const session=await createServerSession("Marla",{hours:ADMIN_SESSION_HOURS});
  return {...session,mustChangePassword:verification.mustChangePassword};
