@@ -79,6 +79,7 @@ const SECTIONS = [
   ["inventory", "📦", "Inventario"],
   ["combos", "🍔", "Combos"],
   ["orders", "📝", "Pedidos"],
+  ["groupDeliveries", "📋", "Entregas del grupo"],
   ["providers", "🤝", "Proveedores"],
   ["notices", "📢", "Avisos"],
   ["referrals", "🎁", "Referidos"],
@@ -97,6 +98,7 @@ const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"home",children:[]},
   {main:"expiry",children:[]},
   {main:"orders",label:"Pedidos y entregas",children:[]},
+  {main:"groupDeliveries",children:[]},
   {main:"inventory",children:["shop","combos"]},
   {main:"clients",children:["questions","referrals","wallet","credit"]},
   {main:"reports",children:[]},
@@ -505,7 +507,7 @@ export function SellerWorkspace() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
-  const [orderChannel, setOrderChannel] = useState<"web" | "cyberdoc" | "manual">("web");
+  const [orderChannel, setOrderChannel] = useState<"all" | "web" | "cyberdoc">("all");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
@@ -550,6 +552,7 @@ export function SellerWorkspace() {
   const navigate = (s: Section) => {
     setSection(s);
     setTab("main");
+    setOrderChannel("all");
     setSelectedOrderId(null);
     setAddStock(false);
     setAssignClient(null);
@@ -644,14 +647,14 @@ export function SellerWorkspace() {
           setOrderChannel(event.target.value as typeof orderChannel);
           setSelectedOrderId(null);
         }}>
+          <option value="all">Tienda web y Cyberdoc</option>
           <option value="web">Tienda web</option>
           <option value="cyberdoc">Cyberdoc</option>
-          <option value="manual">Entregas manuales externas</option>
         </select>
       </label>
-      {orderChannel === "manual" ? orderTabs : <CyberDocsOrdersDialog
+      <CyberDocsOrdersDialog
         key={orderChannel + ":" + tab + ":" + (selectedOrderId || "all")}
-        channel={orderChannel}
+        channel={orderChannel === "all" ? undefined : orderChannel}
         embedded
         initialSelectedId={selectedOrderId}
         stage={tab === "delivered" ? "deliveries" : tab === "processing" || tab === "closed" ? tab : "orders"}
@@ -660,16 +663,22 @@ export function SellerWorkspace() {
           setSelectedOrderId(id);
           setTab(stage === "deliveries" ? "delivered" : stage);
         }}
-      />}
-      {orderChannel === "web" && (tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
+      />
+      {orderChannel !== "cyberdoc" && (tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
         onOpenOrder={(id, delivered, processing) => {
           setSelectedOrderId(id);
           setTab(delivered ? "delivered" : processing ? "processing" : "main");
         }}
       />}
-      {orderChannel === "manual" && (tab === "processing" || tab === "closed") &&
-        <p className="seller-card text-sm text-muted-foreground">Las entregas manuales externas se consultan en Pedidos o Entregadas.</p>}
-      {orderChannel==="manual"&&tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Pedidos manuales externos</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</details>}{orderChannel==="manual"&&tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
+    </div>;
+  else if (section === "groupDeliveries")
+    content = <div className="space-y-4">
+      <Button size="sm" variant="outline" onClick={() => navigate("inventory")}>Asignar desde inventario</Button>
+      <details className="seller-card">
+        <summary className="font-semibold cursor-pointer">Pendientes del grupo</summary>
+        {resource("requests", records.filter(record => record.module !== "requests" || record.status === "pending"))}
+      </details>
+      <details className="seller-card" open><summary className="font-semibold cursor-pointer">Historial de entregas y combos</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>
     </div>;
   else if (section === "reports")
     content = (
@@ -755,7 +764,7 @@ export function SellerWorkspace() {
         )}
       </>
     );
-  else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("orders");setTab("delivered");void load();}}/>;
+  else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("groupDeliveries");void load();}}/>;
   else if (section === "extras") content = <div className="seller-card">{sectionLinks("extras")}</div>;
   else if (section === "subscription")
     content = (
