@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { reportAvailability, reportClosedMessage } from "@/lib/reports/settings";
 const shop = z.object({ slug: z.string().regex(/^[a-z0-9-]{1,100}$/) });
 const password = z
   .string()
@@ -125,7 +126,7 @@ export const customerLoad = createServerFn({ method: "POST" })
     const c = await server(),
       s = await ops(),
       ctx = await c.customerContext(data.slug);
-    const [entries, orders, records] = await Promise.all([
+    const [entries, orders, records, reportSettings] = await Promise.all([
       s.walletEntries(ctx.client.id),
       s
         .opsDB()
@@ -135,6 +136,7 @@ export const customerLoad = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(100),
       c.customerRecords(ctx.client.id, !ctx.shop.id),
+      ctx.shop.id ? null : import("@/lib/reports/settings.server").then((settings) => settings.loadReportSettings()).catch(() => null),
     ]);
     if (orders.error) throw new Error("No se pudieron cargar tus compras");
     const webRequestIds = ctx.shop.id ? [] : entries.filter(entry=>entry.kind==="purchase" && entry.note.startsWith("Pedido web por encargo · ")).slice(0,100).map(entry=>entry.request_id);
@@ -152,6 +154,7 @@ export const customerLoad = createServerFn({ method: "POST" })
     const now = Date.now();
     return {
       shop: ctx.shop,
+      reportSettings,
       name: ctx.client.title,
       email: String(ctx.account.email),
       clientReference:ctx.client.clientReference||"",
@@ -379,6 +382,15 @@ export const customerSubmit = createServerFn({ method: "POST" })
     const c = await server(),
       ctx = await c.customerContext(data.slug),
       s = await ops();
+    if (data.module === "reports" && !ctx.shop.id) {
+      const settings = await (await import("@/lib/reports/settings.server")).loadReportSettings();
+      const { open, next } = reportAvailability(settings);
+      if (!open) throw new Error(reportClosedMessage(next));
+      if (settings.requireEvidence && !data.evidence)
+        throw new Error("Adjunta una captura de la falla para enviar tu reporte.");
+      if (!settings.allowManual && !data.orderId)
+        throw new Error("Selecciona la compra de tu cuenta para enviar tu reporte.");
+    }
     let purchaseTitle = "";
     let purchaseAgeDays: number | null = null;
     if (data.orderId) {
