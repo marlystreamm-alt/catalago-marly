@@ -44,6 +44,8 @@ export function parseCyberDocsMessage(raw: string): ParsedCyberDocsOrder {
     "contacto_(whatsapp)",
     "Contacto (WhatsApp)",
     "WhatsApp del cliente",
+    "Número de contacto WhatsApp",
+    "Numero de contacto WhatsApp",
     "Número para contactar whatsapp",
     "Número para contactar WhatsApp",
     "WhatsApp",
