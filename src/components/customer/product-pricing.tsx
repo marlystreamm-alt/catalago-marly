@@ -7,6 +7,55 @@ import { pricingLoad,pricingSave } from "@/lib/customer/pricing.functions";
 import { pricingKey,type PriceRow } from "@/lib/customer/pricing";
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 
+const cyberdocRates = [
+  ["Crunchyroll perfil", 30],
+  ["Crunchyroll completa", 60],
+  ["Disney+ completa", 130],
+  ["Disney+ estándar completa", 85],
+  ["Fox One perfil", 35],
+  ["Fox One completa", 50],
+  ["HBO Max perfil", 40],
+  ["HBO Max completa", 65],
+  ["Netflix privada", 85],
+  ["Paramount+ perfil", 35],
+  ["Paramount+ completa", 65],
+  ["Prime Video perfil", 35],
+  ["Prime Video completa", 60],
+  ["ViX completa mensual", 40],
+  ["ViX completa anual", 100],
+  ["Netflix privado, Disney+ Premium, Paramount+ y HBO Max", 160],
+  ["Prime Video, Paramount+ y HBO Max", 107],
+  ["HBO Max, Paramount+ y ViX", 98],
+  ["Netflix privado, Disney+ Premium, Prime Video, Paramount+ y HBO Max", 180],
+  ["Kocowa, Disney+ y HBO Max", 110],
+  ["Disney+ Premium, HBO Max, Paramount+ y ViX", 150],
+  ["Kocowa, Crunchyroll, Prime Video y HBO Max", 115],
+  ["Canva 1 mes, Disney+ Premium, Paramount+ y HBO Max", 170],
+  ["Disney + ViX anual", 170],
+  ["Bot para grupos de WhatsApp · 1 mes", 90],
+  ["Canva · 1 mes", 45],
+  ["Canva · 12 meses", 230],
+  ["Duolingo · 12 meses", 100],
+  ["Gemini · 6 meses", 100],
+  ["Drive con más de 250 libros", 80],
+  ["Drive con más de 270 películas", 80],
+  ["Certificado INEA (trabajo, verificable)", 149],
+  ["Tienda web personalizada anual para streaming, reportes y gestión", 1300],
+] as const;
+const cyberdocCurrency = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+
+function CyberdocRates() {
+  return <details className="seller-card">
+    <summary className="cursor-pointer font-semibold">Cyberdoc · Pagos por entrega</summary>
+    <p className="my-2 text-sm text-muted-foreground">Servicios en ON según las capturas del 27 de noviembre de 2026. Importes en MXN.</p>
+    <ul className="divide-y">
+      {cyberdocRates.map(([service, amount]) => <li className="flex justify-between gap-3 py-2 text-sm" key={service}>
+        <span>{service}</span><strong className="shrink-0">{cyberdocCurrency.format(amount)}</strong>
+      </li>)}
+    </ul>
+  </details>;
+}
+
 const label=(kind:string)=>kind==="profile"?"Perfil":kind==="complete"?"Cuenta completa":kind.startsWith("catalog-request-")?"Por encargo":kind.replace("catalog-","");
 function PriceCard({row,busy,onSave,onClose}:{row:PriceRow;busy:boolean;onSave:(row:PriceRow,retail:string,reseller:string)=>void;onClose:()=>void}) {
   const [retail,setRetail]=useState(row.retailCents==null?"":String(row.retailCents/100));
@@ -34,7 +83,7 @@ export function ProductPricing({initialFilter="all"}:{initialFilter?:string}={})
   useEffect(()=>{void load();},[]);
   const save=async(row:PriceRow,retail:string,reseller:string)=>{const parse=(v:string)=>v.trim()?Math.round(Number(v)*100):null;const retailCents=parse(retail),resellerCents=parse(reseller);if((retailCents!==null&&(!Number.isSafeInteger(retailCents)||retailCents<=0))||(resellerCents!==null&&(!Number.isSafeInteger(resellerCents)||resellerCents<=0))||(!retailCents&&!resellerCents&&row.published!==false))return toast.error("Escribe al menos un precio válido");if(busy)return;setBusy(true);try{setRows(await pricingSave({data:{code:getSavedCode(),key:row.key,name:row.name,kind:row.kind,months:row.months,retailCents,resellerCents,version:row.version,costCents:row.costCents,provider:row.provider,image:row.image,description:row.description,published:row.published,warrantyDays:row.warrantyDays,automaticReplacement:row.automaticReplacement}}));toast.success("Tarifas guardadas");setEditing(null);}catch(e){toast.error(e instanceof Error?e.message:"No se pudo guardar");}finally{setBusy(false);}};
   const filtered=rows.filter(r=>(!onlyStock||r.available>0)&&(filter==="all"||(filter==="manual"?r.kind.startsWith("catalog-request-"):r.kind===filter))&&`${r.name} ${label(r.kind)}`.toLowerCase().includes(query.toLowerCase()));
-  return <div className="space-y-3"><section className="seller-card space-y-3"><h2 className="font-bold">Productos y precios</h2><p className="text-sm text-muted-foreground">Gestiona únicamente los productos de tu tienda web. Los catálogos antiguos son independientes y no se modifican.</p><div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={loading||busy} onClick={()=>void load()}>Actualizar</Button><Button size="sm" onClick={()=>setAdd(!add)}>{add?"Cancelar":"Agregar producto"}</Button></div>
+  return <div className="space-y-3"><CyberdocRates/><section className="seller-card space-y-3"><h2 className="font-bold">Productos y precios</h2><p className="text-sm text-muted-foreground">Gestiona únicamente los productos de tu tienda web. Los catálogos antiguos son independientes y no se modifican.</p><div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={loading||busy} onClick={()=>void load()}>Actualizar</Button><Button size="sm" onClick={()=>setAdd(!add)}>{add?"Cancelar":"Agregar producto"}</Button></div>
   {add&&<form className="grid gap-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();const m=Number(months),n=name.trim(),key=pricingKey(n,kind,m);if(rows.some(r=>r.key===key)){setQuery(n);toast.error("Este producto ya está en la lista");return;}if(!n||!Number.isInteger(m)||m<1||m>1200)return;setRows(prev=>[{key,name:n,kind,months:m,retailCents:null,resellerCents:null,available:0,source:"Sin guardar",version:null,published:false},...prev]);setQuery(n);setOnlyStock(false);setFilter("all");setEditing(key);setAdd(false);}}><Input required value={name} maxLength={160} placeholder="Nombre exacto de la plataforma y plan" onChange={e=>setName(e.target.value)}/><select className="buyer-select" value={kind} onChange={e=>setKind(e.target.value)}><option value="profile">Perfil</option><option value="complete">Cuenta completa</option><option value="catalog-request-ia-creatividad">Entrega manual · correo y teléfono</option></select><label className="seller-field"><span>Duración en meses</span><Input required type="number" min="1" max="1200" value={months} onChange={e=>setMonths(e.target.value)}/></label><Button type="submit" size="sm">Preparar tarifas</Button></form>}
   <Input value={query} placeholder="Buscar producto o plan…" onChange={e=>setQuery(e.target.value)}/><select aria-label="Filtrar modalidad" className="buyer-select" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Todas las modalidades</option><option value="profile">Perfiles</option><option value="complete">Completas</option><option value="manual">Entrega manual / por encargo</option></select><label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={onlyStock} onChange={e=>setOnlyStock(e.target.checked)}/> Solo con stock disponible</label></section>
   {error&&<p role="alert" className="text-destructive text-sm">{error}</p>}{loading?<p>Consultando precios…</p>:<div className="grid gap-3 lg:grid-cols-2">{filtered.map(row=>editing===row.key?<PriceCard key={row.key} row={row} busy={busy} onClose={()=>setEditing(null)} onSave={(r,a,b)=>void save(r,a,b)}/>:<article key={row.key} className="seller-card space-y-2"><div className="flex items-start gap-3">{row.image&&/^https:\/\/|^data:image\//.test(row.image)?<img src={row.image} alt="" className="size-12 rounded-xl object-cover"/>:<span className="grid size-12 shrink-0 place-items-center rounded-xl bg-muted text-2xl">{row.kind.startsWith("catalog-request-")?"🔗":"📺"}</span>}<div className="min-w-0 flex-1"><h3 className="font-bold">{row.name}</h3><p className="text-xs text-muted-foreground">{label(row.kind)} · {row.months} mes(es) · {row.available} en stock</p></div><span className="seller-badge">{row.published===false?"Borrador":"Publicado"}</span></div><div className="grid grid-cols-3 gap-2 text-xs"><div>Costo<br/><b>{row.costCents==null?"—":`$${row.costCents/100}`}</b></div><div>Revendedor<br/><b>{row.resellerCents==null?"—":`$${row.resellerCents/100}`}</b></div><div>Público<br/><b>{row.retailCents==null?"—":`$${row.retailCents/100}`}</b></div></div><Button size="sm" variant="outline" disabled={busy} onClick={()=>setEditing(row.key)}>Editar</Button></article>)}</div>}</div>;
