@@ -503,7 +503,7 @@ function CatalogPage() {
   if (!hydrated) return <AccessLoading/>;
   if (hydrated && !isAdmin && search.panel && search.admin_recovery!=="1") return <CustomerStore slug="ma2" initialView="inicio"/>;
   if (hydrated && !isAdmin && !search.panel) return <CustomerStore slug="ma2" initialView="inicio"/>;
-  if (isAdmin && homeView) return <SellerWorkspace onCatalog={(id) => { if (id) setCatalogId(id); setHomeView(false); }} />;
+  if (isAdmin && homeView) return <SellerWorkspace />;
 
   return (
     <main

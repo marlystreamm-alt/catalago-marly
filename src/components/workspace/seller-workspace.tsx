@@ -37,7 +37,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useCatalogStore } from "@/lib/catalog/store";
-import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
+import { mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
 import { ReportSettingsPanel } from "./report-settings-panel";
@@ -47,15 +47,13 @@ import { adminDashboard } from "@/lib/stock/dashboard.functions";
 import { opsLoad } from "@/lib/workspace/operations.functions";
 import { money, type Module, type OpsRecord } from "@/lib/workspace/model";
 import { ResourcePanel, WalletPanel, EmptyState, errorText, type Entry } from "./resource-panel";
-import { BusinessAssistant, GamesPanel, HelpersPanel, StockInsights } from "./insights-panels";
+import { GamesPanel, StockInsights } from "./insights-panels";
 import { StockManagerDialog } from "@/components/catalog/stock-manager-dialog";
 import { CyberDocsOrdersDialog } from "@/components/catalog/cyberdocs-orders-dialog";
-import { MenusDialog } from "@/components/catalog/menus-dialog";
 import { NotificationsDialog } from "@/components/catalog/notifications-dialog";
 import { ProtectedDeliveriesDialog } from "@/components/catalog/protected-deliveries-dialog";
 import { GalleryContents } from "@/components/catalog/platform-gallery-dialog";
 import { MethodsDialog } from "@/components/catalog/methods-dialog";
-import { CatalogSettingsDialog, ServiceFormDialog } from "@/components/catalog/service-dialogs";
 import { SalesDialog } from "@/components/catalog/sales-dialog";
 import { AdminBar } from "@/components/catalog/admin-bar";
 import { SystemStatusDialog } from "@/components/catalog/system-status-dialog";
@@ -82,9 +80,6 @@ const SECTIONS = [
   ["providers", "🤝", "Proveedores"],
   ["notices", "📢", "Avisos"],
   ["referrals", "🎁", "Referidos"],
-  ["helpers", "🧑‍💼", "Ayudantes"],
-  ["codes", "🔑", "Panel de códigos"],
-  ["assistant", "🤖", "Asistente"],
   ["songs", "🎵", "Música"],
   ["games", "🎮", "Juegos"],
   ["memory", "🕹️", "Juegos de memoria"],
@@ -93,8 +88,6 @@ const SECTIONS = [
   ["documents", "🗂️", "Bóveda de documentos"],
   ["subscription", "💳", "Planes y suscripciones"],
   ["gallery", "🖼️", "Guías de ingreso"],
-  ["deliveries", "🛡️", "Entregas protegidas"],
-  ["catalogs", "🏪", "Tiendas contratadas"],
   ["extras","✨","Extras"],
 ] as const;
 export type Section = (typeof SECTIONS)[number][0];
@@ -103,20 +96,14 @@ const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"expiry",children:[]},
   {main:"orders",label:"Pedidos y entregas",children:[]},
   {main:"inventory",children:["shop","combos"]},
-  {main:"clients",children:[]},
+  {main:"clients",children:["questions","referrals","wallet","credit"]},
   {main:"reports",children:[]},
-  {main:"questions",children:[]},
-  {main:"referrals",children:[]},
-  {main:"wallet",children:[]},
-  {main:"credit",children:[]},
   {main:"finance",children:[]},
   {main:"providers",children:[]},
   {main:"gallery",children:[]},
   {main:"notices",children:[]},
-  {main:"helpers",children:[]},
-  {main:"catalogs",children:[]},
   {main:"settings",label:"Ajustes",children:["appearance","subscription"]},
-  {main:"extras",children:["documents","assistant","songs","games","memory","codes","deliveries"]},
+  {main:"extras",children:["documents","songs","games","memory"]},
 ];
 type Summary = Awaited<ReturnType<typeof adminDashboard>>;
 export function SellerLayout({
@@ -308,7 +295,7 @@ export function SellerLayout({
             <img src={qrData} alt="Código QR de la tienda" className="mx-auto w-64 rounded-xl" />
           ) : null}
           <Button asChild>
-            <a href={qrData} download="catalogo-ma2-qr.gif">
+            <a href={qrData} download="tienda-ma2-qr.gif">
               Descargar QR
             </a>
           </Button>
@@ -498,7 +485,7 @@ export function SellerHome({
     </div>
   );
 }
-export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => void }) {
+export function SellerWorkspace() {
   const store = useCatalogStore();
   const [section, setSection] = useState<Section>("home");
   const [records, setRecords] = useState<OpsRecord[]>([]);
@@ -513,8 +500,6 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   const [addStock, setAddStock] = useState(false);
   const [financeStart, setFinanceStart] = useState<"summary" | "income" | "expense">("summary");
   const [walletClient, setWalletClient] = useState("");
-  const [settings, setSettings] = useState(false);
-  const [service, setService] = useState(false);
   const [design, setDesign] = useState(normalizeAppearance({}));
   const [savedDesign,setSavedDesign]=useState(normalizeAppearance({}));
   const [uploading, setUploading] = useState(false);
@@ -576,6 +561,22 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       }}
     />
   );
+  const sectionLinks = (group: "clients" | "extras") => (
+    <div className="grid grid-cols-2 gap-2">
+      {NAV_GROUPS.find((item) => item.main === group)?.children.map((id) => (
+        <Button key={id} variant="outline" size="sm" className="h-auto min-h-10 whitespace-normal"
+          onClick={() => navigate(id)}>{SECTIONS.find((section) => section[0] === id)?.[2]}</Button>
+      ))}
+    </div>
+  );
+  const orderTabs = (
+    <div className="seller-tabs min-w-0 flex-1" aria-label="Estado de pedidos">
+      {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"], ["closed", "Cancelados / rechazados"], ["protected", "Entregas protegidas"]] as const).map(([key, label]) => (
+        <button key={key} type="button" className={tab === key ? "active" : ""} aria-pressed={tab === key}
+          onClick={() => { setSelectedOrderId(null); setTab(key); }}>{label}</button>
+      ))}
+    </div>
+  );
   let content: ReactNode;
   if (section === "home")
     content = (
@@ -636,20 +637,16 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       />
     );
   else if (section === "orders")
-    content = <div className="space-y-4">
+    content = tab === "protected" ? <div className="space-y-4">
+      {orderTabs}
+      <ProtectedDeliveriesDialog embedded />
+    </div> : <div className="space-y-4">
       <CyberDocsOrdersDialog
         key={tab + ":" + (selectedOrderId || "all")}
         embedded
         initialSelectedId={selectedOrderId}
         stage={tab === "delivered" ? "deliveries" : tab === "processing" || tab === "closed" ? tab : "orders"}
-        navigation={
-          <div className="seller-tabs min-w-0 flex-1" aria-label="Estado de pedidos">
-            {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"], ["closed", "Cancelados / rechazados"]] as const).map(([key, label]) => (
-              <button key={key} type="button" className={tab === key ? "active" : ""} aria-pressed={tab === key}
-                onClick={() => { setSelectedOrderId(null); setTab(key); }}>{label}</button>
-            ))}
-          </div>
-        }
+        navigation={orderTabs}
         onStageChange={(id, stage) => {
           setSelectedOrderId(id);
           setTab(stage === "deliveries" ? "delivered" : stage);
@@ -661,7 +658,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
           setTab(delivered ? "delivered" : processing ? "processing" : "main");
         }}
       />}
-      {tab==="delivered"&&<><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas protegidas</summary><ProtectedDeliveriesDialog embedded/></details><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details></>}
+      {tab==="delivered"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details>}
       {tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Encargos registrados manualmente</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</details>}{tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
     </div>;
   else if (section === "reports")
@@ -692,7 +689,11 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
     );
   else if (section === "clients")
     content = (
-      <div className="space-y-5">
+      <div className="space-y-4">
+        <details className="seller-disclosure">
+          <summary className="text-sm font-semibold">Opciones de clientes</summary>
+          <div className="seller-disclosure-body">{sectionLinks("clients")}</div>
+        </details>
         <CustomerManager slug="ma2" records={records} onAssign={assign} />
         {resource("clients")}
       </div>
@@ -703,10 +704,6 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         <GalleryContents />
       </div>
     );
-  else if (section === "deliveries") content = <ProtectedDeliveriesDialog embedded />;
-  else if (section === "catalogs") content = <MenusDialog embedded />;
-  else if (section === "helpers") content = <HelpersPanel records={records} />;
-  else if (section === "assistant") content = <BusinessAssistant records={records} />;
   else if (section === "games" || section === "memory")
     content = <GamesPanel key={section} memory={section === "memory"} />;
   else if (section === "appearance")
@@ -729,7 +726,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         <div className="seller-tabs">
           {[
             ["main", "Notificaciones"],
-            ["tools", "Respaldos y sistema"],
+            ["tools", "Cuenta y sistema"],
           ].map(([v, l]) => (
             <button key={v} className={tab === v ? "active" : ""} onClick={() => setTab(v)}>
               {l}
@@ -740,7 +737,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
           <NotificationsDialog embedded />
         ) : (
           <div className="seller-card space-y-4">
-            <AdminBar />
+            <AdminBar showCatalogTools={false} />
             <SystemStatusDialog />
             <MethodsDialog />
             <details className="seller-card"><summary className="font-semibold cursor-pointer">Contacto, mensajes y semáforo de vigencias</summary>{resource("config")}</details>
@@ -749,7 +746,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       </>
     );
   else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("orders");setTab("delivered");void load();}}/>;
-  else if(section==="extras") content=<div className="seller-card grid grid-cols-2 gap-3">{(["documents","assistant","songs","games","memory","codes","deliveries"] as Section[]).map(id=><Button key={id} variant="outline" className="h-auto whitespace-normal p-3" onClick={()=>navigate(id)}>{SECTIONS.find(s=>s[0]===id)?.[2]}</Button>)}</div>;
+  else if (section === "extras") content = <div className="seller-card">{sectionLinks("extras")}</div>;
   else if (section === "subscription")
     content = (
       <div className="seller-card space-y-4">
@@ -795,8 +792,6 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       <div className="seller-content" key={section}>
         {content}
       </div>
-      <CatalogSettingsDialog open={settings} onOpenChange={setSettings} />
-      <ServiceFormDialog open={service} onOpenChange={setService} service={null} />
     </SellerLayout>
   );
 }
