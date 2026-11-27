@@ -39,6 +39,7 @@ import { Storefront } from "@/components/customer/storefront";
 import { prepareGalleryImage } from "@/lib/gallery/image";
 import { AccessLoading } from "@/components/customer/access-loading";
 import { BusinessCover } from "@/components/catalog/business-cover";
+import { CustomerOnboarding } from "./customer-onboarding";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { reportAvailability, reportClosedMessage } from "@/lib/reports/settings";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
@@ -354,18 +355,10 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
       {!data ? (
         <div className="buyer-auth ma2-login-layout">
           <section className="space-y-4 ma2-login-promo">
-            <p className="buyer-eyebrow">TU TIENDA DIGITAL</p>
-            <h2 className="text-3xl font-extrabold">
-              Todo lo que compras,
-              <br />
-              en un mismo lugar.
-            </h2>
-            <p className="text-muted-foreground">
-              Entra para recargar saldo, comprar productos disponibles, consultar tus entregas y
-              recibir soporte.
-            </p>
+            <h2 className="text-3xl font-extrabold">Tu tienda digital</h2>
+            <p className="text-muted-foreground">Compra servicios y consulta tus entregas desde tu cuenta.</p>
             <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
-            {!shop.id&&<><div className="ma2-brand-promo p-5"><p className="text-xs font-bold uppercase tracking-wide text-primary">Servicios digitales MA²</p><h3 className="mt-2 text-xl font-extrabold">Contrata tus plataformas favoritas</h3><p className="mt-2 text-sm text-muted-foreground">Crea tu cuenta, recarga saldo y compra tus servicios de streaming o solicita entregas por encargo.</p></div><StoreNotices/></>}
+            {!shop.id && <StoreNotices />}
             {shop.id&&<a className="text-sm text-primary underline" href="/plataforma">
               ¿Tienes un negocio? Contrata tu propia tienda
             </a>}
@@ -413,10 +406,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
               });
             }}
           >
-            <div className="flex items-center gap-3"><span className="seller-logo">{shop.logoUrl?<img className="h-full w-full object-contain" src={shop.logoUrl} alt=""/>:"MA²"}</span><div><p className="text-xs font-semibold text-primary">ACCESO MA²</p><h2 className="text-xl font-bold">{mode==="register"?"Crea tu cuenta":"Bienvenido de nuevo"}</h2></div></div>
-            <p className="text-sm text-muted-foreground">
-              {mode === "register" ? "Regístrate con tus datos para empezar." : "Ingresa con el correo y contraseña de tu cuenta."}
-            </p>
+            <h2 className="text-xl font-bold">{mode === "register" ? "Crea tu cuenta" : "Bienvenido de nuevo"}</h2>
             {mode === "register" ? (
               <>
                 <label className="seller-field">
@@ -549,13 +539,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                 {error}
               </p>
             ) : null}
+            {!data.mustChange && <CustomerOnboarding key={slug} slug={slug} section={tab} />}
             {tab === "inicio" ? (
               <>
-                {!shop.id && (
-                  <Button className="mb-4" variant="outline" asChild>
-                    <a href="/plataforma">Quiero mi propia tienda</a>
-                  </Button>
-                )}
                 <div className="buyer-metrics ma2-client-metrics">
                   <article className="aqua">
                     <Wallet />
@@ -583,7 +569,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   </article>
                 </div>
                 <BusinessCover appearance={normalizeAppearance(shop.appearance)} name={shop.name} />
-                {!shop.id&&<><section className="seller-card space-y-3"><h3 className="font-bold text-lg">¿Qué necesitas hoy?</h3><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{([["tienda","Comprar servicios",ShoppingBag],["saldo","Recargar saldo",Wallet],["compras","Mis compras",Package],["reportes","Reportar una falla",LifeBuoy],["movimientos","Mis movimientos",History],["cuenta","Mi perfil",User]] as const).map(([v,label,Icon])=><button key={v} onClick={()=>{setTab(v);if(v==="tienda"){setSku("");setQuery("");}if(v==="reportes"){setReportKind("reports");setReportOrder("");setReportTitle("");setReportMessage("");}}} className="flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center text-sm font-semibold"><Icon className="size-6 text-primary"/>{label}</button>)}</div></section><StoreNotices/></>}
+                {!shop.id&&<><section className="seller-card space-y-3"><h3 className="font-bold text-lg">¿Qué necesitas hoy?</h3><div className="grid grid-cols-2 gap-3">{([["tienda","Comprar servicios",ShoppingBag],["reportes","Reportar una falla",LifeBuoy]] as const).map(([v,label,Icon])=><button key={v} onClick={()=>{setTab(v);if(v==="tienda"){setSku("");setQuery("");}if(v==="reportes"){setReportKind("reports");setReportOrder("");setReportTitle("");setReportMessage("");}}} className="flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center text-sm font-semibold"><Icon className="size-6 text-primary"/>{label}</button>)}</div></section><StoreNotices/></>}
                 <div className="flex justify-between items-center my-5">
                   <h3 className="font-bold">Disponible en la tienda</h3>
                   <button className="text-sm text-primary" onClick={() => {setSku("");setQuery("");setTab("tienda");}}>

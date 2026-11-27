@@ -41,12 +41,11 @@ import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
 import { ReportSettingsPanel } from "./report-settings-panel";
-import { SELLER_ONBOARDING_KEY, SellerOnboarding, SellerOnboardingInvite } from "./seller-onboarding";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { adminDashboard } from "@/lib/stock/dashboard.functions";
 import { opsLoad } from "@/lib/workspace/operations.functions";
-import { DEFINITIONS, money, type Module, type OpsRecord } from "@/lib/workspace/model";
+import { money, type Module, type OpsRecord } from "@/lib/workspace/model";
 import { ResourcePanel, WalletPanel, EmptyState, errorText, type Entry } from "./resource-panel";
 import { BusinessAssistant, GamesPanel, HelpersPanel, StockInsights } from "./insights-panels";
 import { StockManagerDialog } from "@/components/catalog/stock-manager-dialog";
@@ -146,23 +145,6 @@ export function SellerLayout({
   useMa2Appearance(appearance);
   const [open, setOpen] = useState(false);
   const [qr, setQr] = useState(false);
-  const [onboarding, setOnboarding] = useState<"invite" | "active" | "finished">("finished");
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SELLER_ONBOARDING_KEY);
-      setOnboarding(saved === "active" || saved === "finished" ? saved : "invite");
-    } catch {
-      setOnboarding("invite");
-    }
-  }, []);
-  const saveOnboarding = (status: "active" | "finished") => {
-    setOnboarding(status);
-    try {
-      localStorage.setItem(SELLER_ONBOARDING_KEY, status);
-    } catch {
-      // The choice still applies for the current visit.
-    }
-  };
   const [qrData, setQrData] = useState("");
   const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
@@ -181,9 +163,9 @@ export function SellerLayout({
     </>
   );
   const shareCard = (
-    <section className="seller-card ma2-store-link mb-4 space-y-3" aria-label="Mi tienda web">
+    <section className="seller-card ma2-store-link flex flex-wrap items-center justify-between gap-3" aria-label="Mi tienda web">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-card text-primary">
+        <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border bg-card text-primary">
           {appearance?.logoImage
             ? <img src={appearance.logoImage} alt="" className="size-full object-contain" />
             : <Store className="size-6" aria-hidden="true" />}
@@ -204,7 +186,7 @@ export function SellerLayout({
           } catch {
             toast.error("No se pudo copiar el enlace");
           }
-        }}><Copy /> Copiar enlace</Button>
+        }}><Copy /> Copiar</Button>
         <Button type="button" size="sm" variant="outline" onClick={() => {
           const code = qrcode(0, "M");
           code.addData(shareUrl);
@@ -296,13 +278,6 @@ export function SellerLayout({
               )}
               <h1>{section === "home" ? `Resumen de ${name}` : selected[2]}</h1>
             </div>
-            <p>
-              {section === "home"
-                ? "Tu stock, tus clientes y tus entregas, en un solo lugar."
-                : section in DEFINITIONS
-                  ? DEFINITIONS[section as Module].description
-                  : DESCRIPTIONS[section] || "Administra tu negocio desde aquí."}
-            </p>
           </div>
           {section !== "home" && (
             <Button type="button" variant="ghost" size="icon" className="ml-auto shrink-0"
@@ -310,7 +285,7 @@ export function SellerLayout({
               <X className="size-5" />
             </Button>
           )}
-          {appearance?.coverImage ? (
+          {section === "home" && appearance?.coverImage ? (
             <img
               src={appearance.coverImage}
               alt={`Portada de ${name}`}
@@ -318,14 +293,10 @@ export function SellerLayout({
             />
           ) : null}
         </div>
-        {onboarding === "invite" && section === "home" && (
-          <SellerOnboardingInvite onStart={() => saveOnboarding("active")} onSkip={() => saveOnboarding("finished")} />
-        )}
-        {onboarding === "active" && (
-          <SellerOnboarding key={section} section={section} onFinish={() => saveOnboarding("finished")} />
-        )}
-        {section==="home"&&shareCard}
-        {children}
+        <div className="space-y-4">
+          {section === "home" && shareCard}
+          {children}
+        </div>
       </main>
       <Dialog open={qr} onOpenChange={setQr}>
         <DialogContent className="max-w-sm text-center">
@@ -346,24 +317,6 @@ export function SellerLayout({
     </div>
   );
 }
-const DESCRIPTIONS: Partial<Record<Section, string>> = {
-  shop: "Tu página de ventas, enlace público y acceso de compradores.",
-  finance: "Entradas, salidas, cuentas de efectivo y control de pagos.",
-  expiry: "Consulta fechas de corte y da seguimiento a las renovaciones.",
-  wallet: "Recargas confirmadas y movimientos del saldo de tus clientes.",
-  credit: "Registra crédito otorgado y sus abonos, con historial.",
-  inventory: "Cuentas completas y perfiles. Agrega stock, copia credenciales y entrega.",
-  orders: "Pedidos de CyberDocs, ventas web y solicitudes por encargo.",
-  appearance: "Portada, logo, tarjetas, temporadas y transparencia.",
-  helpers: "Administra el equipo y los accesos de los catálogos de clientes.",
-  assistant: "Consulta tus registros y resultados del negocio.",
-  gallery: "Guarda instrucciones por plataforma y reutilízalas en cada entrega.",
-  deliveries: "Enlaces protegidos con instrucciones, imágenes y soporte.",
-  catalogs: "Gestiona las tiendas contratadas y sus funciones habilitadas.",
-  settings: "Contacto, mensajes, avisos de pedidos y respaldos.",
-  subscription: "Administra tus planes, demos y solicitudes de contratación.",
-  combos: "Asigna paquetes de perfiles o cuentas completas del inventario.",
-};
 export function SellerHome({
   summary,
   clients,
@@ -422,7 +375,7 @@ export function SellerHome({
     },
   ] as const;
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="seller-metrics">
         {metrics.map((m) => (
           <button
@@ -436,11 +389,8 @@ export function SellerHome({
           </button>
         ))}
       </div>
-      <section className="seller-card">
-        <div className="flex justify-between gap-2">
-          <h2 className="font-bold text-sm">Ventas de los últimos 7 días</h2>
-          <span className="seller-badge">{money(weekTotal)}</span>
-        </div>
+      <details className="seller-card">
+        <summary className="cursor-pointer text-sm font-semibold">Gráfica de ventas · últimos 7 días</summary>
         <div
           className="seller-chart"
           role="img"
@@ -487,7 +437,7 @@ export function SellerHome({
             ))}
           </svg>
         </div>
-      </section>
+      </details>
       <div className="seller-grid">
         <section className="seller-card">
           <h2 className="font-bold">Se está agotando</h2>
@@ -626,7 +576,8 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   );
   let content: ReactNode;
   if (section === "home")
-    content = (<>
+    content = (
+    <div className="space-y-4">
       <section className="seller-card flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-bold"><Wallet className="size-5 text-primary" /> Finanzas</h2>
         <div className="flex flex-wrap gap-2">
@@ -647,7 +598,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         clients={records.filter((r) => r.module === "clients").length}
         onNavigate={navigate}
       />
-    )}</>);
+    )}</div>);
   else if (section === "shop") content = <ProductPricing/>;
   else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} /></div>;
   else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
