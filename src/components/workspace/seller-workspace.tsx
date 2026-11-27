@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Store,
-  Wallet,
   Pencil,
   X,
   Bell,
@@ -40,6 +39,7 @@ import { useCatalogStore } from "@/lib/catalog/store";
 import { mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
+import { QuickFinance } from "./quick-finance";
 import { ReportSettingsPanel } from "./report-settings-panel";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
@@ -498,7 +498,6 @@ export function SellerWorkspace() {
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
   const [addStock, setAddStock] = useState(false);
-  const [financeStart, setFinanceStart] = useState<"summary" | "income" | "expense">("summary");
   const [walletClient, setWalletClient] = useState("");
   const [design, setDesign] = useState(normalizeAppearance({}));
   const [savedDesign,setSavedDesign]=useState(normalizeAppearance({}));
@@ -538,7 +537,6 @@ export function SellerWorkspace() {
   }, []);
   const navigate = (s: Section) => {
     setSection(s);
-    setFinanceStart("summary");
     setTab("main");
     setSelectedOrderId(null);
     setAddStock(false);
@@ -581,20 +579,7 @@ export function SellerWorkspace() {
   if (section === "home")
     content = (
     <div className="space-y-4">
-      <section className="seller-card flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-bold"><Wallet className="size-5 text-primary" /> Finanzas</h2>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => {
-            navigate("finance");
-            setFinanceStart("income");
-          }}>Registrar entrada</Button>
-          <Button size="sm" variant="outline" onClick={() => {
-            navigate("finance");
-            setFinanceStart("expense");
-          }}>Registrar salida</Button>
-          <Button size="sm" variant="ghost" onClick={() => navigate("finance")}>Ver finanzas</Button>
-        </div>
-      </section>
+      <QuickFinance openFinance={() => navigate("finance")} />
       {summary && (
       <SellerHome
         summary={summary}
@@ -606,7 +591,7 @@ export function SellerWorkspace() {
   else if (section === "shop") content = <ProductPricing/>;
   else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} /></div>;
   else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
-  else if (section === "finance") content = <FinancePanel initialView={financeStart} />;
+  else if (section === "finance") content = <FinancePanel />;
   else if (section === "wallet")
     content = (
       <div className="space-y-5">
