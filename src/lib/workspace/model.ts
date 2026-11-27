@@ -53,6 +53,7 @@ export const DEFINITIONS: Record<
       { key: "whatsapp", label: "WhatsApp con lada", required: true },
       { key: "email", label: "Correo electrónico", required: true },
       { key: "referrer", label: "Código de referido" },
+      { key: "replacementPolicy", label: "Reposición automática", type: "select", options: ["Automática", "Manual"] },
       { key: "notes", label: "Notas", type: "textarea" },
     ],
     statuses: ["active", "inactive"],

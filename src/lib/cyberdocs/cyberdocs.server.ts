@@ -262,7 +262,7 @@ export async function ingestCyberDocsOrder(
     `Pedido recibido de ${sourceLabel} por ${input.source}`,
   );
   if (order.whatsapp && order.clientName && input.source !== "manual_fallback") {
-    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, order.whatsapp); }
+    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, order.whatsapp, undefined, order.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined); }
     catch { await recordOrderEvent(order.id, "client_contact_pending", "system", "No se pudo registrar el contacto; se reintentará al entregar"); }
   }
 
@@ -436,7 +436,7 @@ export async function updateOrderWhatsApp(
       : "WhatsApp de entrega eliminado",
   );
   if (value && order.clientName) {
-    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, value); }
+    try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, value, undefined, order.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined); }
     catch { await recordOrderEvent(order.id, "client_contact_pending", actor, "No se pudo registrar el contacto; se reintentará al entregar"); }
   }
   return rowToCyberDocsOrder(data as Row);
@@ -713,7 +713,7 @@ export async function finalizeCyberDocsOrder(
   if (completed.whatsapp && completed.clientName) {
     try {
       const { rememberOrderClient } = await import("@/lib/customer/remember-client.server");
-      await rememberOrderClient(completed.clientName, completed.whatsapp);
+      await rememberOrderClient(completed.clientName, completed.whatsapp, undefined, completed.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined);
       // Backfill the actual phone column for older Telegram message formats.
       await db.from("cyberdocs_orders").update({ whatsapp: completed.whatsapp }).eq("id", completed.id).eq("whatsapp", "");
     } catch { await recordOrderEvent(completed.id, "client_contact_pending", actor, "Pedido guardado; no se pudo registrar el contacto automáticamente"); }

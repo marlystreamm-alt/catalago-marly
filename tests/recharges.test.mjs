@@ -28,6 +28,12 @@ test("receipt parser rejects ambiguous, missing, negative and outgoing amounts",
   assert.equal(parseBankNotice(notice.replace("15.00", "15,50")).amountCents, 1550);
   assert.equal(parseBankNotice(notice + "\nReferencia: 9999999").reference, null);
 });
+test("permanent customer references are parsed exactly and normalized", () => {
+  assert.equal(parseBankNotice(notice.replace("2310260", "ma-000123")).reference, "MA-000123");
+  assert.equal(parseBankNotice(notice.replace("2310260", "MA-0001234")).reference, null);
+  assert.equal(parseBankNotice(notice + "\nConcepto: MA-000123").reference, null);
+  assert.equal(parseBankNotice(notice + "\nConcepto: MA-000123").referenceAmbiguous, true);
+});
 const sender = "avisos@banco.example",
   allowed = [sender];
 const good =

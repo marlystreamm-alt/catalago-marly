@@ -15,7 +15,7 @@ export function parseBankNotice(text: string) {
     const [a, b = ""] = n.split(".");
     return Number(a) * 100 + Number(b.padEnd(2, "0"));
   });
-  const refs = [...body.matchAll(/(?:referencia|concepto)\s*:\s*(\d{7})(?!\d)/gi)].map((m) => m[1]);
+  const refs = [...body.matchAll(/(?:referencia|concepto)\s*:\s*(MA-\d{6}|\d{7})(?![\w-])/gi)].map((m) => m[1].toUpperCase());
   const traces = [...body.matchAll(/clave\s+de\s+rastreo\s*:\s*([A-Z0-9-]{8,80})/gi)].map((m) =>
     m[1].toUpperCase(),
   );
@@ -27,6 +27,7 @@ export function parseBankNotice(text: string) {
     incoming,
     amountCents: a.length === 1 && a[0] && a[0] > 0 && a[0] <= 100_000_000 ? a[0] : null,
     reference: r.length === 1 ? r[0] : null,
+    ...(r.length > 1 ? { referenceAmbiguous: true } : {}),
     tracking: t.length === 1 ? t[0] : null,
   };
 }

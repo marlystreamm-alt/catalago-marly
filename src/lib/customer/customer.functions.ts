@@ -354,12 +354,19 @@ export const customerSubmit = createServerFn({ method: "POST" })
       ctx = await c.customerContext(data.slug),
       s = await ops();
     let purchaseTitle = "";
+    let purchaseAgeDays: number | null = null;
     if (data.orderId) {
       const db = s.opsDB();
-      const o = await db.from("ma2_customer_orders").select("title")
+      const o = await db.from("ma2_customer_orders").select("title,created_at")
         .eq("id", data.orderId).eq("client_id", ctx.client.id).maybeSingle();
       if (o.error) throw new Error("No se pudo comprobar la compra");
-      if (o.data) purchaseTitle = String(o.data.title);
+      if (o.data) {
+        purchaseTitle = String(o.data.title);
+        if (o.data.created_at) {
+          const day = (value: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Monterrey", year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
+          purchaseAgeDays = Math.round((Date.parse(day(new Date())) - Date.parse(day(new Date(o.data.created_at)))) / 86400000);
+        }
+      }
       else if (!ctx.shop.id) {
         const payment = await db.from("ma2_wallet_entries").select("note")
           .eq("request_id", data.orderId).eq("client_id", ctx.client.id).eq("kind","purchase").maybeSingle();
@@ -385,11 +392,12 @@ export const customerSubmit = createServerFn({ method: "POST" })
       ...(data.module==="requests"?{platform:data.title}:{}),
       orderId: data.orderId || "",
       purchaseTitle,
+      ...(data.module==="reports" && purchaseAgeDays!==null && purchaseAgeDays>=19 && purchaseAgeDays<=25 ? { reply: "Tu reporte quedó pendiente de revisión para posible saldo de garantía (días 19–25)." } : {}),
       ...(data.module === "reports" ? { platform: purchaseTitle || data.title } : {}),
       ...(data.module === "reports" && data.evidence ? { attachment: data.evidence, filename: "captura-de-falla.jpg", filetype: "image/jpeg" } : {}),
     });
     let replaced=false;
-    if(data.module==="reports" && !ctx.shop.id && data.orderId && data.evidence){
+    if(data.module==="reports" && !ctx.shop.id && data.orderId && data.evidence && ctx.client.data.replacementPolicy!=="Manual"){
       try {
         const {purchaseRecordId}=await import("./purchase-identity.server");
         const result=await s.opsDB().rpc("ma2_auto_replace_purchase",{
@@ -406,7 +414,7 @@ export const customerSubmit = createServerFn({ method: "POST" })
       try{
         const notify=await import("@/lib/notify/notify.server"),db=await notify.admin();
         const isReport=data.module==="reports";
-        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:isReport?"customer-report":"customer-request",catalog_name:isReport?"Página web MA² · Reportes":"Página web MA² · Por encargo",service_name:replaced?"Reposición automática · "+purchaseTitle:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\n"+(replaced?"Reposición realizada sin cobro":isReport?"Reporte de falla: "+data.message:"Solicitud por encargo: "+data.message),link:"/?panel=1",recipient:"",...(replaced?{status:"atendido" as const,attended_at:new Date().toISOString()}:{})},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
+        const {data:row,error}=await db.from("orders").upsert({id:record.id,catalog_id:isReport?"customer-report":"customer-request",catalog_name:isReport?"Página web MA² · Reportes":"Página web MA² · Por encargo",service_name:replaced?"Reposición automática · "+purchaseTitle:data.title,total:0,items:[{name:data.title,price:0}],message:"Cliente: "+ctx.client.title+"\n"+(replaced?"Reposición realizada sin cobro":isReport?"Reporte de falla: "+data.message+(purchaseAgeDays!==null&&purchaseAgeDays>=19&&purchaseAgeDays<=25?"\nGarantía: revisar saldo manualmente (día "+purchaseAgeDays+")":""):"Solicitud por encargo: "+data.message),link:"/?panel=1",recipient:"",...(replaced?{status:"atendido" as const,attended_at:new Date().toISOString()}:{})},{onConflict:"id",ignoreDuplicates:true}).select("*").maybeSingle();
         if(error)throw error;
         if(row){const settings=await notify.loadSettings();if(settings.enabled&&notify.withinSchedule(settings))await notify.notifyOrder(notify.rowToOrder(row as Record<string,unknown>),settings);}
       }catch{/* La solicitud está guardada; no volver a crearla por un fallo de aviso. */}

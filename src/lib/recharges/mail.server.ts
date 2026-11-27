@@ -135,6 +135,8 @@ export async function scanRechargeMail() {
             ? "No pasó la autenticación del remitente"
             : !extracted.incoming
               ? "El aviso no identifica una transferencia recibida"
+              : extracted.referenceAmbiguous
+                ? "El aviso contiene referencias contradictorias"
               : !extracted.amountCents
                 ? "No se encontró un importe único"
                 : !extracted.tracking
@@ -148,7 +150,7 @@ export async function scanRechargeMail() {
             reference: extracted.reference,
             tracking: extracted.tracking,
             transfer_key: transfer,
-            verified: verified && extracted.incoming,
+            verified: verified && extracted.incoming && !extracted.referenceAmbiguous,
             status: !extracted.incoming ? "ignored" : "review",
             reason,
           };
