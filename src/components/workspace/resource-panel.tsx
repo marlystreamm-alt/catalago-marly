@@ -175,7 +175,10 @@ export function ResourcePanel({
           </Button>
         ) : null}
         <Button
-          variant="outline"
+          variant="ghost"
+          size="icon"
+          aria-label="Exportar registros"
+          title="Exportar registros"
           onClick={() =>
             exportRows(
               rows.map((r) => ({
@@ -189,7 +192,6 @@ export function ResourcePanel({
           }
         >
           <Download className="size-4" />
-          Exportar
         </Button>
         <Button
           variant="ghost"
@@ -226,21 +228,17 @@ export function ResourcePanel({
         <EmptyState
           icon={def.icon}
           title={query ? "Sin resultados" : `Sin ${def.title.toLowerCase()} todavía`}
-          description="Usa el botón de arriba para agregar tu primer registro."
         />
       ) : (
-        <div className="seller-record-grid">
+        <div className="seller-record-grid items-start">
           {rows.map((r) => (
-            <article className="seller-card" key={r.id}>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="seller-caption">{names.get(r.data.clientId) || def.singular}</p>
-                  <h3 className="font-bold break-words">{r.title}</h3>
-                </div>
-                <span className={`seller-badge status-${r.status}`}>
-                  {STATUS[r.status] || r.status}
-                </span>
-              </div>
+            <details className="seller-disclosure" key={r.id}>
+              <summary>
+                <span className="min-w-0 flex-1 break-words text-sm font-semibold">{r.title}</span>
+                <span className={`seller-badge status-${r.status}`}>{STATUS[r.status] || r.status}</span>
+              </summary>
+              <div className="seller-disclosure-body">
+              {names.get(r.data.clientId) && <p className="text-sm text-muted-foreground">{names.get(r.data.clientId)}</p>}
               {module === "reports" && <p className="mt-2 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString("es-MX")}{r.data.orderId ? ` · Folio de compra ${r.data.orderId.slice(0,8)}` : ""}</p>}
               {module === "clients" ? (
                 <div className="my-3 grid grid-cols-2 gap-2">
@@ -380,7 +378,8 @@ export function ResourcePanel({
                   Retirar
                 </Button>
               </div>
-            </article>
+              </div>
+            </details>
           ))}
         </div>
       )}
@@ -597,13 +596,13 @@ export function EmptyState({
 }: {
   icon: string;
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <div className="seller-empty">
       <span aria-hidden="true">{icon}</span>
       <h3>{title}</h3>
-      <p>{description}</p>
+      {description && <p>{description}</p>}
     </div>
   );
 }

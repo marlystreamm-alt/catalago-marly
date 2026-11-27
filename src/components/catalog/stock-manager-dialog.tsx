@@ -26,7 +26,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Settings2,
   Trash2,
   Warehouse,
@@ -581,22 +580,29 @@ export function StockManagerDialog({
 
   return (
     <ToolFrame embedded={embedded} open={open} onOpenChange={setOpen} trigger={<Button variant="outline" size="sm" className="rounded-xl"><Warehouse className="mr-1.5 size-4" />Gestor</Button>} className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto rounded-3xl">
-        <DialogHeader>
-          <DialogTitle>Gestor</DialogTitle>
-          {initialClient ? <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name} · Elige una cuenta disponible y pulsa Asignar.</p> : null}
-          <DialogDescription>Administra tu stock, copia credenciales y prepara tus entregas.</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold">Mi stock actual</h3>
-          <div className="flex flex-wrap gap-2">
-            {admin && <Button size="sm" variant="outline" disabled={busy} onClick={async()=>{
-              try {setDeletedStock(await stockAdminDeletedList({data:{code:getSavedCode()}}));}
-              catch(e){toast.error(err(e));}
-            }}><History className="mr-1 size-4"/>Deshacer eliminación</Button>}
-            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw className="mr-1 size-4" />Actualizar</Button>
-          </div>
+        {!embedded && <DialogHeader>
+          <DialogTitle>Inventario</DialogTitle>
+          <DialogDescription className="sr-only">Cuentas y perfiles del inventario.</DialogDescription>
+        </DialogHeader>}
+        {initialClient && <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <Input className="min-w-32 flex-1" value={q} onChange={(event) => setQ(event.target.value)}
+            aria-label="Buscar en inventario" placeholder="Buscar plataforma o cliente" />
+          {can("stock_add") && <Button size="sm" onClick={() => {
+            setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true);
+          }}><Plus className="size-4" />Agregar stock</Button>}
         </div>
+        <details className="seller-disclosure">
+          <summary className="text-sm font-medium">Opciones de inventario</summary>
+          <div className="seller-disclosure-body flex flex-wrap gap-2">
+            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw />Actualizar</Button>
+            {can("stock_export") && <Button size="sm" variant="ghost" onClick={exportBackup}><Download />Exportar respaldo</Button>}
+            {admin && <Button size="sm" variant="ghost" disabled={busy} onClick={async () => {
+              try { setDeletedStock(await stockAdminDeletedList({ data: { code: getSavedCode() } })); }
+              catch (error) { toast.error(err(error)); }
+            }}><History />Papelera de inventario</Button>}
+          </div>
+        </details>
         {deletedStock && <section className="rounded-2xl border p-3 space-y-3">
           <div className="flex items-center justify-between"><h3 className="font-semibold">Papelera de inventario</h3><Button size="sm" variant="ghost" onClick={()=>setDeletedStock(null)}>Cerrar</Button></div>
           {deletedStock.length===0 && <p className="text-sm text-muted-foreground">No hay cuentas eliminadas para recuperar.</p>}
@@ -616,33 +622,47 @@ export function StockManagerDialog({
         </section>}
 
           <div className="grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-muted/20 p-3">
-              <div><p className="font-semibold">Mi stock actual</p><p className="text-xs text-muted-foreground">Consulta cuentas completas y perfiles en un mismo listado. La información sensible queda dentro de ⚙️.</p></div>
-              {can("stock_add") ? <Button onClick={() => { setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true); }}><Plus className="mr-1 size-4" />Agregar stock</Button> : null}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
+            <div className="seller-tabs !m-0" aria-label="Estado del inventario">
               {([
                 ["all", "Todos"],
                 ["available", "Disponibles"],
                 ["sold", "Vendidas"],
                 ["expiring", "Por vencer"],
                 ["expired", "Vencidas / bajas"],
-              ] as [StockTab, string][]).map(([key, label]) => <Button key={key} size="sm" variant={stockTab === key ? "default" : "outline"} onClick={() => setStockTab(key)}>{label} ({countTab(key)})</Button>)}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex min-w-56 flex-1 items-center gap-2"><Search className="size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plataforma, cliente, WhatsApp, correo o vencimiento" /></div>
-              {can("stock_export") ? <Button size="sm" variant="outline" onClick={exportBackup}><Download className="mr-1 size-4" />Exportar respaldo</Button> : null}
+              ] as [StockTab, string][]).map(([key, label]) => <button key={key} type="button" className={stockTab === key ? "active" : ""} aria-pressed={stockTab === key} onClick={() => setStockTab(key)}>{label} ({countTab(key)})</button>)}
             </div>
 
             {busy ? <Loader2 className="mx-auto size-5 animate-spin" /> : null}
             <div className="overflow-hidden rounded-2xl border">
-              <div className="grid grid-cols-[1fr_110px_86px] border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><span>Plataforma</span><span>Estado</span><span className="text-center">{initialClient ? "Acción" : "Config."}</span></div>
               {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
                 const statusText = x.status !== "available" && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
-                return <div key={x.id} className="grid grid-cols-[1fr_110px_86px] items-center border-b px-3 py-3 last:border-b-0"><div className="min-w-0"><p className="truncate font-semibold">{x.platform}</p>{x.accountType ? <p className="truncate text-xs text-muted-foreground">{x.accountType}</p> : null}</div><div className="flex items-center gap-2 text-sm"><span className={`size-2.5 shrink-0 rounded-full ${statusDot(x)}`} /><span className="truncate">{statusText}</span></div><div className="text-center">{initialClient && x.status === "available" && can("stock_assign") ? <Button size="sm" disabled={busy} onClick={() => openManualDelivery(x)}>Asignar</Button> : <Button size="icon" variant="outline" className="size-9" onClick={() => setToolsItem(x)} aria-label={`Configurar ${x.platform}`}><Settings2 className="size-4" /></Button>}</div></div>;
+                const platform = <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{x.platform}</span>
+                  {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
+                </span>;
+                const status = <span className="flex shrink-0 items-center gap-1.5 text-xs">
+                  <span className={`size-2 shrink-0 rounded-full ${statusDot(x)}`} />{statusText}
+                </span>;
+                if (initialClient && x.status === "available" && can("stock_assign")) {
+                  return <div key={x.id} className="flex items-center gap-2 border-b px-3 py-2 last:border-b-0">
+                    {platform}{status}
+                    <Button size="sm" disabled={busy} onClick={() => openManualDelivery(x)}>Asignar</Button>
+                  </div>;
+                }
+                return (
+                  <details key={x.id} className="seller-disclosure !rounded-none !border-x-0 !border-t-0 last:!border-b-0">
+                    <summary>{platform}{status}</summary>
+                    <div className="seller-disclosure-body flex flex-wrap gap-2">
+                      {can("stock_edit") && <Button size="sm" variant="outline" onClick={() => {
+                        setForm({ ...x }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
+                      }}><Pencil />Editar</Button>}
+                      <Button size="sm" variant="ghost" onClick={() => setToolsItem(x)}>
+                        <Settings2 />Detalles y acciones
+                      </Button>
+                    </div>
+                  </details>
+                );
               })}
               {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay registros en esta subpestaña.</p> : null}
             </div>

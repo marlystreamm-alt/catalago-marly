@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,19 +85,16 @@ export function RechargePanel({
   };
   return (
     <div className="space-y-4">
-      <div className="seller-card space-y-2">
-        <h2 className="font-bold">Recargas automáticas por Gmail</h2>
-        <p className="text-sm text-muted-foreground">
-          Banco y cuenta configurables. Cada cliente genera una referencia desde su enlace privado
-          de atención.
-        </p>
-        <p className="text-sm font-semibold">
-          {data?.settings?.enabled
-            ? data.lastCheck && !data.lastError
-              ? "🟢 Lector activo"
-              : "🟠 Activadas · esperando revisión"
-            : "⚪ Recargas automáticas apagadas"}
-        </p>
+      <details className="seller-disclosure">
+        <summary className="justify-between">
+          <span className="flex-1 text-sm font-semibold">Lector de Gmail</span>
+          <span className="seller-badge">
+            {data?.lastError ? "Error" : data?.settings?.enabled
+              ? data.lastCheck ? "Activo" : "En espera"
+              : data ? "Apagado" : "Cargando"}
+          </span>
+        </summary>
+        <div className="seller-disclosure-body space-y-2">
         {data?.lastCheck ? (
           <p className="text-xs text-muted-foreground">
             Última revisión: {new Date(data.lastCheck).toLocaleString("es-MX")}
@@ -122,7 +120,8 @@ export function RechargePanel({
         >
           Revisar correo ahora
         </Button>
-      </div>
+        </div>
+      </details>
       <div className="seller-tabs">
         {[
           ["requests", "Recargas"],
@@ -355,16 +354,14 @@ export function RechargePanel({
         </>
       ) : (
         <>
-          <div className="seller-actions">
-            <Input
+          <div className="flex items-center gap-2">
+            <Input className="min-w-0 flex-1"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar referencia o cliente"
               aria-label="Buscar recargas"
             />
-            <Button disabled={busy || changed} variant="outline" onClick={() => void load()}>
-              Actualizar
-            </Button>
+            <Button disabled={busy || changed} variant="ghost" size="icon" aria-label="Actualizar recargas" onClick={() => void load()}><RefreshCw /></Button>
           </div>
           <div className="seller-tabs">
             {[
@@ -378,7 +375,7 @@ export function RechargePanel({
               </button>
             ))}
           </div>
-          <div className="seller-record-grid">
+          <div className="seller-record-grid items-start">
             {tab === "requests"
               ? data?.requests
                   .filter(
@@ -389,18 +386,19 @@ export function RechargePanel({
                         .includes(q.toLowerCase()),
                   )
                   .map((r) => (
-                    <article className="seller-card" key={r.id}>
-                      <div className="flex justify-between gap-2">
-                        <h3 className="font-bold">{money(Number(r.payable_cents) / 100)}</h3>
+                    <details className="seller-disclosure" key={r.id}>
+                      <summary>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold">{names.get(r.client_id) || "Cliente"}</span>
+                          <span className="text-xs text-muted-foreground">{r.reference}</span>
+                        </span>
+                        <b className="whitespace-nowrap text-sm">{money(Number(r.payable_cents) / 100)}</b>
                         <span className="seller-badge">{labels[r.status]}</span>
-                      </div>
-                      <p className="text-sm mt-2">
-                        {names.get(r.client_id) || "Cliente"} · referencia <b>{r.reference}</b>
+                      </summary>
+                      <p className="seller-disclosure-body text-xs text-muted-foreground">
+                        Vencimiento: {new Date(r.expires_at).toLocaleString("es-MX")}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Vence: {new Date(r.expires_at).toLocaleString("es-MX")}
-                      </p>
-                    </article>
+                    </details>
                   ))
               : data?.events
                   .filter(

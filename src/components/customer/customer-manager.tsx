@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,7 @@ export function CustomerManager({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [temporary, setTemporary] = useState("");
+  const [query, setQuery] = useState("");
   const requests = useRef(new Map<string, string>());
   const auth = useCallback(
     () => (ownerToken ? { ownerToken } : { code: getSavedCode() }),
@@ -59,22 +61,23 @@ export function CustomerManager({
       setBusy(false);
     }
   };
+  const search = query.trim().toLowerCase();
+  const matches = data?.accounts.filter((account) =>
+    `${account.name} ${account.email}`.toLowerCase().includes(search),
+  ) ?? [];
   return (
     <section className="seller-card space-y-4">
-      <div className="flex flex-wrap gap-3 items-start justify-between">
-        <div>
-          <h2 className="text-lg font-bold">Portal y saldo de tus clientes</h2>
-          <p className="text-xs text-muted-foreground">
-            Cada comprador tiene cuenta, compras, saldo y soporte propios.
-          </p>
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <h2 className="text-sm font-bold">Cuentas web</h2>
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost"
+            onClick={() => void copyText(`${location.origin}${slug === "ma2" ? mainStoreLink() : `/tienda/${encodeURIComponent(slug)}`}`)}>
+            Copiar enlace
+          </Button>
+          <Button variant="ghost" size="icon" disabled={busy} aria-label="Actualizar clientes" onClick={() => void load()}>
+            <RefreshCw />
+          </Button>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void copyText(`${location.origin}${slug === "ma2" ? mainStoreLink() : `/tienda/${encodeURIComponent(slug)}`}`)}
-        >
-          Copiar enlace de la tienda
-        </Button>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -96,23 +99,26 @@ export function CustomerManager({
           <p className="text-xs">Se pedirá cambiar esta contraseña al entrar.</p>
         </div>
       ) : null}
-      <Button variant="outline" size="sm" disabled={busy} onClick={() => void load()}>
-        Actualizar clientes
-      </Button>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {data?.accounts.map((a) => (
-          <article className="rounded-xl border p-4 space-y-3" key={a.id}>
-            <div className="flex justify-between gap-3">
-              <div>
-                <h3 className="font-bold">{a.name}</h3>
-                <p className="text-xs break-all text-muted-foreground">{a.email}</p>
-              </div>
-              <b>{money(a.balance)}</b>
-            </div>
-            <p className="text-xs">
-              {a.active ? "Activo" : "Suspendido"}
-              {a.must_change ? " · Cambio de contraseña pendiente" : ""}
-            </p>
+      {Boolean(data?.accounts.length) && (
+        <Input value={query} onChange={(event) => setQuery(event.target.value)}
+          aria-label="Buscar cuentas web" placeholder="Buscar cliente o correo" />
+      )}
+      {data?.accounts.length ? (
+        <div className="grid items-start gap-2 lg:grid-cols-2">
+        {matches.map((a) => (
+          <details className="seller-disclosure" key={a.id}>
+            <summary>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{a.name}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {a.active ? "Activo" : "Suspendido"}
+                </span>
+              </span>
+              <b className="whitespace-nowrap text-sm">{money(a.balance)}</b>
+            </summary>
+            <div className="seller-disclosure-body space-y-3">
+              <p className="text-xs break-all text-muted-foreground">{a.email}</p>
+              {a.must_change && <p className="text-xs">Cambio de contraseña pendiente</p>}
             {!ownerToken && slug === "ma2" && <label className="seller-field"><span>Tipo de cliente y tarifa</span><select className="buyer-select" disabled={busy} value={a.price_tier || "retail"} onChange={e=>{const tier=e.target.value as "retail"|"reseller";if(!confirm(`¿Cambiar a ${tier==="reseller"?"Revendedor":"Cliente normal"}? Se aplicará en sus próximas compras.`))return;void action(async()=>{await customerManageTier({data:{...auth(),accountId:a.id,tier}});toast.success("Categoría actualizada");});}}><option value="retail">Cliente normal</option><option value="reseller">Revendedor</option></select></label>}
             <form
               className="grid gap-2"
@@ -197,19 +203,26 @@ export function CustomerManager({
                 {a.active ? "Suspender" : "Reactivar"}
               </Button>
             </div>
-          </article>
+            </div>
+          </details>
         ))}
-      </div>
+        {!matches.length && <p className="text-sm text-muted-foreground">Sin coincidencias.</p>}
+        </div>
+      ) : null}
       {data && !data.accounts.length ? (
         <p className="text-sm text-muted-foreground">
           Los compradores aparecerán cuando se registren desde el enlace de tu tienda.
         </p>
       ) : null}
-      <h3 className="font-bold">Reportes y solicitudes</h3>
-      {data?.requests.map((r) => (
+      {data && data.requests.length > 0 && <details className="seller-disclosure">
+        <summary className="text-sm font-semibold">Reportes y solicitudes ({data.requests.length})</summary>
+        <div className="seller-disclosure-body space-y-2">
+        {data.requests.map((r) => (
+          <details className="seller-disclosure" key={r.id}>
+            <summary><span className="flex-1 text-sm font-semibold">{r.title}</span><span className="seller-badge">{STATUS[r.status] || r.status}</span></summary>
         <form
-          className="border rounded-xl p-3 space-y-3"
-          key={r.id + ":" + r.version}
+          className="seller-disclosure-body space-y-3"
+          key={r.version}
           onSubmit={(e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
@@ -228,7 +241,6 @@ export function CustomerManager({
             });
           }}
         >
-          <h4 className="font-semibold text-sm">{r.title}</h4>
           <p className="text-xs text-muted-foreground">
             {data.accounts.find((a) => a.client_id === r.clientId)?.name || "Cliente"}
           </p>
@@ -251,7 +263,10 @@ export function CustomerManager({
             Guardar respuesta
           </Button>
         </form>
-      ))}
+          </details>
+        ))}
+        </div>
+      </details>}
     </section>
   );
 }
