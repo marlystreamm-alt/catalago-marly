@@ -3,7 +3,7 @@ import { ContactPhoneInput } from "@/components/workspace/contact-phone-input";
 import { phoneNumber, validWhatsApp, validFullName, validClientEmail, transferReferenceMessage } from "@/lib/workspace/model";
 import { pricingLoad } from "@/lib/customer/pricing.functions";
 import { pricingKey, type PriceRow } from "@/lib/customer/pricing";
-import { MASTER_PLANS, masterPlan, masterProduct, stockPlatform } from "@/lib/stock/master-products";
+import { MASTER_PLANS, stockPlatform } from "@/lib/stock/master-products";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
@@ -71,6 +71,36 @@ type FeatureMap = Record<string, boolean>;
 type HistoryRow = { id: string; action: string; detail: string; createdAt: string };
 type StockTab = "all" | "available" | "sold" | "expiring" | "review" | "expired";
 
+
+type PlatformOption = { id: string; label: string; platform: string; months?: number; kind?: "profile" | "complete" };
+const platformOptions: { label: string; options: PlatformOption[] }[] = [
+  {label:"Disney+",options:[
+    {id:"disney-standard",label:"Disney+ Estándar",platform:"Disney+ Estándar",months:1},
+    {id:"disney-premium",label:"Disney+ Premium",platform:"Disney+ Premium",months:1},
+    {id:"disney-annual",label:"Disney+ Anual",platform:"Disney anual",months:12},
+  ]},
+  {label:"Netflix",options:[
+    {id:"netflix-private",label:"Netflix Privado",platform:"Netflix Privado"},
+    {id:"netflix-profile",label:"Netflix Perfil",platform:"Netflix",kind:"profile"},
+    {id:"netflix-complete",label:"Netflix Completa",platform:"Netflix",kind:"complete"},
+  ]},
+  {label:"Paramount+",options:[{id:"paramount",label:"Paramount+",platform:"Paramount+"}]},
+  {label:"Prime Video",options:[
+    {id:"prime",label:"Prime Video",platform:"Prime Video",months:1},
+    {id:"prime-six",label:"Prime Video · 6 meses",platform:"Prime Video 6M",months:6},
+    {id:"prime-no-ads",label:"Prime Video Sin Anuncios",platform:"Prime Video S/A"},
+  ]},
+  {label:"Otras plataformas",options:MASTER_PLANS
+    .filter(plan=>!/^(DIS|NET|PAR|PRI)-/.test(plan.code))
+    .map(plan=>({id:plan.code,label:plan.name,platform:plan.name}))},
+];
+const options = platformOptions.flatMap(group=>group.options);
+function selectedPlatform(form: Pick<StockItem,"platform"|"stockKind"|"durationMonths">) {
+  const key = stockPlatform(form.platform).key;
+  return options.find(option=>stockPlatform(option.platform).key===key
+    && (!option.kind||option.kind===form.stockKind)
+    && (!option.months||option.months===(form.durationMonths||1)))?.id || "manual";
+}
 
 const blank = (): StockItem => ({
   durationMonths: 1,
@@ -711,7 +741,28 @@ export function StockManagerDialog({
             <DialogHeader><DialogTitle>{form.id ? "Editar cuenta" : "Agregar stock"}</DialogTitle><DialogDescription>{form.id ? "Edita todos los datos del registro." : "Aquí solo capturas datos del stock. Cliente y entrega se solicitan únicamente al vender."}</DialogDescription></DialogHeader>
             {!form.id ? <div className="flex gap-2"><Button size="sm" variant={!bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(false); setBulkText(""); }}>Agregar individual</Button><Button size="sm" variant={bulkMode ? "default" : "outline"} onClick={() => { setBulkMode(true); setSplitOnSave(false); setForm((current) => ({ ...current, username: "", password: "", profilePin: "" })); }}>Agregar por lote</Button></div> : null}
             <div ref={formRef} className="grid gap-3 sm:grid-cols-3">
-              <div><Label>Plataforma y plan</Label><Select value={masterPlan(form.platform)?.code || "manual"} onValueChange={v=>setForm({...form,platform:MASTER_PLANS.find(p=>p.code===v)?.name||""})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{MASTER_PLANS.map(p=><SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}<SelectItem value="manual">Otra plataforma (manual)</SelectItem></SelectContent></Select>{!masterPlan(form.platform)?<Input className="mt-2" value={form.platform} onChange={(e)=>setForm({...form,platform:e.target.value})} placeholder="Nombre exacto del servicio"/>:null}<p className="text-xs text-muted-foreground">{masterProduct(form.platform,form.stockKind) || "Sin código maestro · revisión manual"}</p></div>
+              <div>
+                <Label>Plataforma y plan</Label>
+                <Select value={selectedPlatform(form)} onValueChange={value=>setForm(current=>{
+                  const option = options.find(item=>item.id===value);
+                  if (!option) return {...current,platform:""};
+                  const stockKind = current.id ? current.stockKind : option.kind || current.stockKind;
+                  return {...current,platform:option.platform,durationMonths:option.months||current.durationMonths,
+                    stockKind,accountType: stockKind===current.stockKind ? current.accountType : stockKind==="profile"?"Perfil":"Completa"};
+                })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {platformOptions.map(group=><SelectGroup key={group.label}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.options.map(option=><SelectItem key={option.id} value={option.id}
+                        disabled={Boolean(form.id && option.kind && option.kind!==form.stockKind)}>{option.label}</SelectItem>)}
+                    </SelectGroup>)}
+                    <SelectItem value="manual">Otra plataforma (manual)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedPlatform(form)==="manual" && <Input className="mt-2" value={form.platform}
+                  onChange={e=>setForm({...form,platform:e.target.value})} placeholder="Nombre exacto del servicio" />}
+              </div>
               <div><Label>Tipo de stock</Label><Select value={form.stockKind} disabled={Boolean(form.id)} onValueChange={v=>setForm({...form,stockKind:v as "complete"|"profile",accountType:v==="profile"?"Perfil":"Completa"})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="complete">Cuenta completa</SelectItem><SelectItem value="profile">Perfil individual</SelectItem></SelectContent></Select></div>
               {!bulkMode ? <div><Label>Usuario / correo</Label><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></div> : null}
               {!bulkMode ? <div><Label>Contraseña</Label><div className="relative"><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPass((v) => !v)}>{showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button></div></div> : null}
