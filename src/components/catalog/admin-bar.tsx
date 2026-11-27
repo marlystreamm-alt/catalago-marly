@@ -377,7 +377,7 @@ function LoginDialog({
   );
 }
 
-export function AdminBar() {
+export function AdminBar({ showCatalogTools = true }: { showCatalogTools?: boolean } = {}) {
   const { isAdmin, mustChangePassword, logout, exportBackup, importBackup, resetAll } =
     useCatalogStore();
   const [open, setOpen] = useState(false);
@@ -406,7 +406,7 @@ export function AdminBar() {
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => setToolsOpen(true)}>
           <KeyRound className="size-4" />
-          Cuenta y respaldo
+          {showCatalogTools ? "Cuenta y respaldo" : "Cuenta de administración"}
         </Button>
         <Button variant="secondary" size="sm" onClick={logout}>
           <LogOut className="size-4" />
@@ -416,12 +416,13 @@ export function AdminBar() {
       <Dialog open={toolsOpen} onOpenChange={setToolsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Cuenta y respaldo</DialogTitle>
+            <DialogTitle>{showCatalogTools ? "Cuenta y respaldo" : "Cuenta de administración"}</DialogTitle>
             <DialogDescription>
-              Acceso, contraseña y respaldo general de MA² en un solo lugar.
+              {showCatalogTools ? "Gestiona el acceso y el respaldo de tus catálogos." : "Gestiona tu contraseña y sesión de MA²."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
+            {showCatalogTools && <>
             <Button variant="outline" className="justify-start" onClick={exportBackup}>
               <Download className="size-4" /> Exportar respaldo general
             </Button>
@@ -445,6 +446,7 @@ export function AdminBar() {
                 importBackup(text);
               }}
             />
+            </>}
             <Button
               variant={mustChangePassword ? "default" : "outline"}
               className="justify-start"
@@ -452,6 +454,7 @@ export function AdminBar() {
             >
               <KeyRound className="size-4" /> Cambiar contraseña
             </Button>
+            {showCatalogTools && (
             <ConfirmButton
               title="¿Restaurar los catálogos iniciales?"
               description="Se perderán los cambios que no hayas exportado."
@@ -462,6 +465,7 @@ export function AdminBar() {
                 <RotateCcw className="size-4" /> Restaurar catálogos iniciales
               </Button>
             </ConfirmButton>
+            )}
             <Button variant="secondary" className="justify-start" onClick={logout}>
               <LogOut className="size-4" /> Cerrar sesión de administradora
             </Button>
