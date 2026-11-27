@@ -5,7 +5,7 @@ import { stockPlatform } from "@/lib/stock/master-products";
 import { StockPlatformMark } from "./stock-platform-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
+import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminVerifyFamily, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
 import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
@@ -46,18 +46,45 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     .filter(
       (r) =>
         (sales ? (!parents.has(r.id) && r.accountType!=="split_parent" && r.status!=="available") :
-          (Boolean(r.clientName || r.deliveredOn) || r.status==="expired" || r.status==="review" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
+          (Boolean(r.clientName || r.deliveredOn) || (r.status==="expired" && !parents.has(r.id) && r.accountType!=="split_parent") || r.status==="review" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
         `${r.platform} ${stockPlatform(r.platform).label} ${r.clientName} ${r.clientWhatsapp}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     );
-  const tone=(r:StockItem)=>r.status==="expired"?"expired":renewalTone(daysRemaining(r.expiresOn,today),limits);
+  const tone=(r:StockItem)=>r.status==="expired" && !parents.has(r.id) && r.accountType!=="split_parent"?"expired":renewalTone(daysRemaining(r.expiresOn,today),limits);
   const isReview=(r:StockItem)=>r.status==="review"&&tone(r)!=="expired";
   const rows = assigned.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
       if(days==="review")return isReview(r);
       return !isReview(r)&&(days==="all" || tone(r)===days);
     }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
+  const [familyExpiry, setFamilyExpiry] = useState("");
+  const requiresCheck = (row: StockItem) => !sales && (tone(row) === "expired" || isReview(row));
+  const checkedRoots = new Set<string>();
+  const visibleRows = rows.filter(row => {
+    if (!requiresCheck(row)) return true;
+    const id = row.parentStockId || row.id;
+    if (checkedRoots.has(id)) return false;
+    checkedRoots.add(id);
+    return true;
+  });
+  const verifyFamily = async (root: StockItem, family: StockItem[], active: boolean) => {
+    if (active && familyExpiry <= today) return toast.error("Elige una fecha de vigencia futura.");
+    if (!window.confirm(active
+      ? "¿Confirmas que funciona y retiraste los accesos anteriores? Las unidades quedarán disponibles."
+      : "¿Marcar como sin suscripción la cuenta y todos sus perfiles?")) return;
+    setBusy(true);
+    try {
+      await stockAdminVerifyFamily({data:{code:getSavedCode(),root:root.id,
+        members:family.map(row=>({id:row.id,version:row.updatedAt})),
+        active,expiresOn:active?familyExpiry:undefined}});
+      setFamilyExpiry("");
+      await load();
+      onChanged?.();
+      toast.success(active?"Acceso verificado · Stock disponible":"Cuenta y perfiles sin suscripción");
+    } catch (error) { toast.error(errorText(error)); }
+    finally { setBusy(false); }
+  };
   const saveRenewal=async(r:StockItem,date?:string)=>{
     setBusy(true);
     try{if(reactivating&&date){await stockAdminReactivate({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}else{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}setRenewing(null);setReactivating(false);await load();onChanged?.();toast.success(reactivating?"Cuenta reactivada":date?"Renovación guardada":"Marcado como avisado");}
@@ -145,7 +172,14 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         />
       ) : (
         <div className="seller-record-grid items-start">
-          {rows.map((r) => {
+          {visibleRows.map((r) => {
+            const root = items.find(item=>item.id===(r.parentStockId||r.id));
+            const profiles = root ? items.filter(item=>item.parentStockId===root.id) : [];
+            const checking = requiresCheck(r) && Boolean(root);
+            const family = root ? [root,...profiles] : [];
+            const withoutSubscription = checking && family.every(item=>item.renewalStatus==="Sin suscripción");
+            const panel = root?.panelUrl?.trim();
+            const panelLink = panel && /^https?:\/\//i.test(panel) ? panel : null;
             const delta = daysRemaining(r.expiresOn, today);
             const color = tone(r);
             const { label } = stockPlatform(r.platform);
@@ -154,16 +188,44 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 <StockPlatformMark name={label} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{r.clientName || "Sin cliente"} · {r.stockKind === "profile" ? "Perfil" : "Completa"}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{checking && profiles.length ? `${profiles.length} perfiles vinculados` : `${r.clientName || "Sin cliente"} · ${r.stockKind === "profile" ? "Perfil" : "Completa"}`}</span>
                 </span>
-                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
+                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{withoutSubscription?"Sin suscripción":isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
               </summary>
               <div className="seller-disclosure-body">
               <p className="text-xs text-muted-foreground">
                 {sales ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}` : `Vencimiento: ${r.expiresOn || "Sin asignar"}`}
               </p>
               {!sales&&r.renewalNotifiedAt&&<p className="mt-1 text-xs text-muted-foreground">✓ Avisado el {r.renewalNotifiedAt.slice(0,10)}</p>}
-              <div className="seller-actions mt-3">
+              {checking && root && <div className="mt-3 space-y-3">
+                <details className="rounded-xl border p-3">
+                  <summary className="cursor-pointer font-semibold">Datos de acceso y perfiles</summary>
+                  <dl className="mt-2 space-y-1 break-all text-sm">
+                    {([["Correo o usuario",root.username],["Contraseña",root.password],["Perfil / PIN",root.profilePin],
+                      ["Link del panel",root.panelUrl],["Usuario del panel",root.panelUsername],["Contraseña del panel",root.panelPassword],
+                      ["Proveedor",root.provider],["Notas",root.notes]] as const).filter(([,value])=>value).map(([name,value])=>
+                        <div key={name}><dt className="inline font-semibold">{name} </dt><dd className="inline">{value}</dd></div>)}
+                  </dl>
+                  {panelLink && <Button asChild size="sm" variant="outline" className="mt-2"><a href={panelLink}
+                    target="_blank" rel="noopener noreferrer">Abrir panel</a></Button>}
+                  {profiles.length>0 && <ul className="mt-3 divide-y">
+                    {profiles.map((profile,index)=><li key={profile.id} className="py-2 text-sm">
+                      <b>Perfil {index+1}</b> · {profile.clientName || "Sin cliente"} · {profile.expiresOn || "Sin fecha"}
+                      {profile.profilePin && <p>Perfil / PIN {profile.profilePin}</p>}
+                    </li>)}
+                  </ul>}
+                </details>
+                <div className="seller-actions">
+                  <label className="seller-field"><span>Vigencia verificada</span><Input type="date"
+                    value={familyExpiry} onChange={e=>setFamilyExpiry(e.target.value)} /></label>
+                  <Button size="sm" disabled={busy||!familyExpiry} onClick={()=>void verifyFamily(root,family,true)}>Funciona · Liberar</Button>
+                  {!withoutSubscription && <Button size="sm" variant="outline" disabled={busy}
+                    onClick={()=>void verifyFamily(root,family,false)}>Sin suscripción</Button>}
+                </div>
+              </div>}
+              {(!checking || Boolean(r.clientName || r.deliveredOn)) && <details className="mt-3">
+              <summary className="cursor-pointer text-sm font-medium">{sales?"Contacto":"Opciones de renovación"}</summary>
+              <div className="seller-actions mt-2">
                 {r.clientWhatsapp && !isReview(r) ? (
                   <Button asChild size="sm">
                     <a
@@ -187,9 +249,9 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 ) : null}
                 {!sales&&Boolean(r.clientName || r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setReactivating(false);setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
                 {!sales&&Boolean(r.clientName||r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>void review(r,"nonrenewal")}>No renovó</Button>}
-                {!sales&&r.status==="review"&&<>{isReview(r)&&<Button size="sm" disabled={busy} onClick={()=>void review(r,"release")}>Funciona · Liberar</Button>}<Button size="sm" variant="outline" disabled={busy} onClick={()=>void review(r,"expire")}>Caducada</Button></>}
-                {!sales&&!r.clientName&&!r.deliveredOn&&!r.relatedOrderId&&!r.protectedDeliveryId&&!parents.has(r.id)&&r.accountType!=="split_parent"&&["available","expired"].includes(r.status)&&(r.status==="expired"||Boolean(r.expiresOn&&r.expiresOn<=today))&&<Button size="sm" disabled={busy} onClick={()=>{setReactivating(true);setRenewing(r);setNewDate(expiresAfterMonths(today,r.durationMonths||1));}}>Verifiqué acceso · Reactivar</Button>}
-              </div>
+                {!checking&&!sales&&r.status==="review"&&<>{isReview(r)&&<Button size="sm" disabled={busy} onClick={()=>void review(r,"release")}>Funciona · Liberar</Button>}<Button size="sm" variant="outline" disabled={busy} onClick={()=>void review(r,"expire")}>Caducada</Button></>}
+                {!checking&&!sales&&!r.clientName&&!r.deliveredOn&&!r.relatedOrderId&&!r.protectedDeliveryId&&!parents.has(r.id)&&r.accountType!=="split_parent"&&["available","expired"].includes(r.status)&&(r.status==="expired"||Boolean(r.expiresOn&&r.expiresOn<=today))&&<Button size="sm" disabled={busy} onClick={()=>{setReactivating(true);setRenewing(r);setNewDate(expiresAfterMonths(today,r.durationMonths||1));}}>Verifiqué acceso · Reactivar</Button>}
+              </div></details>}
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
               </div>
             </details>;
