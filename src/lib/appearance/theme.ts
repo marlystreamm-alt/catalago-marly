@@ -7,7 +7,7 @@ export type Appearance = {
   pageImage: string;
   cardOpacity: number;
   imageOpacity: number;
-  season: "normal" | "halloween" | "navidad" | "primavera";
+  season: "normal" | "halloween" | "navidad" | "primavera" | "verano";
 };
 export const DEFAULT_APPEARANCE: Appearance = {
   palette: "ma2",
@@ -40,7 +40,7 @@ export function normalizeAppearance(raw: unknown): Appearance {
     pageImage: safeAppearanceImage(a.pageImage),
     cardOpacity: percent(a.cardOpacity, 95),
     imageOpacity: percent(a.imageOpacity, 18),
-    season: ["halloween", "navidad", "primavera"].includes(a.season || "")
+    season: ["halloween", "navidad", "primavera", "verano"].includes(a.season || "")
       ? a.season!
       : "normal",
   };

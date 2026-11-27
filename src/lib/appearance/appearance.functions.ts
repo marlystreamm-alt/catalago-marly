@@ -68,7 +68,7 @@ export const businessSaveAppearance = createServerFn({ method: "POST" })
           pageImage: z.string().max(2000),
           cardOpacity: z.number().min(0).max(100),
           imageOpacity: z.number().min(0).max(100),
-          season: z.enum(["normal", "halloween", "navidad", "primavera"]),
+          season: z.enum(["normal", "halloween", "navidad", "primavera", "verano"]),
         }),
       })
       .parse(v),

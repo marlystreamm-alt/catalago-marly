@@ -4,6 +4,7 @@ import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
+  X,
   Bell,
   Menu,
   Moon,
@@ -265,6 +266,12 @@ export function SellerLayout({
                   : DESCRIPTIONS[section] || "Administra tu negocio desde aquí."}
             </p>
           </div>
+          {section !== "home" && (
+            <Button type="button" variant="ghost" size="icon" className="ml-auto shrink-0"
+              aria-label="Cerrar apartado" title="Cerrar apartado" onClick={() => go("home")}>
+              <X className="size-5" />
+            </Button>
+          )}
           {appearance?.coverImage ? (
             <img
               src={appearance.coverImage}
@@ -678,7 +685,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   else if (section === "appearance")
     content = (
       <div className="seller-card space-y-4">
-        <p className="text-sm text-muted-foreground">Una sola apariencia para el panel, la tienda y la cuenta de cliente.</p>
+        <p className="text-sm text-muted-foreground">Elige una temática en Temporada y guarda para aplicarla al panel, la tienda y la cuenta de cliente.</p>
         <AppearanceEditor value={design} onChange={setDesign} onBusyChange={setUploading} />
         <Button
           disabled={uploading}

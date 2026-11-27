@@ -1,3 +1,7 @@
+export const ADMIN_SESSION_HOURS = 7 * 24;
+
+export class InvalidAdminSessionError extends Error {}
+
 const enc = new TextEncoder();
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -38,7 +42,7 @@ export async function createServerSession(
 }
 
 export async function requireServerSession(token: string) {
-  if (!token || token.length < 20) throw new Error("Sesión no válida, vuelve a entrar");
+  if (!token || token.length < 20) throw new InvalidAdminSessionError("Sesión no válida, vuelve a entrar");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const tokenHash = await hashSessionToken(token);
   const { data, error } = await supabaseAdmin
@@ -48,7 +52,7 @@ export async function requireServerSession(token: string) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data || data.revoked_at || new Date(data.expires_at).getTime() <= Date.now()) {
-    throw new Error("Tu sesión terminó, vuelve a entrar");
+    throw new InvalidAdminSessionError("Tu sesión terminó, vuelve a entrar");
   }
 
   const lastUsed = new Date(data.last_used_at).getTime();

@@ -4,6 +4,6 @@ export async function mainAdminSignIn(password:string){
  const {requireAdminPassword}=await import("@/lib/notify/notify.server");
  const {createServerSession}=await import("@/lib/sessions.server");
  const verification=await requireAdminPassword(password);
- const session=await createServerSession("Marla",{hours:12});
+ const session=await createServerSession("Marla",{hours:ADMIN_SESSION_HOURS});
  return {...session,mustChangePassword:verification.mustChangePassword};
 }

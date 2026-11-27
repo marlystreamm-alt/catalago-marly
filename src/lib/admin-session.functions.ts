@@ -24,9 +24,9 @@ export const adminSessionLogin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { requireAdminPassword } = await import("@/lib/notify/notify.server");
-    const { createServerSession } = await import("@/lib/sessions.server");
+    const { createServerSession, ADMIN_SESSION_HOURS } = await import("@/lib/sessions.server");
     const verification = await requireAdminPassword(data.code);
-    const session = await createServerSession(data.actorName, { hours: 12 });
+    const session = await createServerSession(data.actorName, { hours: ADMIN_SESSION_HOURS });
     return { ...session, mustChangePassword: verification.mustChangePassword };
   });
 
@@ -67,8 +67,14 @@ export const adminSessionChangePassword = createServerFn({ method: "POST" })
 export const adminSessionValidate = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({ token: sessionToken }).parse(value))
   .handler(async ({ data }) => {
-    const { requireServerSession } = await import("@/lib/sessions.server");
-    const session = await requireServerSession(data.token);
+    const { requireServerSession, InvalidAdminSessionError } = await import("@/lib/sessions.server");
+    let session;
+    try {
+      session = await requireServerSession(data.token);
+    } catch (error) {
+      if (error instanceof InvalidAdminSessionError) return { valid: false as const };
+      throw error;
+    }
     const { admin } = await import("@/lib/notify/notify.server");
     const db = await admin();
     const { data: settings, error } = await db
@@ -77,7 +83,7 @@ export const adminSessionValidate = createServerFn({ method: "POST" })
       .eq("id", 1)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return { ...session, mustChangePassword: Boolean(settings?.admin_must_change) };
+    return { ...session, valid: true as const, mustChangePassword: Boolean(settings?.admin_must_change) };
   });
 
 export const adminSessionLogout = createServerFn({ method: "POST" })
