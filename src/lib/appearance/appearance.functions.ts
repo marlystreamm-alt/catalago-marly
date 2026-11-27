@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { normalizeAppearance } from "./theme";
+import { isAppearancePalette, normalizeAppearance } from "./theme";
 const credentials = z.object({
   code: z.string().min(4).max(100).optional(),
   ownerToken: z.string().min(10).optional(),
@@ -62,7 +62,7 @@ export const businessSaveAppearance = createServerFn({ method: "POST" })
         businessId: z.string().uuid(),
         appearance: z.object({
           coverImage: z.string().max(2000),
-          palette: z.enum(["ma2","rosa","lavanda"]).optional(),
+          palette: z.custom(isAppearancePalette, "Selecciona una paleta válida").optional(),
           logoImage: z.string().max(2000),
           cardImage: z.string().max(2000),
           pageImage: z.string().max(2000),

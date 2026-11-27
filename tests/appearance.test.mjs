@@ -32,6 +32,18 @@ test('business owners are scoped to their own business and their edit permission
 test('administrator appearance saves preserve all unrelated business fields',async()=>{
  const s=fixture();const appearance={...theme.DEFAULT_APPEARANCE,cardOpacity:40,season:'navidad',coverImage:'https://example.test/cover.png'};await api.businessSaveAppearance({data:{code:s.code,businessId:s.businessId,appearance}});assert.deepEqual(s.writes[0],{id:s.businessId,payload:{appearance}});
 });
+test('every palette survives normalization and saving and appears in the preview', async () => {
+ const s = fixture();
+ for (const [palette, colors] of Object.entries(theme.APPEARANCE_PALETTES)) {
+   const appearance = {...theme.DEFAULT_APPEARANCE, palette};
+   await api.businessSaveAppearance({data:{code:s.code,businessId:s.businessId,appearance}});
+   assert.equal(s.writes.at(-1).payload.appearance.palette, palette);
+   const style = theme.appearanceStyle(appearance);
+   assert.equal(style['--ma2-accent'], colors.accent);
+   assert.equal(style['--ma2-wash-two'], colors.background[1]);
+ }
+ assert.equal(theme.normalizeAppearance({palette:'constructor'}).palette, 'ma2');
+});
 test('oversized files and SVG are rejected before issuing upload credentials',async()=>{
  const s=fixture();for(const data of [{contentType:'image/svg+xml',size:100},{contentType:'image/png',size:5_242_881}])await assert.rejects(api.appearanceUploadTicket({data:{code:s.code,...data}}));assert.equal(s.uploads.length,0);
 });

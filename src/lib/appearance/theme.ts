@@ -1,6 +1,24 @@
 import type { CSSProperties } from "react";
+export const APPEARANCE_PALETTES = {
+  ma2: { label: "Turquesa y lavanda · MA²", accent: "oklch(.60 .105 216)", highlight: "oklch(.73 .10 213)", background: ["#cbf3f7", "#ece1fa"] },
+  rosa: { label: "Rosa pastel", accent: "oklch(.55 .17 347)", highlight: "oklch(.74 .12 347)", background: ["#fce0ec", "#f1e1fb"] },
+  lavanda: { label: "Lavanda y azul", accent: "oklch(.53 .16 292)", highlight: "oklch(.74 .13 292)", background: ["#e5e0fc", "#d8f1fa"] },
+  menta: { label: "Menta y crema", accent: "#276557", highlight: "#8edac3", background: ["#dcf8ed", "#fff7df"] },
+  durazno: { label: "Durazno y coral", accent: "#9d4539", highlight: "#ffab99", background: ["#ffeadc", "#ffe4e8"] },
+  celeste: { label: "Azul cielo y nube", accent: "#305d91", highlight: "#91c9f0", background: ["#dceeff", "#f4f9ff"] },
+  miel: { label: "Miel y vainilla", accent: "#795412", highlight: "#e8bb62", background: ["#fff0c6", "#fff9eb"] },
+  salvia: { label: "Verde salvia y marfil", accent: "#506547", highlight: "#a9c39c", background: ["#e7efdc", "#fdf8eb"] },
+  frambuesa: { label: "Frambuesa y crema", accent: "#913a61", highlight: "#e8a4c1", background: ["#f9dfe9", "#fff3e7"] },
+  perla: { label: "Perla y azul grisáceo", accent: "#465a72", highlight: "#a7bdd1", background: ["#eef1f6", "#e3edf6"] },
+} as const;
+
+type AppearancePalette = keyof typeof APPEARANCE_PALETTES;
+export function isAppearancePalette(value: unknown): value is AppearancePalette {
+  return typeof value === "string" && Object.hasOwn(APPEARANCE_PALETTES, value);
+}
+
 export type Appearance = {
-  palette?: "ma2" | "rosa" | "lavanda";
+  palette?: AppearancePalette;
   coverImage: string;
   logoImage: string;
   cardImage: string;
@@ -33,7 +51,7 @@ export function normalizeAppearance(raw: unknown): Appearance {
       ? Math.min(100, Math.max(0, v))
       : d;
   return {
-    palette: a.palette === "rosa" || a.palette === "lavanda" ? a.palette : "ma2",
+    palette: isAppearancePalette(a.palette) ? a.palette : "ma2",
     coverImage: safeAppearanceImage(a.coverImage),
     logoImage: safeAppearanceImage(a.logoImage),
     cardImage: safeAppearanceImage(a.cardImage),
@@ -47,16 +65,12 @@ export function normalizeAppearance(raw: unknown): Appearance {
 }
 export function appearanceStyle(raw: unknown): CSSProperties {
   const a = normalizeAppearance(raw);
-  const palette = {
-    ma2: ["oklch(.60 .105 216)","oklch(.73 .10 213)","#cbf3f7","#ece1fa"],
-    rosa: ["oklch(.55 .17 347)","oklch(.74 .12 347)","#fce0ec","#f1e1fb"],
-    lavanda: ["oklch(.53 .16 292)","oklch(.74 .13 292)","#e5e0fc","#d8f1fa"],
-  }[a.palette || "ma2"];
+  const palette = APPEARANCE_PALETTES[a.palette ?? "ma2"];
   return {
-    "--ma2-accent": palette[0],
-    "--ma2-accent-light": palette[1],
-    "--ma2-wash-one": palette[2],
-    "--ma2-wash-two": palette[3],
+    "--ma2-accent": palette.accent,
+    "--ma2-accent-light": palette.highlight,
+    "--ma2-wash-one": palette.background[0],
+    "--ma2-wash-two": palette.background[1],
     "--ma2-card-opacity": `${a.cardOpacity}%`,
     "--ma2-decoration-opacity": a.imageOpacity / 100,
     "--ma2-card-image": a.cardImage ? `url("${a.cardImage}")` : "none",

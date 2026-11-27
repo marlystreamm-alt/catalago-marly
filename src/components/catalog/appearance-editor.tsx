@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  APPEARANCE_PALETTES,
+  isAppearancePalette,
   normalizeAppearance,
   appearanceStyle,
   type Appearance,
@@ -51,10 +53,25 @@ export function AppearanceEditor({
         </p>
       </div>
       <div>
-        <Label>Paleta de colores</Label>
-        <Select value={a.palette||"ma2"} onValueChange={(palette)=>patch({palette:palette as Appearance["palette"]})}>
-          <SelectTrigger><SelectValue/></SelectTrigger>
-          <SelectContent><SelectItem value="ma2">Turquesa y lavanda · MA²</SelectItem><SelectItem value="rosa">Rosa pastel</SelectItem><SelectItem value="lavanda">Lavanda y azul</SelectItem></SelectContent>
+        <Label htmlFor={`${id}-palette`}>Paleta de colores</Label>
+        <Select value={a.palette ?? "ma2"} onValueChange={(palette) => {
+          if (isAppearancePalette(palette)) patch({ palette });
+        }}>
+          <SelectTrigger id={`${id}-palette`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.entries(APPEARANCE_PALETTES).map(([key, palette]) => (
+              <SelectItem key={key} value={key}>
+                <span className="flex items-center gap-2">
+                  <span className="flex shrink-0 gap-0.5" aria-hidden="true">
+                    {[palette.accent, ...palette.background].map(color => (
+                      <span key={color} className="size-3 rounded-full border border-black/10" style={{ backgroundColor: color }} />
+                    ))}
+                  </span>
+                  {palette.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
