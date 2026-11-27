@@ -105,9 +105,7 @@ function AccessPage() {
         <p className="text-center text-xs text-muted-foreground">
           ¿Olvidaste tu contraseña? Pídele una nueva a MA² Connect.
         </p>
-        <Button asChild variant="ghost" size="sm" className="w-full rounded-xl">
-          <Link to="/plataforma">Volver a mi tienda digital</Link>
-        </Button>
+
       </form>
       </div>
     </StoreBusinessPage>

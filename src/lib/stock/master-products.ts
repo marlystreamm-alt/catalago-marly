@@ -64,3 +64,36 @@ export function stockPlatform(name: string) {
     ? { key: plan.code.toLowerCase(), label: plan.name }
     : { key: `custom:${normalized(label)}`, label };
 }
+
+// Display families only. Checkout and assignment still use the selected product key.
+const brands: [RegExp, string][] = [
+  [/\b(?:hbo|max)\b/, "HBO Max"], [/\bparamount\b/, "Paramount+"],
+  [/\bdisney\b/, "Disney+"], [/\bvix\b/, "ViX"], [/\bnetflix\b/, "Netflix"],
+  [/\bprime video\b/, "Prime Video"], [/\bgemini\b/, "Gemini"],
+  [/\bcrunchyroll\b/, "Crunchyroll"], [/\bcanva\b/, "Canva"],
+  [/\bspotify\b/, "Spotify"], [/\byoutube\b/, "YouTube"],
+  [/\bclaro video\b/, "Claro Video"], [/\buniversal\b/, "Universal+"],
+  [/\bhulu\b/, "Hulu"], [/\bfox one\b/, "Fox One"], [/\bmicrosoft 365\b/, "Microsoft 365"],
+  [/\bapple tv\b/, "Apple TV+"],
+];
+
+export function platformFamily(name: string) {
+  const { label } = stockPlatform(name);
+  const words = normalized(label);
+  const found = [...new Set(brands.filter(([pattern]) => pattern.test(words)).map(([, brand]) => brand))];
+  if (found.length > 1) return found.join(" + ");
+  if (/\s\+\s|\bcombo\b/i.test(label)) return label;
+  return found[0] ?? label;
+}
+
+export function groupPlatforms<T>(items: T[], nameOf: (item: T) => string) {
+  const groups = new Map<string, { name: string; items: T[] }>();
+  for (const item of items) {
+    const name = platformFamily(nameOf(item));
+    const key = normalized(name);
+    const group = groups.get(key) ?? { name, items: [] };
+    group.items.push(item);
+    groups.set(key, group);
+  }
+  return Array.from(groups.values());
+}

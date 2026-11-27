@@ -53,3 +53,14 @@ test('historical inventory labels normalize across brands and preserve distinct 
     'Prime Video': 1, 'Prime Video · 6 meses': 1, 'ViX Anual': 2,
   });
 });
+
+test('platform cards retain every offer and keep bundles apart', async () => {
+  const { groupPlatforms } = await import('../src/lib/stock/master-products.ts');
+  const names = ['HBO 3 meses', 'Max Premium', 'HBO', 'Paramoun tiii', 'Paramount+ Premium',
+    'Disney ++', 'Disney + Vix anual', 'Gemini', 'Link geminni 12 m', 'MUBI', 'mubi'];
+  const groups = groupPlatforms(names, name => name);
+  assert.deepEqual(groups.map(group => [group.name, group.items.length]), [
+    ['HBO Max', 3], ['Paramount+', 2], ['Disney+', 1], ['Disney+ + ViX', 1], ['Gemini', 2], ['MUBI', 2],
+  ]);
+  assert.deepEqual(groups.flatMap(group => group.items).sort(), [...names].sort());
+});

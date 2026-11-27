@@ -46,23 +46,23 @@ function Contratar() {
       setEnabled(false);
     });
   }, [selectedPlan]);
-  if (enabled === null) return <main className="mx-auto max-w-lg p-6" role="status">Cargando planes…</main>;
+  if (enabled === null) return <StoreBusinessPage><p className="mx-auto max-w-lg p-6" role="status">Cargando planes…</p></StoreBusinessPage>;
   if (!enabled)
     return (
-      <main className="mx-auto max-w-lg p-6">
-        <div className="rounded-3xl border p-6 text-center">
+      <StoreBusinessPage><div className="mx-auto max-w-lg p-6">
+        <div className="seller-card text-center">
           <h1 className="font-bold">Contrata tu tienda</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {error || "Consulta los planes disponibles y solicita tu tienda por WhatsApp."}
           </p>
           <Button asChild className="mt-4"><a href="https://wa.me/528443852364?text=Hola%2C%20quiero%20contratar%20mi%20tienda">Consultar por WhatsApp</a></Button>
         </div>
-      </main>
+      </div></StoreBusinessPage>
     );
   if (result)
     return (
-      <main className="mx-auto max-w-lg p-6">
-        <div className="rounded-3xl border bg-card p-6 text-center">
+      <StoreBusinessPage><div className="mx-auto max-w-lg p-6">
+        <div className="seller-card text-center">
           <CheckCircle2 className="mx-auto size-10 text-primary" />
           <h1 className="mt-3 text-xl font-bold">Solicitud registrada</h1>
           <p className="mt-3 text-sm">Tu referencia es</p>
@@ -76,7 +76,7 @@ function Contratar() {
             </div>
           ) : null}
         </div>
-      </main>
+      </div></StoreBusinessPage>
     );
   return (
     <StoreBusinessPage actions={<Button asChild size="sm" variant="ghost"><a href="/plataforma#planes">Volver a planes</a></Button>}>

@@ -1,3 +1,4 @@
+import { groupPlatforms } from "@/lib/stock/master-products";
 import { CustomerManager } from "@/components/customer/customer-manager";
 import { WebOrders } from "@/components/customer/web-orders";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
@@ -317,8 +318,9 @@ export function SellerHome({
   onPlatform: (platform: { key: string; platform: string }) => void;
 }) {
   const [salesOpen,setSalesOpen]=useState(false);
-  const lowStock = summary.platforms.filter((platform) => platform.available <= 2)
-    .sort((a, b) => a.available - b.available || a.platform.localeCompare(b.platform, "es"));
+  const lowStock = groupPlatforms(summary.platforms, (plan) => plan.platform)
+    .filter(({ items }) => items.some((plan) => plan.available <= 2))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
   const daily = summary.daily;
   const weekTotal = daily.reduce((s, d) => s + d.total, 0);
   const max = Math.max(100, ...daily.map((d) => d.total));
@@ -437,17 +439,24 @@ export function SellerHome({
             <span className="seller-badge">{lowStock.length}</span>
           </summary>
           <div className="seller-disclosure-body">
-            {lowStock.length ? lowStock.map((platform) => (
-              <button key={platform.key} type="button" onClick={() => onPlatform(platform)}
-                className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted">
-                <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(platform.available)]}`} />
-                <StockPlatformMark name={platform.platform} />
-                <span className="min-w-0 flex-1">{platform.platform}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {platform.available === 0 ? "Agotado" : platform.available === 1 ? "1 disponible" : "2 disponibles"}
-                </span>
-              </button>
-            )) : (
+            {lowStock.length ? lowStock.map(({ name, items }) => {
+              const total = items.reduce((count, plan) => count + plan.available, 0);
+              return <details className="seller-disclosure" key={name}>
+                <summary>
+                  <StockPlatformMark name={name} />
+                  <span className="min-w-0 flex-1">{name}</span>
+                  <span className="text-xs text-muted-foreground">{total ? total + (total === 1 ? " disponible" : " disponibles") : "Agotado"}</span>
+                </summary>
+                <div className="seller-disclosure-body">
+                  {items.map(plan => <button key={plan.key} type="button" onClick={() => onPlatform(plan)}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted">
+                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(plan.available)]}`} />
+                    <span className="flex-1">{plan.platform}</span>
+                    <span>{plan.available || "Agotado"}</span>
+                  </button>)}
+                </div>
+              </details>;
+            }) : (
               <p className="text-sm text-muted-foreground">No hay plataformas con dos unidades o menos.</p>
             )}
           </div>
