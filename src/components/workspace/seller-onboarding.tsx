@@ -19,7 +19,7 @@ const STEPS: Record<Section, [string, string]> = {
   ],
   reports: [
     "Abre el reporte pendiente y revisa la falla y la evidencia del cliente.",
-    "Registra tu respuesta o la reposición y cambia el estado a Resuelto cuando termines.",
+    "En Ajustes puedes elegir en qué días y horarios se reciben los reportes.",
   ],
   questions: [
     "Abre una consulta pendiente, escribe tu respuesta y marca la consulta como contestada.",

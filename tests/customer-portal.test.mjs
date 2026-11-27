@@ -35,6 +35,9 @@ const ops = url(
 const decrypt = url(`export const decryptPayload=async()=>({password:'fixture-password'});`);
 const date = url(`export const businessToday=()=>new Date().toISOString().slice(0,10);`);
 const purchaseNotice = url(`export const notifyPaidPurchase=async (id,businessId)=>{globalThis.__customer.purchaseNotices.push({id,businessId})}`);
+const reportSettings = url(compile(await read("src/lib/reports/settings.ts")));
+const mockReportSettings = url(`import { DEFAULT_REPORT_SETTINGS } from "${reportSettings}";
+export const loadReportSettings=async()=>globalThis.__customer.reportSettings ?? DEFAULT_REPORT_SETTINGS;`);
 async function moduleAt(path) {
   let s = compile(await read(path));
   for (const [name, target] of Object.entries({
@@ -46,6 +49,8 @@ async function moduleAt(path) {
     "@/lib/notify/notify.server": auth,
     "@/lib/deliveries/deliveries.server": decrypt,
     "@/lib/stock/duration": date,
+    "@/lib/reports/settings": reportSettings,
+    "@/lib/reports/settings.server": mockReportSettings,
     "./purchase-notify.server": purchaseNotice,
   }))
     s = s
@@ -330,6 +335,22 @@ test('an active customer session resolves the server-side account and client',as
 
 test("main shop recovery ignores the original template phone number",async()=>{const s=sessionFixture();s.config=[{status:"active",data:{whatsapp:"5215500000000"}}];assert.equal((await sessionAPI.customerShop("ma2")).whatsapp,"528443852364");s.config=[{status:"active",data:{whatsapp:"844 385 2364"}}];assert.equal((await sessionAPI.customerShop("ma2")).whatsapp,"844 385 2364");});
 test("main store uses independent validated appearance",async()=>{const s=sessionFixture();s.config=[{status:"active",data:{storeAppearance:JSON.stringify({logoImage:"https://example.invalid/logo.png",pageImage:"javascript:bad",cardOpacity:60})}}];const shop=await sessionAPI.customerShop("ma2");assert.equal(shop.logoUrl,"https://example.invalid/logo.png");assert.equal(shop.appearance.pageImage,"");assert.equal(shop.appearance.cardOpacity,60);});
+
+test("main storefront blocks reports that fail the configured intake rules before creating a record", async () => {
+  const state = fixture();
+  const data = { slug: "ma2", module: "reports", title: "No abre", message: "Necesito ayuda" };
+  state.reportSettings = { days: [], from: "00:00", until: "23:59", requireEvidence: false, allowManual: true };
+  await assert.rejects(api.customerSubmit({ data }), /recepción de reportes está pausada/);
+  state.reportSettings.days = [0, 1, 2, 3, 4, 5, 6];
+  state.reportSettings.requireEvidence = true;
+  await assert.rejects(api.customerSubmit({ data }), /Adjunta una captura/);
+  state.reportSettings.requireEvidence = false;
+  state.reportSettings.allowManual = false;
+  await assert.rejects(api.customerSubmit({ data }), /Selecciona la compra/);
+  assert.equal(state.calls.length, 0);
+  await api.customerSubmit({ data: { ...data, module: "questions" } });
+  assert.ok(state.calls.some((call) => call.module === "questions"));
+});
 
 test("reports link paid web purchases to the verified customer and reject missing payment", async () => {
   const state = fixture(), orderId = crypto.randomUUID();

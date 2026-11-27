@@ -40,6 +40,7 @@ import { prepareGalleryImage } from "@/lib/gallery/image";
 import { AccessLoading } from "@/components/customer/access-loading";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
+import { reportAvailability, reportClosedMessage } from "@/lib/reports/settings";
 import { CustomerRecharge } from "@/components/recharges/customer-recharge";
 import { copyText } from "@/lib/browser/clipboard";
 import { mainStoreLink, type MainStoreView } from "@/lib/catalog/links";
@@ -253,6 +254,16 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
       ))}
     </div>
   );
+  const [reportTime, setReportTime] = useState(() => new Date());
+  useEffect(() => {
+    if (tab !== "reportes" || !data?.reportSettings) return;
+    setReportTime(new Date());
+    const interval = window.setInterval(() => setReportTime(new Date()), 1000 * 15);
+    return () => window.clearInterval(interval);
+  }, [tab, data?.reportSettings]);
+  const reportSettings = reportKind === "reports" ? data?.reportSettings : null;
+  const reportWindow = reportSettings && reportAvailability(reportSettings, reportTime);
+  const reportsClosed = reportWindow?.open === false;
   if (fatal)
     return (
       <main className="mx-auto max-w-lg p-8">
@@ -767,6 +778,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   className="seller-card space-y-3"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (reportsClosed) return;
                     void action(async () => {
                       await customerSubmit({
                         data: {
@@ -803,14 +815,18 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                       <option value="requests">Pedido por encargo</option>
                     </select>
                   </label>
+                  {reportsClosed && <p role="status" className="rounded-xl border bg-muted/40 p-3 text-sm">
+                    {reportClosedMessage(reportWindow.next)}
+                  </p>}
                   <label className="seller-field">
                     <span>Compra relacionada</span>
                     <select
                       className="buyer-select"
                       value={reportOrder}
+                      required={reportSettings?.allowManual === false}
                       onChange={(e) => setReportOrder(e.target.value)}
                     >
-                      <option value="">Sin compra relacionada</option>
+                      <option value="">{reportSettings?.allowManual === false ? "Selecciona una compra" : "Sin compra relacionada"}</option>
                       {[...data.orders, ...data.webOrders.filter(o=>!["cancelled","rejected"].includes(o.status))].map((o) => (
                         <option key={o.id} value={o.id}>{o.title}</option>
                       ))}
@@ -837,7 +853,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     />
                   </label>
                   {reportKind === "reports" && <div className="space-y-2">
-                    <label className="seller-field"><span>Captura de la falla (opcional)</span>
+                    <label className="seller-field"><span>Captura de la falla{reportSettings?.requireEvidence ? " (obligatoria)" : " (opcional)"}</span>
                       <Input type="file" accept="image/*" disabled={busy || evidenceLoading} onChange={async event => {
                         const file = event.currentTarget.files?.[0];
                         event.currentTarget.value = "";
@@ -850,7 +866,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                     </label>
                     {reportEvidence && <Button type="button" variant="ghost" size="sm" onClick={()=>setReportEvidence("")}>Quitar captura</Button>}
                   </div>}
-                  <Button disabled={busy || evidenceLoading}>{reportKind === "reports" ? "Enviar reporte" : "Enviar solicitud"}</Button>
+                  <Button disabled={busy || evidenceLoading || reportsClosed || (reportSettings?.requireEvidence && !reportEvidence)}>{reportKind === "reports" ? "Enviar reporte" : "Enviar solicitud"}</Button>
                 </form>
                 <div className="mt-4 space-y-3">
                   {data.records

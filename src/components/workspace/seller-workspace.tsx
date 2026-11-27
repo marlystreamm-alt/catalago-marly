@@ -40,6 +40,7 @@ import { useCatalogStore } from "@/lib/catalog/store";
 import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
+import { ReportSettingsPanel } from "./report-settings-panel";
 import { SELLER_ONBOARDING_KEY, SellerOnboarding, SellerOnboardingInvite } from "./seller-onboarding";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
@@ -709,6 +710,18 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
       {tab==="delivered"&&<><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas protegidas</summary><ProtectedDeliveriesDialog embedded/></details><details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details></>}
       {tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Encargos registrados manualmente</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</details>}{tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
     </div>;
+  else if (section === "reports")
+    content = (
+      <div className="space-y-3">
+        <div className="seller-tabs" aria-label="Reportes">
+          <button type="button" className={tab === "main" ? "active" : ""} aria-pressed={tab === "main"}
+            onClick={() => setTab("main")}>Bandeja</button>
+          <button type="button" className={tab === "settings" ? "active" : ""} aria-pressed={tab === "settings"}
+            onClick={() => setTab("settings")}>Ajustes</button>
+        </div>
+        {tab === "settings" ? <ReportSettingsPanel /> : resource("reports")}
+      </div>
+    );
   else if (section === "questions")
     content = (
       <>
