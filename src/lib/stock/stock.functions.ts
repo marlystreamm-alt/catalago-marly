@@ -75,3 +75,11 @@ export const stockAdminConvertProfiles=createServerFn({method:"POST"})
 export const stockOwnerConvertProfiles=createServerFn({method:"POST"})
   .validator((d:unknown)=>convertSchema.extend({token}).parse(d))
   .handler(async({data})=>{const {business}=await ownerCtx(data.token,"stock_edit");await ownerCtx(data.token,"stock_add");return (await import("./stock.server")).convertStockProfiles(data.id,business.id,data.count);});
+
+export const stockAdminVerifyFamily=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({
+  code, root:z.string().uuid(), members:z.array(z.object({id:z.string().uuid(),version:z.string().min(1).max(100)})).min(1).max(50),
+  active:z.boolean(),expiresOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).parse(d)).handler(async({data})=>{
+  await adminGate(data.code);
+  return (await import("./stock.server")).verifyStockFamily(data.root,data.members,data.active,data.expiresOn);
+});
