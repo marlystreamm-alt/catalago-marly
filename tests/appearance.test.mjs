@@ -66,3 +66,21 @@ test('shared palette is validated and changes the workspace theme tokens',()=>{
  assert.notEqual(pink['--ma2-wash-one'],violet['--ma2-wash-one']);
  assert.equal(theme.normalizeAppearance(JSON.parse(JSON.stringify({palette:'rosa'}))).palette,'rosa');
 });
+
+test("the storefront banner shows the cover alone and falls back to the logo", async () => {
+  const source = await readFile(new URL("../src/components/catalog/business-cover.tsx", import.meta.url), "utf8");
+  const js = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const { BusinessCover } = await import(moduleURL(js
+    .replace('"react/jsx-runtime"', JSON.stringify(import.meta.resolve("react/jsx-runtime")))
+    .replace('"@/lib/appearance/theme"', JSON.stringify(themeURL))));
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const coverImage = "https://example.test/cover.jpg";
+  const logoImage = "https://example.test/logo.jpg";
+  const withCover = renderToStaticMarkup(BusinessCover({ name: "MA²", appearance: { coverImage, logoImage } }));
+  assert.match(withCover, /<img[^>]+cover\.jpg/);
+  assert.doesNotMatch(withCover, /logo\.jpg/);
+  const withoutCover = renderToStaticMarkup(BusinessCover({ name: "MA²", appearance: { logoImage } }));
+  assert.match(withoutCover, /<img[^>]+logo\.jpg/);
+});
