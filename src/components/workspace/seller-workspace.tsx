@@ -40,6 +40,7 @@ import { useCatalogStore } from "@/lib/catalog/store";
 import { buildCatalogLink, mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
+import { SELLER_ONBOARDING_KEY, SellerOnboarding, SellerOnboardingInvite } from "./seller-onboarding";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
 import { adminDashboard } from "@/lib/stock/dashboard.functions";
@@ -144,6 +145,23 @@ export function SellerLayout({
   useMa2Appearance(appearance);
   const [open, setOpen] = useState(false);
   const [qr, setQr] = useState(false);
+  const [onboarding, setOnboarding] = useState<"invite" | "active" | "finished">("finished");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SELLER_ONBOARDING_KEY);
+      setOnboarding(saved === "active" || saved === "finished" ? saved : "invite");
+    } catch {
+      setOnboarding("invite");
+    }
+  }, []);
+  const saveOnboarding = (status: "active" | "finished") => {
+    setOnboarding(status);
+    try {
+      localStorage.setItem(SELLER_ONBOARDING_KEY, status);
+    } catch {
+      // The choice still applies for the current visit.
+    }
+  };
   const [qrData, setQrData] = useState("");
   const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
@@ -299,6 +317,12 @@ export function SellerLayout({
             />
           ) : null}
         </div>
+        {onboarding === "invite" && section === "home" && (
+          <SellerOnboardingInvite onStart={() => saveOnboarding("active")} onSkip={() => saveOnboarding("finished")} />
+        )}
+        {onboarding === "active" && (
+          <SellerOnboarding key={section} section={section} onFinish={() => saveOnboarding("finished")} />
+        )}
         {section==="home"&&shareCard}
         {children}
       </main>
