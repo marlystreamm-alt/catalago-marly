@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {z} from "zod";
-import {CUSTOMER_IDENTITY_CALLBACK,eligibleIdentityEmail} from "./identity-policy";
+import {CUSTOMER_IDENTITY_CALLBACK,CUSTOMER_IDENTITY_AUTH_URL,CUSTOMER_IDENTITY_PUBLIC_KEY,eligibleIdentityEmail} from "./identity-policy";
 const email=z.string().trim().email().max(254).transform(v=>v.toLowerCase());
 const token=z.string().min(50).max(10000);
 const password=z.string().min(10,"Usa al menos 10 caracteres").max(128).refine(v=>/[a-záéíóúñ]/i.test(v)&&/\d/.test(v),"Incluye letras y números");
@@ -61,8 +61,7 @@ export const customerGoogleAccess=createServerFn({method:"POST"}).validator((v:u
 // Public status only; no credentials are config exposed to the browser.
 export const customerIdentityOptions=createServerFn({method:"GET"}).handler(async()=>{
  try{
-  const url=(process.env.SUPABASE_URL||process.env.VITE_SUPABASE_URL||"https://dqynxsayqpwhjtfuonyd.supabase.co").replace(/\/$/,"");
-  const key=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.VITE_SUPABASE_PUBLISHABLE_KEY||"sb_publishable_jTnGvywiZOOCaZd_JNZ-6w_pa-SIi7j";
+  const url=CUSTOMER_IDENTITY_AUTH_URL,key=CUSTOMER_IDENTITY_PUBLIC_KEY;
   const res=await fetch(`${url}/auth/v1/settings`,{headers:{apikey:key},signal:AbortSignal.timeout(5000)});
   const config=res.ok?await res.json():null;
   return {google:config?.external?.google===true,email:config?.external?.email===true};

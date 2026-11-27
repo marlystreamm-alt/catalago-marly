@@ -1,4 +1,7 @@
 export const CUSTOMER_IDENTITY_CALLBACK="https://martgor.shop/recuperar-acceso";
+// Public project configuration, never service credentials.
+export const CUSTOMER_IDENTITY_AUTH_URL="https://dqynxsayqpwhjtfuonyd.supabase.co";
+export const CUSTOMER_IDENTITY_PUBLIC_KEY="sb_publishable_jTnGvywiZOOCaZd_JNZ-6w_pa-SIi7j";
 export const normalizedIdentityEmail=(value:string)=>value.trim().toLowerCase();
 export const isCyberdocLogin=(email:string)=>/^cyberdoc[0-9]+@martgor\.shop$/i.test(email.trim());
 export function eligibleIdentityEmail(email:string,adminEmail:string){
