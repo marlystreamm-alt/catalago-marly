@@ -943,6 +943,7 @@ export async function notifyOrder(
   const attempt = order.notifyAttempts + 1;
   const orderId = kind === "prueba" ? null : order.id;
   const results: string[] = [];
+  let accepted = false;
   const channels = [
     ["push", settings.channelPush, "Push"],
     ["email", settings.channelEmail, "Correo"],
@@ -956,6 +957,7 @@ export async function notifyOrder(
     let detail: string;
     try { detail = await sendByChannel(channel, order, settings, repeat); }
     catch { detail = "No se pudo enviar por este canal"; }
+    if (/^(Push enviado a \d+ dispositivo|Correo enviado$|WhatsApp enviado$|Voice Monkey recibió el anuncio$|Virtual Button \d+ activado;|Webhook enviado;|Integración personalizada recibió la prueba$|Rutina de Alexa app activada$)/.test(detail)) accepted = true;
     results.push(`${label}: ${detail}`);
     await logEvent({ orderId, channel, kind, attempt, detail });
   }
@@ -965,7 +967,7 @@ export async function notifyOrder(
     const db = await admin();
     await db
       .from("orders")
-      .update({ notified_at: new Date().toISOString(), notify_attempts: attempt })
+      .update({ ...(accepted ? { notified_at: new Date().toISOString() } : {}), notify_attempts: attempt })
       .eq("id", order.id);
   }
 
