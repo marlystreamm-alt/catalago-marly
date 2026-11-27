@@ -4,6 +4,9 @@ import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
+  Store,
+  Wallet,
+  Pencil,
   X,
   Bell,
   Menu,
@@ -158,28 +161,44 @@ export function SellerLayout({
       </nav>
     </>
   );
-  const shareCard = <div className="seller-share mt-4 mb-4">
-        <p>🔗 Enlace de mi tienda web</p>
-        <strong className="break-all">{shareUrl.replace(/^https?:\/\//, "")}</strong>
-        <div className="seller-share-actions">
-          <button onClick={() => void copyText(shareUrl)}>Copiar</button>
-          <a href={shareUrl} target="_blank" rel="noopener noreferrer">
-            Ver
+  const shareCard = (
+    <section className="seller-card ma2-store-link mb-4 space-y-3" aria-label="Mi tienda web">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border bg-card text-primary">
+          {appearance?.logoImage
+            ? <img src={appearance.logoImage} alt="" className="size-full object-contain" />
+            : <Store className="size-6" aria-hidden="true" />}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold">Mi tienda web</h2>
+          <a href={shareUrl} className="break-all text-sm font-semibold text-primary hover:underline">
+            {shareUrl.replace(/^https?:\/\//, "")}
           </a>
-          <button
-            onClick={() => {
-              const code = qrcode(0, "M");
-              code.addData(shareUrl);
-              code.make();
-              setQrData(code.createDataURL(5, 8));
-              setQr(true);
-            }}
-          >
-            QR
-          </button>
         </div>
-        <p>Compártelo en tu grupo y tus estados.</p>
-      </div>;
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" asChild><a href={shareUrl}><ExternalLink /> Ver tienda</a></Button>
+        <Button type="button" size="sm" variant="outline" onClick={async () => {
+          try {
+            await copyText(shareUrl);
+            toast.success("Enlace copiado");
+          } catch {
+            toast.error("No se pudo copiar el enlace");
+          }
+        }}><Copy /> Copiar enlace</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => {
+          const code = qrcode(0, "M");
+          code.addData(shareUrl);
+          code.make();
+          setQrData(code.createDataURL(5, 8));
+          setQr(true);
+        }}><QrCode /> QR</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => go("appearance")}>
+          <Pencil /> {appearance?.logoImage ? "Cambiar logo" : "Agregar logo"}
+        </Button>
+      </div>
+    </section>
+  );
   return (
     <div
       className="seller-app ma2-unified"
@@ -516,6 +535,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
   const [addStock, setAddStock] = useState(false);
+  const [financeStart, setFinanceStart] = useState<"summary" | "income" | "expense">("summary");
   const [walletClient, setWalletClient] = useState("");
   const [settings, setSettings] = useState(false);
   const [service, setService] = useState(false);
@@ -557,6 +577,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   }, []);
   const navigate = (s: Section) => {
     setSection(s);
+    setFinanceStart("summary");
     setTab("main");
     setSelectedOrderId(null);
     setAddStock(false);
@@ -580,17 +601,32 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   );
   let content: ReactNode;
   if (section === "home")
-    content = summary ? (
+    content = (<>
+      <section className="seller-card flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-base font-bold"><Wallet className="size-5 text-primary" /> Finanzas</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => {
+            navigate("finance");
+            setFinanceStart("income");
+          }}>Registrar entrada</Button>
+          <Button size="sm" variant="outline" onClick={() => {
+            navigate("finance");
+            setFinanceStart("expense");
+          }}>Registrar salida</Button>
+          <Button size="sm" variant="ghost" onClick={() => navigate("finance")}>Ver finanzas</Button>
+        </div>
+      </section>
+      {summary && (
       <SellerHome
         summary={summary}
         clients={records.filter((r) => r.module === "clients").length}
         onNavigate={navigate}
       />
-    ) : null;
+    )}</>);
   else if (section === "shop") content = <ProductPricing/>;
   else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} /></div>;
   else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
-  else if (section === "finance") content = <FinancePanel/>;
+  else if (section === "finance") content = <FinancePanel initialView={financeStart} />;
   else if (section === "wallet")
     content = (
       <div className="space-y-5">
