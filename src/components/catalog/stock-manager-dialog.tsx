@@ -540,7 +540,7 @@ export function StockManagerDialog({
     if (protect && (accessPassword.length < 4 || accessPassword !== confirmPassword)) return toast.error("Revisa la contraseña de protección");
     const incomplete = !validFullName(deliverClient) || (admin && !deliverEmail.trim());
     if (incomplete && !confirm("Faltan datos del cliente (nombre completo o correo). ¿Confirmas que deseas guardar la asignación con los datos disponibles?")) return;
-    if(admin&&!deliverOrderRef){const price=Number(deliverSalePrice);if(!Number.isFinite(price)||price<=0)return toast.error("Escribe el precio que se descontará del saldo.");if(!confirm(`¿Asignar esta cuenta y descontar $${price.toFixed(2)} del saldo del cliente?`))return;}
+    if(admin&&!deliverOrderRef){const price=Number(deliverSalePrice);if(!Number.isFinite(price)||price<0)return toast.error("Escribe un precio de venta válido.");if(!confirm(`¿Asignar esta cuenta por $${price.toFixed(2)}? El saldo de la tienda no se modificará.`))return;}
     setBusy(true);
     try {
       const payload = {
@@ -766,7 +766,7 @@ export function StockManagerDialog({
                   }
                 }} onName={name=>{if(!deliverOrderRef&&!deliverClient.trim())setDeliverClient(name);}}/></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
-                <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">{deliverOrderRef?"Pedido vinculado: no se realiza un segundo cobro.":"Entrega manual: este importe se descontará del saldo del cliente. Si es nuevo, se registrará con su WhatsApp y deberá recargar antes de recibir la cuenta."}</p>}</div>
+                <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">Se registra la venta sin modificar el saldo de la tienda.</p>}</div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
                   <Select value={deliverOrderRef || "manual"} onValueChange={(value) => {
                     const selected = cyberdocOrders.find((order) => order.id === value);

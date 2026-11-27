@@ -2,11 +2,11 @@ import { businessToday, expiresAfterMonths } from "./duration";
 import type { DeliveryAttachment, ProtectedDeliveryPrivate } from "@/lib/deliveries/types";
 type Input={requestId:string;itemId:string;clientId?:string;clientName:string;clientWhatsapp:string;clientEmail?:string;acceptIncomplete?:boolean;stockExpiresOn:string|null;salePrice:number;accessPassword:string;expiresAt:string;maxViews:number|null;notes:string;attachment:DeliveryAttachment|null;images:string[]};
 
-/** One transaction reserves stock, debits the wallet and saves the delivery and client history. */
+/** One transaction reserves stock and saves the delivery and client history. */
 export async function deliverManualWithWallet(input:Input){
  const ops=await import("@/lib/workspace/operations.server"),ds=await import("@/lib/deliveries/deliveries.server");
  const cents=Math.round(input.salePrice*100);
- if(cents<=0||cents>100000000||Math.abs(input.salePrice*100-cents)>1e-6)throw new Error("Indica un precio de venta válido, mayor a cero.");
+ if(cents<0||cents>100000000||Math.abs(input.salePrice*100-cents)>1e-6)throw new Error("Indica un precio de venta válido.");
  const {validFullName,validClientEmail}=await import("@/lib/workspace/model");
  const email=input.clientEmail?.trim().toLowerCase()||"";
  if(email&&!validClientEmail(email))throw new Error("Revisa el correo electrónico del cliente.");
@@ -39,9 +39,9 @@ export async function deliverManualWithWallet(input:Input){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(expiry)||expiry<today||Date.parse(input.expiresAt)<=Date.now())throw new Error("Revisa las fechas de vigencia.");
  if(input.accessPassword&&input.accessPassword.length<4)throw new Error("La contraseña de protección debe tener al menos cuatro caracteres.");
  const now=new Date().toISOString(),phone=client.data.whatsapp||"",token=ds.randomToken();
- const document:ProtectedDeliveryPrivate={id:input.requestId,createdAt:now,updatedAt:now,platform:item.platform,client:client.title,whatsapp:phone,username:item.username,password:item.password,link:item.panelUrl,panelUsername:item.panelUsername,panelPassword:item.panelPassword,accessPassword:input.accessPassword,protectedWithPassword:Boolean(input.accessPassword),notes:[item.profilePin?`Perfil / PIN: ${item.profilePin}`:"",input.notes||item.notes].filter(Boolean).join("\n"),images:input.images,attachment:input.attachment,imageCount:input.images.length,expiresAt:input.expiresAt,maxViews:input.maxViews,viewCount:0,lastViewedAt:null,status:"active",token,history:[{at:now,kind:"created",detail:"Entrega manual pagada con saldo"}]};
+ const document:ProtectedDeliveryPrivate={id:input.requestId,createdAt:now,updatedAt:now,platform:item.platform,client:client.title,whatsapp:phone,username:item.username,password:item.password,link:item.panelUrl,panelUsername:item.panelUsername,panelPassword:item.panelPassword,accessPassword:input.accessPassword,protectedWithPassword:Boolean(input.accessPassword),notes:[item.profilePin?`Perfil / PIN: ${item.profilePin}`:"",input.notes||item.notes].filter(Boolean).join("\n"),images:input.images,attachment:input.attachment,imageCount:input.images.length,expiresAt:input.expiresAt,maxViews:input.maxViews,viewCount:0,lastViewedAt:null,status:"active",token,history:[{at:now,kind:"created",detail:"Entrega manual"}]};
  const url=`https://martgor.shop/e/${input.requestId}?t=${encodeURIComponent(token)}`;
- const payload=await ds.encryptPayload({clientId,platform:item.platform,amount:String(cents/100),deliveryUrl:url,reply:"Entrega manual pagada con saldo",manualStockId:item.id,clientReference:client.clientReference||""});
+ const payload=await ds.encryptPayload({clientId,platform:item.platform,amount:String(cents/100),deliveryUrl:url,reply:"Entrega manual",manualStockId:item.id,clientReference:client.clientReference||""});
  const {error}=await ops.opsDB().rpc("ma2_manual_wallet_delivery",{p_request:input.requestId,p_client:clientId,p_client_version:client.version,p_stock:item.id,p_stock_version:item.updatedAt,p_name:client.title,p_phone:phone,p_cents:cents,p_expiry:expiry,p_title:item.platform,p_payload:payload,p_document:await ds.encryptPayload(document)});
  if(error)throw new Error(error.message||"No se pudo completar la entrega.");
  return saved();
