@@ -104,7 +104,7 @@ export const salesGetPublicConfig = createServerFn({ method: "GET" }).handler(as
   const c = await loadConfig();
   return {
     enabled: c.enabled,
-    plans: c.enabled ? c.plans : [],
+    plans: c.plans.map(({ id, name, monthly, description }) => ({ id, name, monthly, description })),
     paymentInstructions: c.enabled ? c.paymentInstructions : "",
   };
 });
