@@ -61,7 +61,23 @@ export const financeQuickMove = createServerFn({ method: "POST" })
     await recordFinanceMove({ ...data, toAccount: null, date: financeToday(), note: "", reference: "" });
     return { saved: true };
   });
-export const financeReconcile=createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({sourceKey:z.string().max(180),account:id,date,includePrevious:z.boolean().optional()}).parse(v)).handler(async({data})=>{const db=await admin(data.code);const current=await snapshot();const source=current.sources.find(s=>s.key===data.sourceKey);const debt=current.debts.find(d=>`debt:${d.id}`===data.sourceKey);if(!source&&!debt)throw Error("Movimiento no disponible");if(data.includePrevious&&!canIncludePrevious(source?.receivedAt))throw Error("La conciliación de medianoche terminó. Registra este pago en el día nuevo.");const r=await db.rpc("ma2_finance_post_reconciled",{p_id:crypto.randomUUID(),p_source:data.sourceKey,p_kind:source?.kind||(debt!.kind==="receivable"?"income":"expense"),p_account:data.account,p_amount:source?.amount||Number(debt!.amount_cents),p_date:source?.date||data.date,p_category:source?.category||"Liquidación de deuda",p_note:source?.title||debt!.name,p_received:source?.receivedAt||null,p_previous:data.includePrevious===true});if(r.error)throw Error("No se pudo conciliar. Actualiza y revisa el corte.");return snapshot();});
+export const financeReconcile=createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({sourceKey:z.string().max(180),account:id,date,includePrevious:z.boolean().optional(),confirmedAmount:cents.optional()}).parse(v)).handler(async({data})=>{const db=await admin(data.code);const current=await snapshot();
+if (data.sourceKey.startsWith("cyberdoc-cut:")) {
+  const cut = current.cyberdocPayouts.find(item => item.key === data.sourceKey);
+  if (cut?.paidOn) return current;
+  if (!cut?.closed || cut.missing.length || !cut.amount || cut.amount !== data.confirmedAmount)
+    throw Error("El depósito debe coincidir con el importe completo del corte de Cyberdoc.");
+  const klar = current.accounts.filter(account => account.name.trim().toLowerCase() === "klar");
+  if (klar.length !== 1 || klar[0].id !== data.account) throw Error("Selecciona la cuenta Klar.");
+  const result = await db.rpc("ma2_finance_post_reconciled", {
+    p_id: crypto.randomUUID(), p_source: cut.key, p_kind: "income", p_account: klar[0].id,
+    p_amount: cut.amount, p_date: data.date, p_category: "Depósito Cyberdoc",
+    p_note: "Corte Cyberdoc " + cut.date, p_received: null, p_previous: false,
+  });
+  if (result.error) throw Error("No se pudo registrar el depósito de Cyberdoc.");
+  return snapshot();
+}
+const source=current.sources.find(s=>s.key===data.sourceKey);const debt=current.debts.find(d=>`debt:${d.id}`===data.sourceKey);if(!source&&!debt)throw Error("Movimiento no disponible");if(data.includePrevious&&!canIncludePrevious(source?.receivedAt))throw Error("La conciliación de medianoche terminó. Registra este pago en el día nuevo.");const r=await db.rpc("ma2_finance_post_reconciled",{p_id:crypto.randomUUID(),p_source:data.sourceKey,p_kind:source?.kind||(debt!.kind==="receivable"?"income":"expense"),p_account:data.account,p_amount:source?.amount||Number(debt!.amount_cents),p_date:source?.date||data.date,p_category:source?.category||"Liquidación de deuda",p_note:source?.title||debt!.name,p_received:source?.receivedAt||null,p_previous:data.includePrevious===true});if(r.error)throw Error("No se pudo conciliar. Actualiza y revisa el corte.");return snapshot();});
 export const financeVoid=createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({moveId:id}).parse(v)).handler(async({data})=>{const db=await admin(data.code);const r=await db.from("ma2_finance_moves").update({voided_at:new Date().toISOString(),source_key:null}).eq("id",data.moveId).is("voided_at",null);if(r.error)throw Error("No se pudo anular");return snapshot();});
 export const financeAddDebt=createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({kind:z.enum(["receivable","payable"]),name:z.string().trim().min(1).max(150),amount:cents,due:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),note:z.string().max(400)}).parse(v)).handler(async({data})=>{const db=await admin(data.code);const r=await db.from("ma2_finance_debts").insert({kind:data.kind,name:data.name,amount_cents:data.amount,due_on:data.due,note:data.note});if(r.error)throw Error("No se pudo registrar deuda");return snapshot();});
 export const financeCut=createServerFn({method:"POST"}).validator((v:unknown)=>auth.extend({account:id,date,counted:z.number().int().min(-100000000).max(100000000)}).parse(v)).handler(async({data})=>{const db=await admin(data.code);const r=await db.rpc("ma2_finance_save_manual_cut",{p_account:data.account,p_day:data.date,p_counted:data.counted});if(r.error)throw Error("No se pudo guardar el corte. Si ya existe uno, confírmalo o elimínalo para rehacerlo.");return snapshot();});
