@@ -171,9 +171,9 @@ export function SalesDialog() {
             <section className="rounded-2xl border p-3">
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">Ventas públicas</p>
+                  <p className="font-semibold">Contratación en línea</p>
                   <p className="text-xs text-muted-foreground">
-                    Actívalo solo cuando quieras mostrar contratación a clientes.
+                    Los planes se muestran en la tienda. Activa esta opción para aceptar solicitudes en línea.
                   </p>
                 </div>
                 <Switch

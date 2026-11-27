@@ -13,8 +13,13 @@ import {
 } from "@/components/ui/select";
 import { salesCreateRequest, salesGetPublicConfig } from "@/lib/sales/sales.functions";
 import type { SalesPlan } from "@/lib/sales/types";
-export const Route = createFileRoute("/contratar")({ component: Contratar });
+import { StoreBusinessPage } from "@/components/sales/store-business-page";
+export const Route = createFileRoute("/contratar")({
+  validateSearch: (search) => ({ plan: typeof search.plan === "string" ? search.plan : undefined }),
+  component: Contratar,
+});
 function Contratar() {
+  const { plan: selectedPlan } = Route.useSearch();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [plans, setPlans] = useState<SalesPlan[]>([]);
@@ -35,12 +40,12 @@ function Contratar() {
       setEnabled(c.enabled && c.plans.length > 0);
       setPlans(c.plans);
       setInstructions(c.paymentInstructions);
-      setPlan(c.plans[0]?.id ?? "");
+      setPlan(c.plans.find((item) => item.id === selectedPlan)?.id ?? c.plans[0]?.id ?? "");
     }).catch(() => {
       setError("No pudimos cargar los planes.");
       setEnabled(false);
     });
-  }, []);
+  }, [selectedPlan]);
   if (enabled === null) return <main className="mx-auto max-w-lg p-6" role="status">Cargando planes…</main>;
   if (!enabled)
     return (
@@ -74,8 +79,9 @@ function Contratar() {
       </main>
     );
   return (
-    <main className="mx-auto max-w-lg p-4 sm:p-6">
-      <section className="rounded-3xl border bg-card p-4 sm:p-6">
+    <StoreBusinessPage actions={<Button asChild size="sm" variant="ghost"><a href="/plataforma#planes">Volver a planes</a></Button>}>
+      <div className="mx-auto max-w-lg px-4 py-6">
+      <section className="seller-card">
         <h1 className="text-xl font-bold">Contratar MA²</h1>
         <p className="mb-4 text-sm text-muted-foreground">
           Elige un plan y genera tu referencia de pago.
@@ -181,6 +187,7 @@ function Contratar() {
           </Button>
         </div>
       </section>
-    </main>
+      </div>
+    </StoreBusinessPage>
   );
 }

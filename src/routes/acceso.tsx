@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ownerSignIn } from "@/lib/menus/owner.functions";
+import { StoreBusinessPage } from "@/components/sales/store-business-page";
 import { saveOwnerToken } from "@/lib/menus/owner-session";
 
 export const Route = createFileRoute("/acceso")({
@@ -64,18 +65,15 @@ function AccessPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-background via-background to-secondary/40 px-4 py-10">
+    <StoreBusinessPage actions={<Button size="sm" variant="ghost" asChild><Link to="/plataforma">Ver planes</Link></Button>}>
+      <div className="mx-auto max-w-md px-4 py-6 sm:py-10">
       <form
         onSubmit={submit}
-        className="card-soft w-full max-w-sm space-y-4 rounded-3xl border border-border bg-card p-6"
+        className="seller-card space-y-4"
       >
-        <div className="text-center">
-          <KeyRound className="mx-auto mb-2 size-7 text-primary" />
-          <h1 className="text-xl font-bold">Mi tienda · Acceso del negocio</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Entra con el usuario y contraseña que te asignó MA².
-          </p>
-        </div>
+        <h1 className="flex items-center gap-2 text-xl font-bold">
+          <KeyRound className="size-5 text-primary" aria-hidden="true" /> Acceso a mi negocio
+        </h1>
         <div className="space-y-1.5">
           <Label htmlFor="username">Usuario</Label>
           <Input
@@ -83,6 +81,8 @@ function AccessPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Tu usuario"
+            required
+            autoComplete="username"
             autoCapitalize="none"
             autoCorrect="off"
           />
@@ -92,6 +92,7 @@ function AccessPage() {
           <Input
             id="pass"
             type="password"
+            required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
@@ -105,9 +106,10 @@ function AccessPage() {
           ¿Olvidaste tu contraseña? Pídele una nueva a MA² Connect.
         </p>
         <Button asChild variant="ghost" size="sm" className="w-full rounded-xl">
-          <Link to="/">Volver al inicio</Link>
+          <Link to="/plataforma">Volver a mi tienda digital</Link>
         </Button>
       </form>
-    </main>
+      </div>
+    </StoreBusinessPage>
   );
 }
