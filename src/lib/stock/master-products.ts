@@ -29,10 +29,38 @@ export function recognizeOrderProduct(name:string) {
 }
 export function isPlanFamily(name:string){return /^(disney|hbo|max|netflix|paramount|prime|amazon prime|vix|crunchyroll|fox one)\b/i.test(normalized(name));}
 
+const legacyStockLabels = new Map(Object.entries({
+  "disney": "Disney+",
+  "disney anual": "Disney+ Anual",
+  "disney anual completa": "Disney+ Anual",
+  "disney mes": "Disney+ Mensual",
+  "disney vix anual": "Disney+ + ViX Anual",
+  "hbo": "HBO Max",
+  "max": "HBO Max",
+  "hbo max": "HBO Max",
+  "hbo 3 meses": "HBO Max · 3 meses",
+  "hbo max 3 meses": "HBO Max · 3 meses",
+  "kocowa": "KOCOWA",
+  "link de gemini": "Gemini",
+  "link geminni 12 m": "Gemini · 12 meses",
+  "microsoft": "Microsoft",
+  "microsoft 365": "Microsoft 365",
+  "mubi": "MUBI",
+  "net privada": "Netflix Privado",
+  "net privado": "Netflix Privado",
+  "netflix privada": "Netflix Privado",
+  "netflix": "Netflix",
+  "netflix extra": "Netflix Extra",
+  "paramoun tiii": "Paramount+",
+  "prime video 6m": "Prime Video · 6 meses",
+  "vix anual": "ViX Anual",
+}));
+
 export function stockPlatform(name: string) {
-  const label = name.trim().replace(/\s+/g, " ") || "Sin plataforma";
+  const original = name.trim().replace(/\s+/g, " ") || "Sin plataforma";
+  const label = legacyStockLabels.get(normalized(original)) ?? original;
   const plan = masterPlan(label);
   return plan
     ? { key: plan.code.toLowerCase(), label: plan.name }
-    : { key: `custom:${label.toLocaleLowerCase("es-MX")}`, label };
+    : { key: `custom:${normalized(label)}`, label };
 }

@@ -238,10 +238,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
         </Button>} className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Avisos de pedidos</DialogTitle>
-          <DialogDescription>
-            Recibe una notificación cada vez que alguien pide por WhatsApp, con recordatorios
-            mientras no lo marques como atendido.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Configura canales y recordatorios de pedidos.</DialogDescription>
         </DialogHeader>
 
         {!logged ? (
@@ -255,7 +252,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
           </div>
         ) : (
           <Tabs defaultValue="config">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="!grid h-auto w-full grid-cols-3">
               <TabsTrigger value="config" className="text-xs">
                 Ajustes
               </TabsTrigger>
@@ -270,13 +267,13 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
             <TabsContent value="config" className="space-y-4 pt-3">
               <Row
                 label="Avisos activados"
-                hint="Apaga los avisos sin impedir que se guarden los pedidos."
                 checked={settings.enabled}
                 onChange={(v) => void save({ ...settings, enabled: v })}
               />
 
-              <div className="space-y-3 rounded-2xl border p-3">
-                <p className="text-sm font-medium">Canales</p>
+              <details className="seller-disclosure">
+                <summary className="text-sm font-semibold">Canales</summary>
+                <div className="seller-disclosure-body space-y-3">
                 <Row
                   label="Notificación en el teléfono (push)"
                   checked={settings.channelPush}
@@ -311,8 +308,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                 )}
 
                 <Row
-                  label="WhatsApp (preparado para después)"
-                  hint="Puedes dejarlo apagado. MA² ya queda listo para Twilio, Whapi.Cloud o GREEN-API."
+                  label="WhatsApp"
                   checked={settings.channelWhatsapp}
                   onChange={(v) => void save({ ...settings, channelWhatsapp: v })}
                 />
@@ -356,9 +352,11 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                 />
 
               </div>
+              </details>
 
-              <div className="space-y-3 rounded-2xl border p-3">
-                <p className="text-sm font-medium">Horario y recordatorios</p>
+              <details className="seller-disclosure">
+                <summary className="text-sm font-semibold">Horario y recordatorios</summary>
+                <div className="seller-disclosure-body space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-xs">Desde</Label>
@@ -433,9 +431,11 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                   </div>
                 )}
               </div>
+              </details>
 
-              <div className="space-y-3 rounded-2xl border p-3">
-                <p className="text-sm font-medium">Escalamiento automático</p>
+              <details className="seller-disclosure">
+                <summary className="text-sm font-semibold">Escalamiento automático</summary>
+                <div className="seller-disclosure-body space-y-3">
                 <p className="text-xs text-muted-foreground">
                   Si no marcas el pedido como atendido, se avisa por otro canal.
                 </p>
@@ -487,6 +487,7 @@ export function NotificationsDialog({embedded=false}:{embedded?:boolean}={}) {
                   </div>
                 )}
               </div>
+              </details>
 
               <Button
                 variant="secondary"

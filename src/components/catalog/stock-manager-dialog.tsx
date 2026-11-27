@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
 import { daysRemaining } from '@/lib/stock/traffic-light';
 import { ToolFrame } from '@/components/workspace/tool-frame';
+import { StockPlatformMark } from "@/components/workspace/stock-platform-mark";
 import { GalleryDeliveryImages } from "./platform-gallery-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -645,10 +646,10 @@ export function StockManagerDialog({
               {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
                 const statusText = x.status !== "available" && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
-                const platform = <span className="min-w-0 flex-1">
+                const platform = <><StockPlatformMark name={stockPlatform(x.platform).label} /><span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
                   {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
-                </span>;
+                </span></>;
                 const status = <span className="flex shrink-0 items-center gap-1.5 text-xs">
                   <span className={`size-2 shrink-0 rounded-full ${statusDot(x)}`} />{statusText}
                 </span>;

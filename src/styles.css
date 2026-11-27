@@ -466,3 +466,7 @@ body.ma2-appearance-active [role="dialog"],body.ma2-appearance-active [role="lis
 .seller-disclosure > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 10px; }
 .seller-disclosure-body { padding: 12px; border-top: 1px solid var(--border); }
 .seller-date-field { width: 100%; min-width: 0; }
+
+.ma2-admin-panel .seller-content [data-slot="button"] { box-shadow: none; }
+.ma2-admin-panel .seller-tabs { margin-block: 8px; }
+.ma2-admin-panel .seller-tabs button { white-space: normal; line-height: 1.25; }
