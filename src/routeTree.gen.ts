@@ -16,6 +16,7 @@ import { Route as ContratarRouteImport } from './routes/contratar'
 import { Route as CuentaRouteImport } from './routes/cuenta'
 import { Route as MiCatalogoRouteImport } from './routes/mi-catalogo'
 import { Route as PlataformaRouteImport } from './routes/plataforma'
+import { Route as RecuperarAccesoRouteImport } from './routes/recuperar-acceso'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ClienteIdRouteImport } from './routes/cliente.$id'
@@ -61,6 +62,11 @@ const MiCatalogoRoute = MiCatalogoRouteImport.update({
 const PlataformaRoute = PlataformaRouteImport.update({
   id: '/plataforma',
   path: '/plataforma',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecuperarAccesoRoute = RecuperarAccesoRouteImport.update({
+  id: '/recuperar-acceso',
+  path: '/recuperar-acceso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
   '/plataforma': typeof PlataformaRoute
+  '/recuperar-acceso': typeof RecuperarAccesoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
   '/plataforma': typeof PlataformaRoute
+  '/recuperar-acceso': typeof RecuperarAccesoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/cuenta': typeof CuentaRoute
   '/mi-catalogo': typeof MiCatalogoRoute
   '/plataforma': typeof PlataformaRoute
+  '/recuperar-acceso': typeof RecuperarAccesoRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/cliente/$id': typeof ClienteIdRoute
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/cuenta'
     | '/mi-catalogo'
     | '/plataforma'
+    | '/recuperar-acceso'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/cuenta'
     | '/mi-catalogo'
     | '/plataforma'
+    | '/recuperar-acceso'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/cuenta'
     | '/mi-catalogo'
     | '/plataforma'
+    | '/recuperar-acceso'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/cliente/$id'
@@ -253,6 +265,7 @@ export interface RootRouteChildren {
   CuentaRoute: typeof CuentaRoute
   MiCatalogoRoute: typeof MiCatalogoRoute
   PlataformaRoute: typeof PlataformaRoute
+  RecuperarAccesoRoute: typeof RecuperarAccesoRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ClienteIdRoute: typeof ClienteIdRoute
@@ -315,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/plataforma'
       fullPath: '/plataforma'
       preLoaderRoute: typeof PlataformaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recuperar-acceso': {
+      id: '/recuperar-acceso'
+      path: '/recuperar-acceso'
+      fullPath: '/recuperar-acceso'
+      preLoaderRoute: typeof RecuperarAccesoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -405,6 +425,7 @@ const rootRouteChildren: RootRouteChildren = {
   CuentaRoute: CuentaRoute,
   MiCatalogoRoute: MiCatalogoRoute,
   PlataformaRoute: PlataformaRoute,
+  RecuperarAccesoRoute: RecuperarAccesoRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ClienteIdRoute: ClienteIdRoute,

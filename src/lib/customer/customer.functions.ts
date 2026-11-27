@@ -39,6 +39,7 @@ export const customerSignUp = createServerFn({ method: "POST" })
     if(!validWhatsApp(data.whatsapp)) throw new Error("Escribe un WhatsApp válido con lada");
     await c.customerThrottle("signup", store.slug + ":" + data.email, 5);
     if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail())throw new Error("No se pudo crear la cuenta. Si ya tienes acceso, inicia sesión.");
+    if(!store.id&&(await import("./identity-policy")).isCyberdocLogin(data.email))throw new Error("Este correo está reservado para accesos Cyberdoc.");
     const p = await import("./password.server"),
       salt = p.customerSalt();
     const payload = await (

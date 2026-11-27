@@ -45,6 +45,8 @@ import { mainStoreLink, type MainStoreView } from "@/lib/catalog/links";
 import { pricingKey } from "@/lib/customer/pricing";
 import { groupProducts } from "@/lib/customer/group-products";
 import { money, phoneNumber, STATUS } from "@/lib/workspace/model";
+import {customerIdentityOptions,customerRequestRecovery} from "@/lib/customer/identity.functions";
+import {isCyberdocLogin} from "@/lib/customer/identity-policy";
 import {
   customerShopInfo,
   customerSignUp,
@@ -89,6 +91,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     [error, setError] = useState(""),
     [fatal, setFatal] = useState("");
   const [showLoginPassword,setShowLoginPassword]=useState(false);
+  const [identityOptions,setIdentityOptions]=useState({google:false,email:false});
+  useEffect(()=>{if(slug!=="ma2")return;let active=true;void customerIdentityOptions().then(v=>{if(active)setIdentityOptions(v);}).catch(()=>{});return()=>{active=false;};},[slug]);
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [name, setName] = useState(""),
@@ -445,13 +449,16 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   : "Entrar"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">{mode==="register"?"¿Ya tienes cuenta?":"¿Todavía no tienes cuenta?"} <button type="button" className="font-bold text-primary underline-offset-4 hover:underline" onClick={()=>{setMode(mode==="register"?"login":"register");setPassword("");setConfirmation("");setShowLoginPassword(false);setError("");}}>{mode==="register"?"Entrar":"Regístrate aquí"}</button></p>
+            {!shop.id&&mode==="login"&&!isCyberdocLogin(email)&&identityOptions.email&&<Button type="button" variant="ghost" className="w-full" disabled={busy} onClick={()=>{if(!email.trim()){toast.info("Escribe tu correo en el campo de arriba");return;}void action(async()=>{await customerRequestRecovery({data:{email}});toast.success("Si el correo está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también spam.");});}}>Olvidé mi contraseña · Enviar enlace</Button>}
+            {!shop.id&&mode==="login"&&!isCyberdocLogin(email)&&identityOptions.google&&<Button type="button" variant="outline" className="w-full" disabled={busy} onClick={()=>void action(async()=>{await (await import("@/lib/customer/identity-client")).startCustomerGoogle();})}>Continuar con Google</Button>}
+            {!shop.id&&isCyberdocLogin(email)&&<p className="text-xs text-muted-foreground">Acceso Cyberdoc. Conserva tu correo y contraseña; no está habilitada la recuperación automática.</p>}
             <a
               className="block text-sm text-primary underline"
               href={support}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Olvidé mi contraseña · Recuperar con soporte
+              ¿Necesitas ayuda? Contactar soporte
             </a>
             {!shop.id && (
               <Button className="w-full" variant="outline" asChild>
