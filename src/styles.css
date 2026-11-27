@@ -277,12 +277,7 @@ body.seller-mode { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0
 .seller-exit { display:flex; gap:5px; align-items:center; font-size:12px; font-weight:700; padding:7px 10px; border-radius:8px; background:var(--muted); cursor:pointer; }
 .seller-mobile-toggle { display:none; }
 .seller-sidebar { position:fixed; top:64px; bottom:0; left:0; width:246px; padding:20px 14px; background:var(--card); border-right:1px solid var(--border); overflow-y:auto; z-index:30; scrollbar-width:thin; }
-.seller-share { padding:14px; border:1px solid var(--border); background:color-mix(in oklch,var(--primary) 9%,var(--card)); border-radius:12px; }
-.seller-share>p { font-size:11px; color:var(--muted-foreground); line-height:1.55; }
-.seller-share strong { display:block; margin-top:6px; font-size:12px; color:var(--primary); }
-.seller-share-actions { display:flex; align-items:center; gap:8px; margin:10px 0 8px; }
-.seller-share-actions>* { padding:5px 10px; border-radius:8px; font-size:11px; font-weight:700; }
-.seller-share-actions>button:first-child { color:var(--primary-foreground); background:var(--primary); }
+.ma2-store-link { background:linear-gradient(120deg,color-mix(in oklch,var(--primary) 7%,var(--card)),var(--card)); }
 .seller-nav-caption { font-size:10px; color:var(--muted-foreground); letter-spacing:.14em; font-weight:700; margin:22px 8px 12px; }
 .seller-sidebar nav,.seller-drawer nav { display:grid; gap:3px; }
 .seller-sidebar nav button,.seller-drawer nav button { display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:9px; text-align:left; font-size:13px; line-height:1.35; cursor:pointer; position:relative; }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Menu,
   X,
   Home,
@@ -18,7 +19,7 @@ import {
   Sun,
 } from "lucide-react";
 import { toast } from "sonner";
-import { adminSessionLogout } from "@/lib/admin-session.functions";
+import { adminSessionLogout, adminSessionValidate } from "@/lib/admin-session.functions";
 import { clearCode } from "@/lib/notify/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -164,6 +165,20 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     const refresh=()=>{void load();if(tab==="tienda"||tab==="inicio")void loadProducts();};
     window.addEventListener("focus",refresh);return ()=>window.removeEventListener("focus",refresh);
   },[Boolean(data),tab,load,loadProducts]);
+  const [canReturnToPanel, setCanReturnToPanel] = useState(false);
+  useEffect(() => {
+    if (slug !== "ma2") return;
+    let active = true;
+    let token = "";
+    try { token = window.localStorage.getItem("ma2-admin-session-v2") || ""; }
+    catch { return; }
+    if (token) {
+      void adminSessionValidate({ data: { token } }).then(result => {
+        if (active) setCanReturnToPanel(result.valid);
+      }).catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [slug]);
   const support = `https://wa.me/${phoneNumber(shop?.whatsapp || "")}?text=${encodeURIComponent(`Hola, necesito ayuda con mi cuenta de ${shop?.name || "la tienda"}.`)}`;
   function openRecovery(message = "") {
     setRecoveryEmail("");
@@ -281,6 +296,9 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
           </div>
         </div>
         <div className="flex shrink-0 gap-1 items-center">
+          {canReturnToPanel && <Button asChild variant="outline" size="sm">
+            <a href="/?panel=1"><ArrowLeft /> <span>Mi panel</span></a>
+          </Button>}
           <button type="button" className="seller-icon-button" aria-label={dark?"Activar modo claro":"Activar modo oscuro"} onClick={toggleTheme}>{dark?<Sun className="size-4"/>:<Moon className="size-4"/>}</button>
           {data ? (
             <>
