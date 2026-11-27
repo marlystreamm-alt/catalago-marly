@@ -66,8 +66,8 @@ const STEPS: Record<Section, [string, string]> = {
     "Registra la comisión acordada para tenerla como referencia.",
   ],
   helpers: [
-    "Selecciona el catálogo del cliente antes de asignar acceso a un ayudante.",
-    "Revisa qué secciones puede usar y guarda únicamente los permisos que necesita.",
+    "Selecciona el negocio donde trabajará el ayudante y elige Crear usuario o Elegir de mis clientes.",
+    "Asigna un nombre de usuario y copia su acceso con la contraseña temporal.",
   ],
   codes: [
     "Agrega el código y un título que te ayude a identificarlo.",
