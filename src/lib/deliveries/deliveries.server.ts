@@ -81,15 +81,18 @@ export async function getDeliveryRow(id: string) {
   return (data as Row | null) ?? null;
 }
 
-export async function saveDeliveryRow(id: string, payload: ProtectedDeliveryPrivate, status = payload.status) {
+export async function saveDeliveryRow(id: string, payload: ProtectedDeliveryPrivate, status = payload.status, requireActive = false) {
   const db = await admin();
   const detail = await encryptPayload(payload);
-  const { error } = await db
+  let query = db
     .from("notification_log")
     .update({ detail, status, attempt: payload.viewCount })
     .eq("id", id)
     .eq("channel", CHANNEL);
+  if (requireActive) query = query.eq("status", "active");
+  const { data, error } = await query.select("id");
   if (error) throw new Error(error.message);
+  if (requireActive && !data?.length) throw new Error("Esta entrega ya no está disponible");
 }
 
 export async function insertDelivery(payload: ProtectedDeliveryPrivate) {

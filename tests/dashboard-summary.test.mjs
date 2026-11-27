@@ -64,3 +64,16 @@ test('platform cards retain every offer and keep bundles apart', async () => {
   ]);
   assert.deepEqual(groups.flatMap(group => group.items).sort(), [...names].sort());
 });
+
+test('a released sale is retained without counting it as additional inventory', () => {
+  const summary=stockDashboardSummary([
+    row('available',{platform:'HBO Max'}),
+    row('old-sale',{platform:'HBO Max',status:'expired',delivered_on:'2026-11-20',cost:30,sale_price:85,archived_sale:true}),
+    row('review',{status:'review',expires_on:'2026-11-29',delivered_on:'2026-11-20',cost:10,sale_price:50}),
+  ],'2026-11-27');
+  assert.equal(summary.available,1);
+  assert.equal(summary.sold,0);
+  assert.equal(summary.expired,0);
+  assert.equal(summary.renewUpcoming,0);
+  assert.equal(summary.revenue,135);
+});

@@ -53,6 +53,7 @@ import {
   stockAdminList,
   stockAdminSave,
   stockAdminProtectedLink,
+  stockAdminReview,
   stockOwnerDelete,
   stockOwnerConvertProfiles,
   stockOwnerDeliver,
@@ -60,6 +61,7 @@ import {
   stockOwnerList,
   stockOwnerSave,
   stockOwnerProtectedLink,
+  stockOwnerReview,
 } from "@/lib/stock/stock.functions";
 import { STOCK_STATUS_LABELS, type StockItem } from "@/lib/stock/types";
 import type { DeliveryAttachment } from "@/lib/deliveries/types";
@@ -67,7 +69,7 @@ import { getPrimaryFichaTemplate, renderDeliveryFicha } from "@/lib/delivery-fic
 
 type FeatureMap = Record<string, boolean>;
 type HistoryRow = { id: string; action: string; detail: string; createdAt: string };
-type StockTab = "all" | "available" | "sold" | "expiring" | "expired";
+type StockTab = "all" | "available" | "sold" | "expiring" | "review" | "expired";
 
 
 const blank = (): StockItem => ({
@@ -256,20 +258,22 @@ export function StockManagerDialog({
   const daysUntil = (value: string | null) => daysRemaining(value,businessToday());
   const availableIds=useMemo(()=>{const parents=new Set(items.map(x=>x.parentStockId));return new Set(items.filter(x=>x.status==="available"&&x.accountType!=="split_parent"&&!parents.has(x.id)&&(!x.expiresOn||x.expiresOn>=businessToday())&&Boolean(x.username&&x.password)).map(x=>x.id));},[items]);
 
-  const soldItems = useMemo(() => items.filter((x) => x.status !== "available" && x.status !== "expired"), [items]);
+  const isExpired = (x: StockItem) => x.status === "expired" || Boolean(x.expiresOn && x.expiresOn < businessToday());
+  const needsReview = (x: StockItem) => x.status === "review" && !isExpired(x);
+  const soldItems = items.filter((x) => x.status !== "available" && x.status !== "review" && !isExpired(x));
   const renewalItems = useMemo(
-    () => items.filter((x) => x.status !== "available" && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7),
+    () => items.filter((x) => ["assigned", "expiring"].includes(x.status) && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7),
     [items],
   );
   const expiredCount = items.filter((x) => x.status === "expired" || (x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0)).length;
 
   const tabItems = useMemo(() => {
     let base = [...items];
-    if (!admin) base = base.filter((x) => x.status !== "available");
     if (stockTab === "available") base = base.filter((x) => admin?availableIds.has(x.id):x.status==="available");
-    if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "expired");
+    if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "review" && !isExpired(x));
+    if (stockTab === "review") base = base.filter(needsReview);
     if (stockTab === "expiring")
-      base = base.filter((x) => x.status !== "available" && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7 && (daysUntil(x.expiresOn) ?? -1) >= 0);
+      base = base.filter((x) => ["assigned", "expiring"].includes(x.status) && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7 && (daysUntil(x.expiresOn) ?? -1) >= 0);
     if (stockTab === "expired")
       base = base.filter((x) => x.status === "expired" || Boolean(x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0));
     const needle = q.trim().toLowerCase();
@@ -502,18 +506,29 @@ export function StockManagerDialog({
   }
 
   async function noRenew(x: StockItem) {
-    const action = window.prompt("Escribe LIBERAR para regresar la cuenta a Disponibles o BAJA para dejarla fuera de servicio:", "BAJA")?.trim().toUpperCase();
-    if (!action || !["LIBERAR", "BAJA"].includes(action)) return;
-    const next = action === "LIBERAR"
-      ? { ...x, status: "available" as const, clientName: "", clientWhatsapp: "", deliveredOn: null, relatedOrderId: "", renewalStatus: "No renovó" }
-      : { ...x, status: "expired" as const, renewalStatus: "No renovó" };
+    await resolveReview(x, "nonrenewal");
+  }
+
+  async function resolveReview(x: StockItem, action: "nonrenewal" | "release" | "expire") {
+    if (busy || !can("stock_edit")) return;
+    let expiresOn: string | undefined;
+    if (action === "release") {
+      if (!confirm("¿Confirmas que la cuenta funciona y que retiraste el acceso del cliente anterior en la plataforma?")) return;
+      expiresOn = window.prompt("Fecha real de vigencia de la cuenta (AAAA-MM-DD):", x.expiresOn || "") || undefined;
+      if (!expiresOn) return;
+    }
+    if (action === "expire" && !confirm("¿Marcar esta cuenta como vencida?")) return;
+    setBusy(true);
     try {
-      await persist(next, action === "LIBERAR" ? "Cuenta liberada" : "Cuenta marcada como baja/vencida");
+      const payload = { id: x.id, version: x.updatedAt, action, expiresOn };
+      const result = ownerToken ? await stockOwnerReview({data:{token:ownerToken,...payload}}) : await stockAdminReview({data:{code:getSavedCode(),...payload}});
       await load();
       setToolsItem(null);
+      setStockTab(result.status === "available" ? "available" : result.status === "review" ? "review" : "expired");
+      toast.success(result.status === "available" ? "Cuenta disponible para volver a vender" : result.status === "review" ? "Cuenta enviada a Validar cuenta" : "Cuenta enviada a Vencidas");
     } catch (e) {
       toast.error(err(e));
-    }
+    } finally { setBusy(false); }
   }
 
   function openManualDelivery(item: StockItem) {
@@ -566,6 +581,8 @@ export function StockManagerDialog({
   }
 
   const statusDot = (x: StockItem) => {
+    if (isExpired(x)) return "bg-red-500";
+    if (x.status === "review") return "bg-amber-500";
     const d = daysUntil(x.expiresOn);
     if (x.status !== "available" && d !== null && d <= 1) return "bg-red-500";
     if (x.status !== "available" && d !== null && d <= 3) return "bg-orange-500";
@@ -581,6 +598,7 @@ export function StockManagerDialog({
     if (tab === "available") return admin?availableIds.size:items.filter((x) => x.status === "available").length;
     if (tab === "sold") return soldItems.length;
     if (tab === "expiring") return renewalItems.filter((x) => (daysUntil(x.expiresOn) ?? -1) >= 0).length;
+    if (tab === "review") return items.filter(needsReview).length;
     return expiredCount;
   };
 
@@ -638,6 +656,7 @@ export function StockManagerDialog({
                 ["available", "Disponibles"],
                 ["sold", "Vendidas"],
                 ["expiring", "Por vencer"],
+                ["review", "Validar cuenta"],
                 ["expired", "Vencidas / bajas"],
               ] as [StockTab, string][]).map(([key, label]) => <button key={key} type="button" className={stockTab === key ? "active" : ""} aria-pressed={stockTab === key} onClick={() => setStockTab(key)}>{label} ({countTab(key)})</button>)}
             </div>
@@ -646,7 +665,7 @@ export function StockManagerDialog({
             <div className="overflow-hidden rounded-2xl border">
               {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
-                const statusText = x.status !== "available" && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
+                const statusText = isExpired(x) ? "Caducada" : x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
                 const platform = <><StockPlatformMark name={stockPlatform(x.platform).label} /><span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
                   {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
@@ -664,6 +683,10 @@ export function StockManagerDialog({
                   <details key={x.id} className="seller-disclosure !rounded-none !border-x-0 !border-t-0 last:!border-b-0">
                     <summary>{platform}{status}</summary>
                     <div className="seller-disclosure-body flex flex-wrap gap-2">
+                      {x.status === "review" && can("stock_edit") && <>
+                        {!isExpired(x) && <Button size="sm" disabled={busy} onClick={() => void resolveReview(x,"release")}>Funciona · Liberar</Button>}
+                        <Button size="sm" variant="outline" disabled={busy} onClick={() => void resolveReview(x,"expire")}>Caducada</Button>
+                      </>}
                       {can("stock_edit") && <Button size="sm" variant="outline" onClick={() => {
                         setForm({ ...x }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true);
                       }}><Pencil />Editar</Button>}
@@ -739,7 +762,7 @@ export function StockManagerDialog({
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
                 {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => openManualDelivery(toolsItem)}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
-                {toolsItem.status !== "available" && toolsItem.expiresOn && (daysUntil(toolsItem.expiresOn) ?? 999) <= 7 ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
+                {["assigned","expiring","expired"].includes(toolsItem.status) && (toolsItem.clientName || toolsItem.deliveredOn) && can("stock_edit") ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
               </div>
             </> : null}

@@ -35,7 +35,7 @@ export async function readWebOrderDelivery(clientId: string, orderId: string) {
   if (error) throw new Error("No se pudo consultar la guía de ingreso");
   const images = stored ? (await decryptPayload<{images: string[]}>(String(stored.detail))).images : [];
   const row = order.data.protected_delivery_id ? await getDeliveryRow(order.data.protected_delivery_id) : null;
-  const saved = row ? await decryptPayload<ProtectedDeliveryPrivate>(String(row["detail"])) : null;
+  const saved = row?.status === "active" ? await decryptPayload<ProtectedDeliveryPrivate>(String(row["detail"])) : null;
   const payload = saved?.status === "active" && (!saved.expiresAt || Date.parse(saved.expiresAt) > Date.now()) ? saved : null;
   const link = payload?.link?.trim() || "";
   const title = String(request.data.service_name);

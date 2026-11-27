@@ -1,6 +1,6 @@
-export type StockStatus = "available" | "assigned" | "expiring" | "expired" | "client_replacement" | "provider_replacement";
+export type StockStatus = "available" | "assigned" | "expiring" | "expired" | "client_replacement" | "provider_replacement" | "review";
 export const STOCK_STATUS_LABELS: Record<StockStatus,string> = {
-  available: "Disponible", assigned: "Asignada", expiring: "Por vencer", expired: "Caducada", client_replacement: "Reposición cliente", provider_replacement: "Reposición proveedor",
+  available: "Disponible", assigned: "Asignada", expiring: "Por vencer", expired: "Caducada", client_replacement: "Reposición cliente", provider_replacement: "Reposición proveedor", review: "Validar cuenta",
 };
 export type StockItem = {
   durationMonths?: number;

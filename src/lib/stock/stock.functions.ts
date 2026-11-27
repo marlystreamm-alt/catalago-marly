@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { StockItem } from "./types";
 import { duplicateComplete } from "./duplicate";
 const code=z.string().min(4); const token=z.string().min(10);
-const itemSchema=z.object({ durationMonths:z.number().int().min(1).max(36).default(1), startsOnSale:z.boolean().default(false),  id:z.string().default(""), platform:z.string().min(1).max(100), accountType:z.string().max(100).default(""), stockKind:z.enum(["complete","profile"]).default("complete"), parentStockId:z.string().uuid().nullable().default(null), username:z.string().max(250).default(""), password:z.string().max(1000).default(""), profilePin:z.string().max(100).default(""), panelUrl:z.string().max(2000).default(""), panelUsername:z.string().max(250).default(""), panelPassword:z.string().max(1000).default(""), provider:z.string().max(160).default(""), catalogRef:z.string().max(160).default(""), clientName:z.string().max(160).default(""), clientWhatsapp:z.string().max(40).default(""), status:z.enum(["available","assigned","expiring","expired","client_replacement","provider_replacement"]).default("available"), acquiredOn:z.string().nullable().default(null), deliveredOn:z.string().nullable().default(null), expiresOn:z.string().nullable().default(null), notes:z.string().max(3000).default(""), cost:z.number().min(0).default(0), salePrice:z.number().min(0).default(0), relatedOrderId:z.string().max(200).default(""), renewalStatus:z.string().max(60).default(""), renewalNotifiedAt:z.string().nullable().default(null), protectedDeliveryId:z.string().default("") });
+const itemSchema=z.object({ durationMonths:z.number().int().min(1).max(36).default(1), startsOnSale:z.boolean().default(false),  id:z.string().default(""), platform:z.string().min(1).max(100), accountType:z.string().max(100).default(""), stockKind:z.enum(["complete","profile"]).default("complete"), parentStockId:z.string().uuid().nullable().default(null), username:z.string().max(250).default(""), password:z.string().max(1000).default(""), profilePin:z.string().max(100).default(""), panelUrl:z.string().max(2000).default(""), panelUsername:z.string().max(250).default(""), panelPassword:z.string().max(1000).default(""), provider:z.string().max(160).default(""), catalogRef:z.string().max(160).default(""), clientName:z.string().max(160).default(""), clientWhatsapp:z.string().max(40).default(""), status:z.enum(["available","assigned","expiring","expired","client_replacement","provider_replacement","review"]).default("available"), acquiredOn:z.string().nullable().default(null), deliveredOn:z.string().nullable().default(null), expiresOn:z.string().nullable().default(null), notes:z.string().max(3000).default(""), cost:z.number().min(0).default(0), salePrice:z.number().min(0).default(0), relatedOrderId:z.string().max(200).default(""), renewalStatus:z.string().max(60).default(""), renewalNotifiedAt:z.string().nullable().default(null), protectedDeliveryId:z.string().default("") });
 async function adminGate(v:string){ const {requireAdminCode}=await import("@/lib/notify/notify.server"); await requireAdminCode(v); }
 export const stockAdminDeletedList=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code}).parse(d)).handler(async({data})=>{
   await adminGate(data.code);
@@ -20,6 +20,14 @@ export const stockAdminRestoreDeleted=createServerFn({method:"POST"}).validator(
   return Number(result.data);
 });
 export const stockAdminList=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code}).parse(d)).handler(async({data}):Promise<StockItem[]>=>{await adminGate(data.code); return (await import("./stock.server")).listStock(null);});
+export const stockAdminReleasedSales=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code}).parse(d)).handler(async({data}):Promise<StockItem[]>=>{
+  await adminGate(data.code);
+  const {opsDB}=await import("@/lib/workspace/operations.server");
+  const {rowToStock}=await import("./stock.server");
+  const rows:StockItem[]=[];
+  for(let from=0;;from+=1000){const result=await opsDB().from("ma2_released_stock_sales").select("*").is("business_id",null).order("id").range(from,from+999);if(result.error)throw new Error("No se pudo consultar el historial de ventas");for(const row of result.data||[])rows.push(await rowToStock({...row,status:"expired"}));if((result.data?.length||0)<1000)break;}
+  return rows;
+});
 export const stockAdminRenewal=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code,id:z.string().uuid(),version:z.string().min(1).max(100),expiresOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()}).parse(d)).handler(async({data})=>{
   await adminGate(data.code);
   return (await import("./stock.server")).updateMainRenewal(data.id,data.version,data.expiresOn);
@@ -52,6 +60,15 @@ export const stockAdminProtectedLink=createServerFn({method:"POST"}).validator((
 export const stockOwnerProtectedLink=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({token,id:z.string().uuid()}).parse(d)).handler(async({data})=>{const {business}=await ownerCtx(data.token); const s=await import("./stock.server"); const item=(await s.listStock(business.id)).find(x=>x.id===data.id); if(!item?.protectedDeliveryId) throw new Error("Esta cuenta no tiene documento protegido"); const ds=await import("@/lib/deliveries/deliveries.server"); const row=await ds.getDeliveryRow(item.protectedDeliveryId); if(!row) throw new Error("Documento protegido no encontrado"); const payload=await ds.decryptPayload<any>(String(row["detail"]||"")); return {id:item.protectedDeliveryId,token:String(payload.token||""),status:String(payload.status||"active")};});
 
 const convertSchema=z.object({id:z.string().uuid(),count:z.number().int().min(1).max(10)});
+const reviewSchema=z.object({id:z.string().uuid(),version:z.string().min(1).max(100),action:z.enum(["nonrenewal","release","expire"]),expiresOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()});
+export const stockAdminReview=createServerFn({method:"POST"}).validator((d:unknown)=>reviewSchema.extend({code}).parse(d)).handler(async({data})=>{
+  await adminGate(data.code);
+  return (await import("./stock.server")).reviewStock(data.id,null,data.version,data.action,data.expiresOn);
+});
+export const stockOwnerReview=createServerFn({method:"POST"}).validator((d:unknown)=>reviewSchema.extend({token}).parse(d)).handler(async({data})=>{
+  const {business}=await ownerCtx(data.token,"stock_edit");
+  return (await import("./stock.server")).reviewStock(data.id,business.id,data.version,data.action,data.expiresOn);
+});
 export const stockAdminConvertProfiles=createServerFn({method:"POST"})
   .validator((d:unknown)=>convertSchema.extend({code}).parse(d))
   .handler(async({data})=>{await adminGate(data.code);return (await import("./stock.server")).convertStockProfiles(data.id,null,data.count);});

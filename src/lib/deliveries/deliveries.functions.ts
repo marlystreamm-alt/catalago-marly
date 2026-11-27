@@ -223,6 +223,7 @@ export const deliveriesOpen = createServerFn({ method: "POST" })
     const s = await import("./deliveries.server");
     const row = await s.getDeliveryRow(data.id);
     if (!row) throw new Error("Este enlace no existe o fue retirado");
+    if (row.status !== "active") throw new Error("Esta entrega ya no está disponible");
     const raw = await s.decryptPayload<ProtectedDeliveryPrivate>(String(row["detail"] ?? ""));
     const d: ProtectedDeliveryPrivate = { ...raw, images: Array.isArray(raw.images) ? raw.images.slice(0, 2) : [], attachment: raw.attachment ?? null, imageCount: Array.isArray(raw.images) ? raw.images.length : 0 };
     if (d.token !== data.token) throw new Error("Enlace no válido");
@@ -238,7 +239,7 @@ export const deliveriesOpen = createServerFn({ method: "POST" })
     d.lastViewedAt = now;
     d.updatedAt = now;
     d.history = [...d.history, { at: now, kind: "opened" as const, detail: `Acceso #${d.viewCount}` }].slice(-100);
-    await s.saveDeliveryRow(data.id, d);
+    await s.saveDeliveryRow(data.id, d, d.status, true);
     return {
       id: d.id,
       platform: d.platform,
@@ -263,6 +264,7 @@ export const deliveriesReveal = createServerFn({ method: "POST" })
     const s = await import("./deliveries.server");
     const row = await s.getDeliveryRow(data.id);
     if (!row) throw new Error("Entrega no encontrada");
+    if (row.status !== "active") throw new Error("Esta entrega ya no está disponible");
     const d = await s.decryptPayload<ProtectedDeliveryPrivate>(String(row["detail"] ?? ""));
     if (d.token !== data.token) throw new Error("Enlace no válido");
     const requiredPassword = d.accessPassword ?? "";
@@ -271,7 +273,7 @@ export const deliveriesReveal = createServerFn({ method: "POST" })
     const now = new Date().toISOString();
     d.updatedAt = now;
     d.history = [...d.history, { at: now, kind: "password_viewed" as const, detail: "Contraseña visualizada" }].slice(-100);
-    await s.saveDeliveryRow(data.id, d);
+    await s.saveDeliveryRow(data.id, d, d.status, true);
     return { password: d.password };
   });
 

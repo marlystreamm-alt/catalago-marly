@@ -1,5 +1,6 @@
 import { expiresAfterMonths, businessToday } from './duration';
 import type { StockItem, StockStatus } from "./types";
+import type { ProtectedDeliveryPrivate } from "@/lib/deliveries/types";
 type Row = Record<string, unknown>;
 async function admin(){ const { supabaseAdmin } = await import("@/integrations/supabase/client.server"); return supabaseAdmin; }
 const s=(v:unknown)=>typeof v === "string" ? v : "";
@@ -60,6 +61,40 @@ export async function reactivateUnsoldStock(id:string,version:string,expiresOn:s
 
 export async function logStockHistory(stockId:string,businessId:string|null,action:string,detail:string){
  const db=await admin(); const {error}=await db.from("stock_history").insert({stock_id:stockId,business_id:businessId,action,detail}); if(error) throw new Error(error.message);
+}
+
+export async function reviewStock(id: string, businessId: string | null, version: string, action: "nonrenewal" | "release" | "expire", expiresOn?: string) {
+  const db = await admin();
+  let query = db.from("stock_items").select("id,updated_at,protected_delivery_id,status,expires_on").eq("id", id);
+  query = businessId ? query.eq("business_id", businessId) : query.is("business_id", null);
+  const { data, error } = await query.maybeSingle();
+  if (error || !data || data.updated_at !== version) throw new Error("La cuenta cambió. Actualiza el inventario.");
+  const closing = action !== "nonrenewal" || data.status === "expired" || Boolean(data.expires_on && data.expires_on < businessToday());
+  const ds = await import("@/lib/deliveries/deliveries.server");
+  let document: string | null = null;
+  if (closing && data.protected_delivery_id) {
+    const row = await ds.getDeliveryRow(data.protected_delivery_id);
+    if (row) {
+      const payload = await ds.decryptPayload<ProtectedDeliveryPrivate>(String(row.detail));
+      const now = new Date().toISOString();
+      document = await ds.encryptPayload({ ...payload, status: "revoked", updatedAt: now,
+        history: [...payload.history, { at: now, kind: "revoked", detail: "Cuenta sin renovación" }].slice(-100) });
+    }
+  }
+  const {opsDB}=await import("@/lib/workspace/operations.server");
+  const result = await opsDB().rpc("ma2_review_stock", { p_id: id, p_business: businessId, p_version: version, p_action: action, p_expiry: expiresOn || null, p_document: document });
+  if (result.error) throw new Error(result.error.message);
+  return { status: String(result.data) };
+}
+
+export async function expireStockReviews() {
+  const db = await admin();
+  const {data,error}=await db.from("stock_items").select("id,business_id,updated_at").eq("status","review").lt("expires_on",businessToday()).limit(100);
+  if(error)throw new Error(error.message);
+  for(const item of data||[]){
+    try{await reviewStock(item.id,item.business_id,item.updated_at,"expire");}
+    catch(error){console.error("No se pudo concluir revisión de stock",item.id,error);}
+  }
 }
 export async function listStockHistory(stockId:string,businessId:string|null){
  const db=await admin(); let q=db.from("stock_history").select("*").eq("stock_id",stockId).order("created_at",{ascending:false}).limit(100);

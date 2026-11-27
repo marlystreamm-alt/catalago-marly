@@ -5,7 +5,7 @@ import { stockPlatform } from "@/lib/stock/master-products";
 import { StockPlatformMark } from "./stock-platform-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { stockAdminList, stockAdminRenewal, stockAdminReactivate } from "@/lib/stock/stock.functions";
+import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
 import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
@@ -28,7 +28,9 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     setBusy(true);
     setError("");
     try {
-      setItems(await stockAdminList({ data: { code: getSavedCode() } }));
+      const data = { code: getSavedCode() };
+      const current = await stockAdminList({ data });
+      setItems(sales ? [...current, ...await stockAdminReleasedSales({data})] : current);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -44,19 +46,33 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     .filter(
       (r) =>
         (sales ? (!parents.has(r.id) && r.accountType!=="split_parent" && r.status!=="available") :
-          (Boolean(r.clientName || r.deliveredOn) || r.status==="expired" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
+          (Boolean(r.clientName || r.deliveredOn) || r.status==="expired" || r.status==="review" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
         `${r.platform} ${stockPlatform(r.platform).label} ${r.clientName} ${r.clientWhatsapp}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     );
   const tone=(r:StockItem)=>r.status==="expired"?"expired":renewalTone(daysRemaining(r.expiresOn,today),limits);
+  const isReview=(r:StockItem)=>r.status==="review"&&tone(r)!=="expired";
   const rows = assigned.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
-      return days==="all" || tone(r)===days;
+      if(days==="review")return isReview(r);
+      return !isReview(r)&&(days==="all" || tone(r)===days);
     }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
   const saveRenewal=async(r:StockItem,date?:string)=>{
     setBusy(true);
     try{if(reactivating&&date){await stockAdminReactivate({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}else{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}setRenewing(null);setReactivating(false);await load();onChanged?.();toast.success(reactivating?"Cuenta reactivada":date?"Renovación guardada":"Marcado como avisado");}
+    catch(e){toast.error(errorText(e));}finally{setBusy(false);}
+  };
+  const review=async(r:StockItem,action:"nonrenewal"|"release"|"expire")=>{
+    let expiresOn: string|undefined;
+    if(action==="release"){
+      if(!confirm("¿Confirmas que la cuenta funciona y retiraste el acceso del cliente anterior en la plataforma?"))return;
+      expiresOn=window.prompt("Fecha real de vigencia (AAAA-MM-DD):",r.expiresOn||"")||undefined;
+      if(!expiresOn)return;
+    }
+    if(action==="expire"&&!confirm("¿Marcar como vencida?"))return;
+    setBusy(true);
+    try{const result=await stockAdminReview({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,action,expiresOn}});await load();onChanged?.();setDays(result.status==="review"?"review":result.status==="expired"?"expired":"all");toast.success(result.status==="available"?"Cuenta liberada":result.status==="review"?"Enviada a Validar cuenta":"Enviada a Vencidas");}
     catch(e){toast.error(errorText(e));}finally{setBusy(false);}
   };
   return (
@@ -91,6 +107,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         <div className="seller-tabs">
           {[
             ["all", "Todos"],
+            ["review", "Validar cuenta"],
             ["expired", "⚫ Vencidos"],
             ["red", `🔴 0–${limits.red} días`],
             ["yellow", `🟡 ${limits.red+1}–${limits.yellow} días`],
@@ -98,7 +115,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
             ["unknown", "Sin fecha"],
           ].map(([v, l]) => (
             <button key={v} className={days === v ? "active" : ""} onClick={() => setDays(v)}>
-              {l} ({v==="all"?assigned.length:assigned.filter(r=>tone(r)===v).length})
+              {l} ({v==="review"?assigned.filter(isReview).length:assigned.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})
             </button>
           ))}
         </div>
@@ -139,7 +156,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                   <span className="block truncate text-sm font-semibold">{label}</span>
                   <span className="block truncate text-xs text-muted-foreground">{r.clientName || "Sin cliente"} · {r.stockKind === "profile" ? "Perfil" : "Completa"}</span>
                 </span>
-                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
+                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
               </summary>
               <div className="seller-disclosure-body">
               <p className="text-xs text-muted-foreground">
@@ -147,7 +164,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
               </p>
               {!sales&&r.renewalNotifiedAt&&<p className="mt-1 text-xs text-muted-foreground">✓ Avisado el {r.renewalNotifiedAt.slice(0,10)}</p>}
               <div className="seller-actions mt-3">
-                {r.clientWhatsapp ? (
+                {r.clientWhatsapp && !isReview(r) ? (
                   <Button asChild size="sm">
                     <a
                       href={`https://wa.me/${phoneNumber(r.clientWhatsapp)}?text=${encodeURIComponent(`Hola ${r.clientName}, tu servicio de ${r.platform} vence el ${r.expiresOn || "día indicado"}. ¿Deseas renovar?`)}`}
@@ -158,7 +175,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                     </a>
                   </Button>
                 ) : !sales?<span className="text-xs text-muted-foreground">Sin WhatsApp registrado</span>:null}
-                {!sales && Boolean(r.clientName || r.deliveredOn) && r.status!=="available" ? (
+                {!sales && Boolean(r.clientName || r.deliveredOn) && r.status!=="available" && r.status!=="review" ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -169,6 +186,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                   </Button>
                 ) : null}
                 {!sales&&Boolean(r.clientName || r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>{setReactivating(false);setRenewing(r);setNewDate(expiresAfterMonths(r.expiresOn&&r.expiresOn>today?r.expiresOn:today,r.durationMonths||1));}}>Renovar</Button>}
+                {!sales&&Boolean(r.clientName||r.deliveredOn)&&["assigned","expired","expiring"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>void review(r,"nonrenewal")}>No renovó</Button>}
+                {!sales&&r.status==="review"&&<>{isReview(r)&&<Button size="sm" disabled={busy} onClick={()=>void review(r,"release")}>Funciona · Liberar</Button>}<Button size="sm" variant="outline" disabled={busy} onClick={()=>void review(r,"expire")}>Caducada</Button></>}
                 {!sales&&!r.clientName&&!r.deliveredOn&&!r.relatedOrderId&&!r.protectedDeliveryId&&!parents.has(r.id)&&r.accountType!=="split_parent"&&["available","expired"].includes(r.status)&&(r.status==="expired"||Boolean(r.expiresOn&&r.expiresOn<=today))&&<Button size="sm" disabled={busy} onClick={()=>{setReactivating(true);setRenewing(r);setNewDate(expiresAfterMonths(today,r.durationMonths||1));}}>Verifiqué acceso · Reactivar</Button>}
               </div>
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}

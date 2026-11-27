@@ -142,6 +142,8 @@ export async function loadSettings(): Promise<NotifySettings> {
 
 /** Procesa recordatorios y escalaciones pendientes desde una tarea del servidor. */
 export async function runPendingReminders() {
+  try { await (await import("@/lib/stock/stock.server")).expireStockReviews(); }
+  catch (error) { console.error("No se pudieron actualizar cuentas sin renovación", error); }
   const settings = await loadSettings();
   if (!settings.enabled || !withinSchedule(settings)) {
     return { skipped: true, sent: 0, escalated: 0 };
