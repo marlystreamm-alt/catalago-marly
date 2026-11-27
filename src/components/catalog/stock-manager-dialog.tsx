@@ -286,6 +286,7 @@ export function StockManagerDialog({
       .sort((a, b) => {
         const ad = a.expiresOn ? new Date(a.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         const bd = b.expiresOn ? new Date(b.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
+        if (stockTab === "expired") return (b.expiresOn || "").localeCompare(a.expiresOn || "") || b.createdAt.localeCompare(a.createdAt);
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
   }, [items, stockTab, q, admin, availableIds, platformFilter]);
