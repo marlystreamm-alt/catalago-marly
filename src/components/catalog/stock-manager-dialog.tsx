@@ -258,24 +258,27 @@ export function StockManagerDialog({
   const daysUntil = (value: string | null) => daysRemaining(value,businessToday());
   const availableIds=useMemo(()=>{const parents=new Set(items.map(x=>x.parentStockId));return new Set(items.filter(x=>x.status==="available"&&x.accountType!=="split_parent"&&!parents.has(x.id)&&(!x.expiresOn||x.expiresOn>=businessToday())&&Boolean(x.username&&x.password)).map(x=>x.id));},[items]);
 
-  const isExpired = (x: StockItem) => x.status === "expired" || Boolean(x.expiresOn && x.expiresOn < businessToday());
+  // Converted parents use expired as a non-sellable sentinel, not a validity date.
+  const parentIds = useMemo(() => new Set(items.map(x => x.parentStockId).filter(Boolean)), [items]);
+  const isContainer = (x: StockItem) => parentIds.has(x.id) || x.accountType === "split_parent";
+  const isExpired = (x: StockItem) => (!isContainer(x) && x.status === "expired") || Boolean(x.expiresOn && x.expiresOn < businessToday());
   const needsReview = (x: StockItem) => x.status === "review" && !isExpired(x);
-  const soldItems = items.filter((x) => x.status !== "available" && x.status !== "review" && !isExpired(x));
+  const soldItems = items.filter((x) => !isContainer(x) && x.status !== "available" && x.status !== "review" && !isExpired(x));
   const renewalItems = useMemo(
     () => items.filter((x) => ["assigned", "expiring"].includes(x.status) && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7),
     [items],
   );
-  const expiredCount = items.filter((x) => x.status === "expired" || (x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0)).length;
+  const expiredCount = items.filter(isExpired).length;
 
   const tabItems = useMemo(() => {
     let base = [...items];
     if (stockTab === "available") base = base.filter((x) => admin?availableIds.has(x.id):x.status==="available");
-    if (stockTab === "sold") base = base.filter((x) => x.status !== "available" && x.status !== "review" && !isExpired(x));
+    if (stockTab === "sold") base = base.filter((x) => !isContainer(x) && x.status !== "available" && x.status !== "review" && !isExpired(x));
     if (stockTab === "review") base = base.filter(needsReview);
     if (stockTab === "expiring")
       base = base.filter((x) => ["assigned", "expiring"].includes(x.status) && x.expiresOn && (daysUntil(x.expiresOn) ?? 999) <= 7 && (daysUntil(x.expiresOn) ?? -1) >= 0);
     if (stockTab === "expired")
-      base = base.filter((x) => x.status === "expired" || Boolean(x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0));
+      base = base.filter(isExpired);
     const needle = q.trim().toLowerCase();
     return base
       .filter((x) => !platformFilter || stockPlatform(x.platform).key === platformFilter.key)
@@ -582,6 +585,7 @@ export function StockManagerDialog({
 
   const statusDot = (x: StockItem) => {
     if (isExpired(x)) return "bg-red-500";
+    if (isContainer(x)) return "bg-sky-500";
     if (x.status === "review") return "bg-amber-500";
     const d = daysUntil(x.expiresOn);
     if (x.status !== "available" && d !== null && d <= 1) return "bg-red-500";
@@ -665,7 +669,7 @@ export function StockManagerDialog({
             <div className="overflow-hidden rounded-2xl border">
               {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
-                const statusText = isExpired(x) ? "Caducada" : x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
+                const statusText = isExpired(x) ? "Caducada" : isContainer(x) ? "Dividida en perfiles · vigente" : x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
                 const platform = <><StockPlatformMark name={stockPlatform(x.platform).label} /><span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
                   {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
