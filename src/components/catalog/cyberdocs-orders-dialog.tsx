@@ -149,11 +149,12 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 }
 
 export function CyberDocsOrdersDialog({
-  embedded = false, initialSelectedId = null, stage = "all", navigation, onStageChange,
+  embedded = false, initialSelectedId = null, stage = "all", channel, navigation, onStageChange,
 }: {
   embedded?: boolean;
   initialSelectedId?: string | null;
   stage?: "all" | keyof typeof orderStageStatuses;
+  channel?: "web" | "cyberdoc";
   navigation?: ReactNode;
   onStageChange?: (id: string, stage: "processing" | "deliveries" | "closed") => void;
 } = {}) {
@@ -251,10 +252,14 @@ export function CyberDocsOrdersDialog({
         cyberdocsIntegrationStatus({ data: { code } }),
         cyberdocsListStock({ data: { code } }),
       ]);
-      const relevantOrders=embedded && stage==="all" ? nextOrders.filter(o=>initialSelectedId ? o.id===initialSelectedId : o.sourceKey!=="web_catalog") : nextOrders;
+      const relevantOrders = nextOrders.filter(order => {
+        if (channel) return (order.sourceKey === "web_catalog") === (channel === "web");
+        return !embedded || stage !== "all"
+          || (initialSelectedId ? order.id === initialSelectedId : order.sourceKey !== "web_catalog");
+      });
       setOrders(relevantOrders);
       setCheckedIds((current) =>
-        new Set([...current].filter((id) => nextOrders.some((order) => order.id === id && !terminal(order)))),
+        new Set([...current].filter((id) => relevantOrders.some((order) => order.id === id && !terminal(order)))),
       );
       setStatus(nextStatus);
       setStock(nextStock);
@@ -268,7 +273,7 @@ export function CyberDocsOrdersDialog({
     } finally {
       setBusy(false);
     }
-  }, [code,embedded,initialSelectedId]);
+  }, [code, channel, embedded, initialSelectedId, stage]);
 
   const checkAlexa = useCallback(async () => {
     try { setAlexaStatus(await cyberdocsAlexaStatus({ data: { code } })); }
