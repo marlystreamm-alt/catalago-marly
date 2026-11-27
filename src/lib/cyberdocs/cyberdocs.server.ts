@@ -261,7 +261,7 @@ export async function ingestCyberDocsOrder(
     "system",
     `Pedido recibido de ${sourceLabel} por ${input.source}`,
   );
-  if (order.whatsapp && order.clientName && input.source !== "manual_fallback") {
+  if (order.whatsapp && input.source !== "manual_fallback") {
     try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, order.whatsapp, undefined, order.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined); }
     catch { await recordOrderEvent(order.id, "client_contact_pending", "system", "No se pudo registrar el contacto; se reintentará al entregar"); }
   }
@@ -435,7 +435,7 @@ export async function updateOrderWhatsApp(
       ? `WhatsApp de entrega actualizado (${order.whatsapp ? "corregido" : "agregado"})`
       : "WhatsApp de entrega eliminado",
   );
-  if (value && order.clientName) {
+  if (value) {
     try { await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(order.clientName, value, undefined, order.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined); }
     catch { await recordOrderEvent(order.id, "client_contact_pending", actor, "No se pudo registrar el contacto; se reintentará al entregar"); }
   }
@@ -710,7 +710,7 @@ export async function finalizeCyberDocsOrder(
       if (expiryError) throw new Error("Pedido finalizado; no se pudo guardar el vencimiento automático.");
     }
   }
-  if (completed.whatsapp && completed.clientName) {
+  if (completed.whatsapp) {
     try {
       const { rememberOrderClient } = await import("@/lib/customer/remember-client.server");
       await rememberOrderClient(completed.clientName, completed.whatsapp, undefined, completed.sourceKey === "cyberdocsmx_bot" ? "Cyberdoc" : undefined);

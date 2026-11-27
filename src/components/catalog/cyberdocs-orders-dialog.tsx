@@ -1,5 +1,5 @@
 import { ToolFrame } from '@/components/workspace/tool-frame';
-import { transferReferenceMessage } from "@/lib/workspace/model";
+import { transferReferenceMessage, validFullName, validClientEmail, validWhatsApp, phoneNumber } from "@/lib/workspace/model";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -445,8 +445,13 @@ export function CyberDocsOrdersDialog({
     if (!selected || !stockItemId) return toast.error("Selecciona una cuenta disponible");
     if (withPassword && (accessPassword.length < 4 || accessPassword !== confirmPassword))
       return toast.error("Revisa la contraseña del documento protegido");
+    if (!validWhatsApp(selectedWhatsApp)) return toast.error("Escribe un WhatsApp válido para la entrega");
+    if ((!validFullName(selected.clientName) || !validClientEmail(selected.contactValue)) && !confirm("Faltan datos del cliente (nombre completo o correo). ¿Guardar la asignación con los datos disponibles?")) return;
     setBusy(true);
     try {
+      if (phoneNumber(selectedWhatsApp) !== phoneNumber(selected.whatsapp || "")) {
+        replaceOrder(await cyberdocsUpdateWhatsApp({data:{code,orderId:selected.id,whatsapp:phoneNumber(selectedWhatsApp)}}));
+      }
       const result = await cyberdocsAssignStock({ data: {
         code, orderId: selected.id, stockItemId,
         accessPassword: withPassword ? accessPassword : "",
@@ -471,8 +476,13 @@ export function CyberDocsOrdersDialog({
     if (manualType === "link" && !manualLink.trim()) return toast.error("Agrega el link");
     if (manualType !== "link" && !manualUsername.trim()) return toast.error("Agrega el correo o usuario");
     if (withPassword && (accessPassword.length < 4 || accessPassword !== confirmPassword)) return toast.error("Revisa la contraseña del documento protegido");
+    if (!validWhatsApp(selectedWhatsApp)) return toast.error("Escribe un WhatsApp válido para la entrega");
+    if ((!validFullName(selected.clientName) || !validClientEmail(selected.contactValue)) && !confirm("Faltan datos del cliente (nombre completo o correo). ¿Guardar la entrega con los datos disponibles?")) return;
     setBusy(true);
     try {
+      if (phoneNumber(selectedWhatsApp) !== phoneNumber(selected.whatsapp || "")) {
+        replaceOrder(await cyberdocsUpdateWhatsApp({data:{code,orderId:selected.id,whatsapp:phoneNumber(selectedWhatsApp)}}));
+      }
       const result = await cyberdocsManualDelivery({ data: {
         code, orderId: selected.id, deliveryType: manualType, platform: manualPlatform.trim(),
         username: manualUsername, password: manualPassword, profilePin: manualPin, link: manualLink,

@@ -1,6 +1,6 @@
 import { businessToday, expiresAfterMonths } from "./duration";
 import type { DeliveryAttachment, ProtectedDeliveryPrivate } from "@/lib/deliveries/types";
-type Input={requestId:string;itemId:string;clientId?:string;clientName:string;clientWhatsapp:string;clientEmail?:string;stockExpiresOn:string|null;salePrice:number;accessPassword:string;expiresAt:string;maxViews:number|null;notes:string;attachment:DeliveryAttachment|null;images:string[]};
+type Input={requestId:string;itemId:string;clientId?:string;clientName:string;clientWhatsapp:string;clientEmail?:string;acceptIncomplete?:boolean;stockExpiresOn:string|null;salePrice:number;accessPassword:string;expiresAt:string;maxViews:number|null;notes:string;attachment:DeliveryAttachment|null;images:string[]};
 
 /** One transaction reserves stock, debits the wallet and saves the delivery and client history. */
 export async function deliverManualWithWallet(input:Input){
@@ -9,16 +9,19 @@ export async function deliverManualWithWallet(input:Input){
  if(cents<=0||cents>100000000||Math.abs(input.salePrice*100-cents)>1e-6)throw new Error("Indica un precio de venta válido, mayor a cero.");
  const {validFullName,validClientEmail}=await import("@/lib/workspace/model");
  const email=input.clientEmail?.trim().toLowerCase()||"";
- if(!validFullName(input.clientName)||!validClientEmail(email))throw new Error("Completa el nombre y correo electrónico del cliente.");
- const clientId=input.clientId||(await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(input.clientName,input.clientWhatsapp,email));
+ if(email&&!validClientEmail(email))throw new Error("Revisa el correo electrónico del cliente.");
+ if((!validFullName(input.clientName)||!email)&&!input.acceptIncomplete)throw new Error("Confirma que deseas guardar con los datos disponibles.");
+ const clientId=input.clientId||(await (await import("@/lib/customer/remember-client.server")).rememberOrderClient(input.clientName.trim()||input.clientWhatsapp,input.clientWhatsapp,email));
  if(!clientId)throw new Error("Selecciona un cliente o registra su nombre y WhatsApp válido.");
  let client=await ops.readRecord(clientId);
  if(client.module!=="clients"||client.status!=="active"||(client.data.shopId&&client.data.shopId!=="main"))throw new Error("Cliente no disponible");
  const {normalizedClientPhone}=await import("@/lib/customer/remember-client.server");
  if(!normalizedClientPhone(client.data.whatsapp||""))throw new Error("Actualiza el WhatsApp del cliente antes de entregar.");
  if(normalizedClientPhone(client.data.whatsapp)!==normalizedClientPhone(input.clientWhatsapp))throw new Error("El WhatsApp no coincide con el cliente seleccionado.");
- if(client.data.email!==email||client.title!==input.clientName.trim()){
-   client=await ops.changeRecord(client,{title:input.clientName.trim(),data:{...client.data,email}});
+ const name=validFullName(client.title)&&!validFullName(input.clientName)?client.title:input.clientName.trim()||client.title;
+ const savedEmail=email||client.data.email||"";
+ if((client.data.email||"")!==savedEmail||client.title!==name){
+   client=await ops.changeRecord(client,{title:name,data:{...client.data,email:savedEmail}});
  }
  const item=(await (await import("./stock.server")).listStock(null)).find(x=>x.id===input.itemId);
  if(!item)throw new Error("Registro no encontrado");

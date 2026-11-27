@@ -535,15 +535,16 @@ export function StockManagerDialog({
   async function send() {
     if (!deliver) return;
     if (!can("stock_assign")) return toast.error("No tienes permiso para entregar stock");
-    if (!deliverClient.trim()) return toast.error("Escribe a quién se entrega el producto");
     if (!validWhatsApp(deliverWhatsapp)) return toast.error("Escribe un número de WhatsApp válido con lada");
-    if(admin&&!deliverOrderRef&&(!validFullName(deliverClient)||!validClientEmail(deliverEmail)))return toast.error("Completa nombre y apellido, WhatsApp y correo.");
+    if(admin&&!deliverOrderRef&&deliverEmail.trim()&&!validClientEmail(deliverEmail))return toast.error("Revisa el correo electrónico.");
     if (protect && (accessPassword.length < 4 || accessPassword !== confirmPassword)) return toast.error("Revisa la contraseña de protección");
+    const incomplete = !validFullName(deliverClient) || (admin && !deliverEmail.trim());
+    if (incomplete && !confirm("Faltan datos del cliente (nombre completo o correo). ¿Confirmas que deseas guardar la asignación con los datos disponibles?")) return;
     if(admin&&!deliverOrderRef){const price=Number(deliverSalePrice);if(!Number.isFinite(price)||price<=0)return toast.error("Escribe el precio que se descontará del saldo.");if(!confirm(`¿Asignar esta cuenta y descontar $${price.toFixed(2)} del saldo del cliente?`))return;}
     setBusy(true);
     try {
       const payload = {
-        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim(), clientWhatsapp: phoneNumber(deliverWhatsapp), clientEmail:deliverEmail.trim(),
+        itemId: deliver.id, clientId: admin && clientChoice !== "manual" && !deliverOrderRef ? clientChoice : undefined, clientName: deliverClient.trim() || (admin ? "" : phoneNumber(deliverWhatsapp)), clientWhatsapp: phoneNumber(deliverWhatsapp), clientEmail:deliverEmail.trim(), acceptIncomplete: incomplete,
         stockExpiresOn: deliverStockExpires || null, salePrice: Number(deliverSalePrice) || 0,
         relatedOrderId: deliverOrderRef.trim(), accessPassword: protect ? accessPassword : "",
         expiresAt: iso(Math.max(1, days)), maxViews: Number(views) > 0 ? Number(views) : null, notes: deliver.notes, attachment: deliveryAttachment, images: deliveryImages,
@@ -555,7 +556,7 @@ export function StockManagerDialog({
       if (ficha) { toast.success("Ficha de entrega preparada"); }
       const reference="clientReference" in res?String(res.clientReference||""):"";
       const platformText = (message || whatsappTemplate)
-        .replaceAll("{cliente}", deliverClient || "cliente").replaceAll("{plataforma}", deliver.platform)
+        .replaceAll("{cliente}", res.client || deliverClient || "cliente").replaceAll("{plataforma}", deliver.platform)
         .replaceAll("{usuario}", deliver.username).replaceAll("{vigencia}", `${days} día(s)`).replaceAll("{link}", link)+transferReferenceMessage(reference);
       setDeliveryResult({ link, text: platformText, phone: deliverWhatsapp.replace(/\D/g, ""), item: deliver, password: protect ? accessPassword : "", ficha: ficha || "" });
       toast.success("Entrega registrada");
@@ -751,9 +752,19 @@ export function StockManagerDialog({
               <DialogHeader><DialogTitle>Entregar · {deliver.platform}</DialogTitle><DialogDescription>Los datos de cliente se capturan aquí, nunca al agregar stock.</DialogDescription></DialogHeader>
               <div className="grid gap-3 sm:grid-cols-2">
                 {admin ? <div className="sm:col-span-2"><Label>Buscar cliente registrado</Label><Input placeholder="Nombre, WhatsApp o referencia" value={clientSearch} disabled={Boolean(deliverOrderRef)} onChange={e=>setClientSearch(e.target.value)}/><Select value={clientChoice} disabled={Boolean(deliverOrderRef)} onValueChange={value => { setClientChoice(value); const client = registeredClients.find(c => c.id === value); if (client) { setDeliverClient(client.name); setDeliverWhatsapp(client.whatsapp); setDeliverEmail(client.email||""); } }}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="manual">Capturar cliente manualmente</SelectItem>{registeredClients.filter(c=>c.id===clientChoice||!clientSearch.trim()||`${c.name} ${c.whatsapp} ${c.clientReference||""}`.toLowerCase().includes(clientSearch.toLowerCase())).map(c => <SelectItem key={c.id} value={c.id}>{c.name} · {c.whatsapp}{c.clientReference?` · ${c.clientReference}`:""}</SelectItem>)}</SelectContent></Select>{clientLoadError ? <p className="text-xs text-muted-foreground">No se pudo cargar el registro. Puedes capturar los datos manualmente.</p> : null}</div> : null}
-                <div><Label>Nombre completo</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setDeliverClient(e.target.value); }} /></div>
-                {admin&&!deliverOrderRef&&<div className="sm:col-span-2"><Label>Correo electrónico (obligatorio)</Label><Input required type="email" autoComplete="email" value={deliverEmail} onChange={e=>setDeliverEmail(e.target.value)} placeholder="cliente@correo.com"/>{selectedClient?.clientReference&&<p className="text-xs text-muted-foreground">Referencia: {selectedClient.clientReference}</p>}</div>}
-                <div><Label>WhatsApp (obligatorio)</Label><ContactPhoneInput value={deliverWhatsapp} onChange={value=>{setClientChoice("manual");setDeliverWhatsapp(value);}} onName={name=>{if(!deliverOrderRef&&!deliverClient.trim())setDeliverClient(name);}}/></div>
+                <div><Label>Nombre (opcional)</Label><Input value={deliverClient} disabled={admin && Boolean(deliverOrderRef)} onChange={(e) => { setDeliverClient(e.target.value); }} /></div>
+                {admin&&!deliverOrderRef&&<div className="sm:col-span-2"><Label>Correo electrónico (opcional)</Label><Input type="email" autoComplete="email" value={deliverEmail} onChange={e=>setDeliverEmail(e.target.value)} placeholder="cliente@correo.com"/>{selectedClient?.clientReference&&<p className="text-xs text-muted-foreground">Referencia: {selectedClient.clientReference}</p>}</div>}
+                <div><Label>WhatsApp (obligatorio)</Label><ContactPhoneInput value={deliverWhatsapp} onChange={value=>{
+                  setDeliverWhatsapp(value);
+                  if (deliverOrderRef) return;
+                  const match = validWhatsApp(value) ? registeredClients.find(c => phoneNumber(c.whatsapp) === phoneNumber(value)) : undefined;
+                  if (match) {
+                    setClientChoice(match.id); setDeliverClient(match.name); setDeliverEmail(match.email || "");
+                  } else {
+                    if (clientChoice !== "manual") { setDeliverClient(""); setDeliverEmail(""); }
+                    setClientChoice("manual");
+                  }
+                }} onName={name=>{if(!deliverOrderRef&&!deliverClient.trim())setDeliverClient(name);}}/></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
                 <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">{deliverOrderRef?"Pedido vinculado: no se realiza un segundo cobro.":"Entrega manual: este importe se descontará del saldo del cliente. Si es nuevo, se registrará con su WhatsApp y deberá recargar antes de recibir la cuenta."}</p>}</div>
                 {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
@@ -761,6 +772,7 @@ export function StockManagerDialog({
                     const selected = cyberdocOrders.find((order) => order.id === value);
                     setClientChoice("manual");
                     setDeliverOrderRef(selected?.id || "");
+                    setDeliverEmail("");
                     setDeliverClient(selected?.clientName || "");
                     setDeliverWhatsapp(selected ? selected.whatsapp || (selected.contactLabel === "WhatsApp" ? selected.contactValue : "") : "");
                     setDeliverStockExpires(selected?.expiresOn || "");
