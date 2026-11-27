@@ -321,12 +321,16 @@ export function SellerHome({
   summary,
   clients,
   onNavigate,
+  onPlatform,
 }: {
   summary: Summary;
   clients: number;
   onNavigate: (section: Section) => void;
+  onPlatform: (platform: { key: string; platform: string }) => void;
 }) {
   const [salesOpen,setSalesOpen]=useState(false);
+  const lowStock = summary.platforms.filter((platform) => platform.available <= 2)
+    .sort((a, b) => a.available - b.available || a.platform.localeCompare(b.platform, "es"));
   const daily = summary.daily;
   const weekTotal = daily.reduce((s, d) => s + d.total, 0);
   const max = Math.max(100, ...daily.map((d) => d.total));
@@ -438,31 +442,27 @@ export function SellerHome({
           </svg>
         </div>
       </details>
-      <div className="seller-grid">
-        <section className="seller-card">
-          <h2 className="font-bold">Se está agotando</h2>
-          {summary.platforms.filter((p) => p.available <= 2).length ? (
-            <div className="mt-3 space-y-3">
-              {summary.platforms
-                .filter((p) => p.available <= 2)
-                .map((p) => (
-                  <button
-                    key={p.platform}
-                    onClick={() => onNavigate("inventory")}
-                    className="flex w-full items-center gap-2 text-left text-sm"
-                  >
-                    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(p.available)]}`} />
-                    <span>{p.platform}</span>
-                    <span className="sr-only">{p.available ? `Disponibles: ${p.available}` : "Agotado"}</span>
-                  </button>
-                ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-muted-foreground">
-              No hay plataformas con dos unidades o menos.
-            </p>
-          )}
-        </section>
+      <div className="seller-grid items-start">
+        <details className="seller-disclosure">
+          <summary className="text-sm font-semibold">
+            <span className="flex-1">Se está agotando</span>
+            <span className="seller-badge">{lowStock.length}</span>
+          </summary>
+          <div className="seller-disclosure-body">
+            {lowStock.length ? lowStock.map((platform) => (
+              <button key={platform.key} type="button" onClick={() => onPlatform(platform)}
+                className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted">
+                <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(platform.available)]}`} />
+                <span className="min-w-0 flex-1">{platform.platform}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {platform.available === 0 ? "Agotado" : platform.available === 1 ? "1 disponible" : "2 disponibles"}
+                </span>
+              </button>
+            )) : (
+              <p className="text-sm text-muted-foreground">No hay plataformas con dos unidades o menos.</p>
+            )}
+          </div>
+        </details>
         <section className="seller-card">
           <h2 className="font-bold">Pendientes del día</h2>
           <div className="mt-3 space-y-3">
@@ -508,6 +508,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
   const [addStock, setAddStock] = useState(false);
   const [financeStart, setFinanceStart] = useState<"summary" | "income" | "expense">("summary");
@@ -557,6 +558,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
     setSelectedOrderId(null);
     setAddStock(false);
     setAssignClient(null);
+    setStockPlatformFilter(null);
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   const assign = (id: string) => { const client = records.find(r => r.id === id && r.module === "clients" && r.status === "active"); if (!client) return toast.error("El cliente no está disponible. Actualiza clientes e inténtalo de nuevo."); navigate("inventory"); setAssignClient(client); };
@@ -597,10 +599,11 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
         summary={summary}
         clients={records.filter((r) => r.module === "clients").length}
         onNavigate={navigate}
+        onPlatform={(platform) => { navigate("inventory"); setStockPlatformFilter(platform); }}
       />
     )}</div>);
   else if (section === "shop") content = <ProductPricing/>;
-  else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || String(addStock)} embedded autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} /></div>;
+  else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} /></div>;
   else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
   else if (section === "finance") content = <FinancePanel initialView={financeStart} />;
   else if (section === "wallet")

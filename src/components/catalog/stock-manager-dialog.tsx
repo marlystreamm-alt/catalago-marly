@@ -3,7 +3,7 @@ import { ContactPhoneInput } from "@/components/workspace/contact-phone-input";
 import { phoneNumber, validWhatsApp, validFullName, validClientEmail, transferReferenceMessage } from "@/lib/workspace/model";
 import { pricingLoad } from "@/lib/customer/pricing.functions";
 import { pricingKey, type PriceRow } from "@/lib/customer/pricing";
-import { MASTER_PLANS, masterPlan, masterProduct } from "@/lib/stock/master-products";
+import { MASTER_PLANS, masterPlan, masterProduct, stockPlatform } from "@/lib/stock/master-products";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
@@ -132,6 +132,7 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 export function StockManagerDialog({
   embedded = false,
   initialTab = "all",
+  initialPlatform,
   autoAdd = false,
   initialClient,
   ownerToken,
@@ -140,6 +141,7 @@ export function StockManagerDialog({
 }: {
   embedded?: boolean;
   initialTab?: StockTab;
+  initialPlatform?: { key: string; platform: string } | null;
   autoAdd?: boolean;
   initialClient?: {id:string;name:string;whatsapp:string;email?:string;clientReference?:string};
   ownerToken?: string;
@@ -156,6 +158,7 @@ export function StockManagerDialog({
   const [items, setItems] = useState<StockItem[]>([]);
   const [stockTab, setStockTab] = useState<StockTab>(initialTab);
   const [q, setQ] = useState("");
+  const [platformFilter, setPlatformFilter] = useState(initialPlatform);
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
 
   const [formOpen, setFormOpen] = useState(autoAdd);
@@ -270,13 +273,14 @@ export function StockManagerDialog({
       base = base.filter((x) => x.status === "expired" || Boolean(x.expiresOn && (daysUntil(x.expiresOn) ?? 1) < 0));
     const needle = q.trim().toLowerCase();
     return base
-      .filter((x) => !needle || `${x.platform} ${x.username} ${x.clientName} ${x.clientWhatsapp} ${x.expiresOn || ""}`.toLowerCase().includes(needle))
+      .filter((x) => !platformFilter || stockPlatform(x.platform).key === platformFilter.key)
+      .filter((x) => !needle || `${x.platform} ${stockPlatform(x.platform).label} ${x.username} ${x.clientName} ${x.clientWhatsapp} ${x.expiresOn || ""}`.toLowerCase().includes(needle))
       .sort((a, b) => {
         const ad = a.expiresOn ? new Date(a.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         const bd = b.expiresOn ? new Date(b.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
-  }, [items, stockTab, q, admin, availableIds]);
+  }, [items, stockTab, q, admin, availableIds, platformFilter]);
 
   async function persist(item: StockItem, success = "Registro guardado") {
     const saved = ownerToken
@@ -592,6 +596,10 @@ export function StockManagerDialog({
             setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true);
           }}><Plus className="size-4" />Agregar stock</Button>}
         </div>
+        {platformFilter && <div className="flex flex-wrap items-center gap-2">
+          <span className="seller-badge">{platformFilter.platform}</span>
+          <Button size="sm" variant="ghost" onClick={() => setPlatformFilter(null)}>Quitar filtro</Button>
+        </div>}
         <details className="seller-disclosure">
           <summary className="text-sm font-medium">Opciones de inventario</summary>
           <div className="seller-disclosure-body flex flex-wrap gap-2">
@@ -638,7 +646,7 @@ export function StockManagerDialog({
                 const d = daysUntil(x.expiresOn);
                 const statusText = x.status !== "available" && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
                 const platform = <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{x.platform}</span>
+                  <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
                   {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
                 </span>;
                 const status = <span className="flex shrink-0 items-center gap-1.5 text-xs">

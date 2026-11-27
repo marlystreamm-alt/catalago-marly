@@ -1,3 +1,5 @@
+import { stockPlatform } from './master-products.ts';
+
 export type DashboardStock = {
   id: string; platform: string; status: string; parent_stock_id: string | null;
   expires_on: string | null; delivered_on: string | null; cost: number | null; sale_price: number | null;
@@ -11,8 +13,10 @@ export function stockDashboardSummary(rows: DashboardStock[], today: string) {
   // A complete account split into profiles is a container, not another sellable unit.
   const units = rows.filter(r => !parents.has(r.id));
   const expired = (r: DashboardStock) => r.status === 'expired' || Boolean(r.expires_on && r.expires_on < today);
-  const available = units.filter(r => r.status === 'available' && !expired(r));
-  const sold = units.filter(r => ['assigned', 'expiring'].includes(r.status) && !expired(r));
+  const isAvailable = (r: DashboardStock) => r.status === 'available' && !expired(r);
+  const isSold = (r: DashboardStock) => ['assigned', 'expiring'].includes(r.status) && !expired(r);
+  const available = units.filter(isAvailable);
+  const sold = units.filter(isSold);
   const expiring = units.filter(r => !expired(r) && r.expires_on && r.expires_on >= today && r.expires_on <= weekEnd);
   const sales = units.filter(r => r.delivered_on?.slice(0, 7) === month && r.delivered_on <= today && r.status !== 'available');
   const priced = sales.filter(r => Number(r.sale_price) > 0);
@@ -20,11 +24,16 @@ export function stockDashboardSummary(rows: DashboardStock[], today: string) {
   const withMargin = priced.filter(r => !r.parent_stock_id && Number(r.cost) > 0);
   const revenue = priced.reduce((sum, r) => sum + Number(r.sale_price), 0);
   const margin = withMargin.reduce((sum, r) => sum + Number(r.sale_price) - Number(r.cost), 0);
-  const platforms = [...new Set(units.map(r => r.platform.trim() || 'Sin plataforma'))].map(platform => ({
-    platform,
-    available: available.filter(r => (r.platform.trim() || 'Sin plataforma') === platform).length,
-    sold: sold.filter(r => (r.platform.trim() || 'Sin plataforma') === platform).length,
-  })).sort((a,b) => b.available - a.available || a.platform.localeCompare(b.platform, 'es'));
+  const byPlatform = new Map<string, { key: string; platform: string; available: number; sold: number }>();
+  for (const unit of units) {
+    const { key, label } = stockPlatform(unit.platform);
+    const group = byPlatform.get(key) ?? { key, platform: label, available: 0, sold: 0 };
+    if (isAvailable(unit)) group.available++;
+    if (isSold(unit)) group.sold++;
+    byPlatform.set(key, group);
+  }
+  const platforms = [...byPlatform.values()].sort((a, b) =>
+    b.available - a.available || a.platform.localeCompare(b.platform, 'es'));
   const daily = Array.from({length:7},(_,index)=>{const d=new Date(`${today}T12:00:00Z`);d.setUTCDate(d.getUTCDate()-6+index);const date=d.toISOString().slice(0,10);const sold=units.filter(r=>r.delivered_on===date&&r.status!=='available');return {date,count:sold.length,total:Math.round(sold.reduce((sum,r)=>sum+Number(r.sale_price||0),0)*100)/100};});
   return { daily, today, weekEnd, month, available: available.length, sold: sold.length, expiring: expiring.length,
     expired: units.filter(expired).length,
