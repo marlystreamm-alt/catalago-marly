@@ -7,41 +7,8 @@ import { pricingLoad,pricingSave } from "@/lib/customer/pricing.functions";
 import { pricingKey,type PriceRow } from "@/lib/customer/pricing";
 import { ImageLibraryPicker } from "@/components/catalog/image-library-picker";
 
-const cyberdocRates = [
-  ["Crunchyroll perfil", 30],
-  ["Crunchyroll completa", 60],
-  ["Disney+ completa", 130],
-  ["Disney+ estándar completa", 85],
-  ["Fox One perfil", 35],
-  ["Fox One completa", 50],
-  ["HBO Max perfil", 40],
-  ["HBO Max completa", 65],
-  ["Netflix privada", 85],
-  ["Paramount+ perfil", 35],
-  ["Paramount+ completa", 65],
-  ["Prime Video perfil", 35],
-  ["Prime Video completa", 60],
-  ["ViX completa mensual", 40],
-  ["ViX completa anual", 100],
-  ["Netflix privado, Disney+ Premium, Paramount+ y HBO Max", 160],
-  ["Prime Video, Paramount+ y HBO Max", 107],
-  ["HBO Max, Paramount+ y ViX", 98],
-  ["Netflix privado, Disney+ Premium, Prime Video, Paramount+ y HBO Max", 180],
-  ["Kocowa, Disney+ y HBO Max", 110],
-  ["Disney+ Premium, HBO Max, Paramount+ y ViX", 150],
-  ["Kocowa, Crunchyroll, Prime Video y HBO Max", 115],
-  ["Canva 1 mes, Disney+ Premium, Paramount+ y HBO Max", 170],
-  ["Disney + ViX anual", 170],
-  ["Bot para grupos de WhatsApp · 1 mes", 90],
-  ["Canva · 1 mes", 45],
-  ["Canva · 12 meses", 230],
-  ["Duolingo · 12 meses", 100],
-  ["Gemini · 6 meses", 100],
-  ["Drive con más de 250 libros", 80],
-  ["Drive con más de 270 películas", 80],
-  ["Certificado INEA (trabajo, verificable)", 149],
-  ["Tienda web personalizada anual para streaming, reportes y gestión", 1300],
-] as const;
+import { cyberdocRates } from "@/lib/cyberdocs/rates";
+
 const cyberdocCurrency = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
 
 function CyberdocRates() {
