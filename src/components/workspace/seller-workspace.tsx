@@ -40,6 +40,7 @@ import { mainStoreLink } from "@/lib/catalog/links";
 import { ProductPricing } from "@/components/customer/product-pricing";
 import { FinancePanel } from "./finance-panel";
 import { QuickFinance } from "./quick-finance";
+import { StockPlatformMark } from "./stock-platform-mark";
 import { ReportSettingsPanel } from "./report-settings-panel";
 import { getSavedCode } from "@/lib/notify/client";
 import { copyText } from "@/lib/browser/clipboard";
@@ -189,7 +190,7 @@ export function SellerLayout({
   );
   return (
     <div
-      className="seller-app ma2-unified"
+      className="seller-app ma2-unified ma2-admin-panel"
       style={appearanceStyle(appearance)}
       data-season={appearance?.season || "normal"}
     >
@@ -440,6 +441,7 @@ export function SellerHome({
               <button key={platform.key} type="button" onClick={() => onPlatform(platform)}
                 className="flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm hover:bg-muted">
                 <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${INVENTORY_DOT_CLASSES[inventoryTone(platform.available)]}`} />
+                <StockPlatformMark name={platform.platform} />
                 <span className="min-w-0 flex-1">{platform.platform}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {platform.available === 0 ? "Agotado" : platform.available === 1 ? "1 disponible" : "2 disponibles"}

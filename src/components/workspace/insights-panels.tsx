@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Download, RefreshCw } from "lucide-react";
+import { stockPlatform } from "@/lib/stock/master-products";
+import { StockPlatformMark } from "./stock-platform-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { stockAdminList, stockAdminRenewal, stockAdminReactivate } from "@/lib/stock/stock.functions";
@@ -42,7 +45,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
       (r) =>
         (sales ? (!parents.has(r.id) && r.accountType!=="split_parent" && r.status!=="available") :
           (Boolean(r.clientName || r.deliveredOn) || r.status==="expired" || Boolean(r.expiresOn && r.expiresOn<=today))) &&
-        `${r.platform} ${r.clientName} ${r.clientWhatsapp}`
+        `${r.platform} ${stockPlatform(r.platform).label} ${r.clientName} ${r.clientWhatsapp}`
           .toLowerCase()
           .includes(query.toLowerCase()),
     );
@@ -58,16 +61,17 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   };
   return (
     <div className="space-y-4">
-      <div className="seller-actions">
-        <Button variant="outline" disabled={busy} onClick={() => void load()}>
-          Actualizar
-        </Button>
+      <div className="flex items-center gap-1">
+        <Input className="min-w-0 flex-1" aria-label="Buscar ventas o vencimientos" value={query}
+          onChange={(event) => setQuery(event.target.value)} placeholder="Buscar plataforma o cliente" />
+        <Button variant="ghost" size="icon" aria-label="Actualizar vigencias" title="Actualizar"
+          disabled={busy} onClick={() => void load()}><RefreshCw /></Button>
         <Button
-          variant="outline"
+          variant="ghost" size="icon" aria-label="Exportar CSV" title="Exportar CSV"
           onClick={() =>
             exportRows(
               rows.map((r) => ({
-                Plataforma: r.platform,
+                Plataforma: stockPlatform(r.platform).label,
                 Cliente: r.clientName,
                 Entrega: r.deliveredOn,
                 Vence: r.expiresOn,
@@ -79,16 +83,10 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
             )
           }
         >
-          Exportar CSV
+          <Download />
         </Button>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
-      <Input
-        aria-label="Buscar ventas o vencimientos"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar plataforma, cliente o WhatsApp…"
-      />
       {!sales ? (
         <div className="seller-tabs">
           {[
@@ -129,19 +127,23 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
           description="Cambia el filtro para consultar otros registros."
         />
       ) : (
-        <div className="seller-record-grid">
+        <div className="seller-record-grid items-start">
           {rows.map((r) => {
-            const delta=daysRemaining(r.expiresOn,today), color=tone(r);
-            return <article className="seller-card" key={r.id}>
-              <div className="flex justify-between gap-2">
-                <h3 className="font-bold">{r.platform}</h3>
-                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{color==="expired"?"Vencido":delta===null?"Sin fecha":delta===0?"Vence hoy":`${delta} día${delta===1?"":"s"}`}</span>
-              </div>
-              <p className="text-sm">{r.clientName || "Sin cliente · revisar acceso en inventario"} · {r.stockKind==="profile"?"Perfil":"Completa"}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {sales
-                  ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}`
-                  : `Vencimiento: ${r.expiresOn || "Sin asignar"}`}
+            const delta = daysRemaining(r.expiresOn, today);
+            const color = tone(r);
+            const { label } = stockPlatform(r.platform);
+            return <details className="seller-disclosure" key={r.id}>
+              <summary>
+                <StockPlatformMark name={label} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{label}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{r.clientName || "Sin cliente"} · {r.stockKind === "profile" ? "Perfil" : "Completa"}</span>
+                </span>
+                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
+              </summary>
+              <div className="seller-disclosure-body">
+              <p className="text-xs text-muted-foreground">
+                {sales ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}` : `Vencimiento: ${r.expiresOn || "Sin asignar"}`}
               </p>
               {!sales&&r.renewalNotifiedAt&&<p className="mt-1 text-xs text-muted-foreground">✓ Avisado el {r.renewalNotifiedAt.slice(0,10)}</p>}
               <div className="seller-actions mt-3">
@@ -170,7 +172,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 {!sales&&!r.clientName&&!r.deliveredOn&&!r.relatedOrderId&&!r.protectedDeliveryId&&!parents.has(r.id)&&r.accountType!=="split_parent"&&["available","expired"].includes(r.status)&&(r.status==="expired"||Boolean(r.expiresOn&&r.expiresOn<=today))&&<Button size="sm" disabled={busy} onClick={()=>{setReactivating(true);setRenewing(r);setNewDate(expiresAfterMonths(today,r.durationMonths||1));}}>Verifiqué acceso · Reactivar</Button>}
               </div>
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
-            </article>;
+              </div>
+            </details>;
           })}
         </div>
       )}

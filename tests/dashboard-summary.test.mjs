@@ -36,3 +36,20 @@ test('platform counts merge case and aliases without mixing separate plans', () 
   assert.equal(summary.platforms.find(group => group.platform === 'Prime Video S/A')?.available, 1);
   assert.equal(summary.platforms.filter(group => group.key === 'custom:mubi').length, 1);
 });
+
+test('historical inventory labels normalize across brands and preserve distinct offers', () => {
+  const source = [
+    'Disney', 'Disney ++', 'Disney anual completa', 'Disney + Vix anual',
+    'Hbo', 'HBO max', 'HBO 3 meses', 'HBO Max 3 meses',
+    'Net privada', 'Netflix privado', 'Netflix extra',
+    'Paramoun tiii', 'Paramount+', 'Prime vídeo', 'Prime video 6m', 'VIX anual', 'ViX anual',
+  ];
+  const { platforms } = stockDashboardSummary(source.map((platform, index) => row(String(index), { platform })), '2026-11-27');
+  const totals = Object.fromEntries(platforms.map((platform) => [platform.platform, platform.available]));
+  assert.deepEqual(totals, {
+    'Disney+': 2, 'Disney+ Anual': 1, 'Disney+ + ViX Anual': 1,
+    'HBO Max': 2, 'HBO Max · 3 meses': 2,
+    'Netflix Privado': 2, 'Netflix Extra': 1, 'Paramount+': 2,
+    'Prime Video': 1, 'Prime Video · 6 meses': 1, 'ViX Anual': 2,
+  });
+});
