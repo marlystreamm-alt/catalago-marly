@@ -156,6 +156,7 @@ export function AppearanceEditor({
             <SelectItem value="halloween">Halloween / otoño</SelectItem>
             <SelectItem value="navidad">Navidad</SelectItem>
             <SelectItem value="primavera">Primavera</SelectItem>
+            <SelectItem value="verano">Verano</SelectItem>
           </SelectContent>
         </Select>
       </div>

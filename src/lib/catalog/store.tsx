@@ -210,14 +210,18 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       ? adminSessionValidate({ data: { token: remembered } })
         .then((session) => {
           if (cancelled) return;
+          if (!session.valid) {
+            rememberAdminSession("");
+            clearCode();
+            return;
+          }
           setAdminToken(remembered);
           setIsAdmin(true);
           setMustChangePassword(session.mustChangePassword);
         })
         .catch(() => {
           if (cancelled) return;
-          rememberAdminSession("");
-          clearCode();
+          toast.error("No se pudo comprobar tu sesión. Recarga cuando vuelva la conexión.");
         })
       : Promise.resolve();
     void (async () => {

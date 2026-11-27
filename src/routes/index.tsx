@@ -610,7 +610,7 @@ function CatalogPage() {
                 aria-current={homeView ? "page" : undefined}
                 className={`rounded-xl px-2 py-2 text-xs font-semibold transition-colors ${homeView ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
-                Inicio
+                <span className="inline-flex items-center gap-1"><ArrowLeft className="size-3" /> Panel</span>
               </button>
               {visibleCatalogIds.map((id) => (
                 <button

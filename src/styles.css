@@ -260,9 +260,10 @@ body {
 .ma2-business-logo { width:75%; height:75%; max-height:200px; object-fit:contain; filter:drop-shadow(0 2px 5px #0002); }
 .ma2-themed-card { position:relative; isolation:isolate; background-color:color-mix(in oklch,var(--card) var(--ma2-card-opacity,95%),transparent)!important; }
 .ma2-themed-card::before { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; border-radius:inherit; background-image:var(--ma2-card-image,none),var(--ma2-season-gradient,none); background-size:cover; background-position:center; opacity:var(--ma2-decoration-opacity,.18); }
-[data-season="halloween"] { --ma2-season-gradient:linear-gradient(135deg,#fdba74,#a855f7 65%,#431407); }
-[data-season="navidad"] { --ma2-season-gradient:linear-gradient(135deg,#ef4444,#fef3c7 55%,#16a34a); }
-[data-season="primavera"] { --ma2-season-gradient:linear-gradient(135deg,#f9a8d4,#a7f3d0 55%,#fde68a); }
+[data-season="halloween"] { --ma2-season-gradient:linear-gradient(135deg,#ffedd5,#f3e8ff 65%,#fed7aa); }
+[data-season="navidad"] { --ma2-season-gradient:linear-gradient(135deg,#ffe4e6,#fff7df 55%,#bbf7d0); }
+[data-season="primavera"] { --ma2-season-gradient:linear-gradient(135deg,#fce7f3,#ccfbf1 55%,#fef3c7); }
+[data-season="verano"] { --ma2-season-gradient:linear-gradient(135deg,#cffafe,#fef3c7 55%,#fed7aa); }
 [data-season="normal"] { --ma2-season-gradient:none; }
 
 /* Seller workspace, based on the user's video reference. */
@@ -421,3 +422,19 @@ body.ma2-appearance-active [role="dialog"],body.ma2-appearance-active [role="lis
 @media(max-width:760px){.ma2-login-layout{gap:18px;padding:20px 14px 40px}.ma2-login-layout .ma2-login-card{order:-1}.ma2-login-layout .ma2-login-promo>h2,.ma2-login-layout .ma2-login-promo>p{display:none}.ma2-login-card{padding:20px}.buyer-shell{display:block}}
 @media(min-width:761px){.buyer-nav:has(.ma2-client-menu){display:block}}
 @media(max-width:767px){.buyer-shell{display:block}.ma2-client-metrics article:first-child{grid-column:span 2;display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 12px}.ma2-client-metrics article:first-child button{grid-column:2;grid-row:2/4;padding:9px 12px;border-radius:10px;background:var(--primary);color:var(--primary-foreground);font-weight:700}.ma2-client-metrics article:first-child strong{grid-column:1}.ma2-client-metrics article:last-child{grid-column:auto}}
+
+/* A light seasonal accent on the storefront and panels. */
+[data-season]:not([data-season="normal"]) .ma2-brand-promo {
+  background-image: var(--ma2-season-gradient);
+  color: oklch(.26 .045 285);
+}
+[data-season]:not([data-season="normal"]) .ma2-brand-promo .text-muted-foreground {
+  color: oklch(.40 .04 285);
+}
+.dark [data-season]:not([data-season="normal"]) .ma2-brand-promo {
+  background-image: linear-gradient(var(--card),var(--card));
+  color: var(--foreground);
+}
+.dark [data-season]:not([data-season="normal"]) .ma2-brand-promo .text-muted-foreground {
+  color: var(--muted-foreground);
+}
