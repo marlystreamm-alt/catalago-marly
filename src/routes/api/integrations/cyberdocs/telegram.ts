@@ -75,7 +75,8 @@ export const Route = createFileRoute("/api/integrations/cyberdocs/telegram")({
         const server = await import("@/lib/cyberdocs/cyberdocs.server");
         const matchedBot = matchAllowedTelegramBot(usernames, await server.getAllowedTelegramBots());
         if (!matchedBot) {
-          // Defensa adicional: no se conserva contenido de otros chats.
+          // No guardar contenido ni identificadores de chats ajenos; registrar solo el motivo.
+          console.warn("CyberDocs webhook: remitente no permitido", { updateId: stringOf(update["update_id"]), business: extracted.business });
           return Response.json({ ok: true, ignored: true, reason: "Remitente no permitido" });
         }
         const rawMessage = stringOf(message["text"]) || stringOf(message["caption"]);
