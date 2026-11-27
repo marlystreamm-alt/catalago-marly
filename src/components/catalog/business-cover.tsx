@@ -1,4 +1,5 @@
 import { normalizeAppearance, type Appearance } from "@/lib/appearance/theme";
+
 export function BusinessCover({
   appearance,
   name,
@@ -6,23 +7,14 @@ export function BusinessCover({
   appearance?: Partial<Appearance>;
   name: string;
 }) {
-  const a = normalizeAppearance(appearance);
-  if (!a.coverImage && !a.logoImage) return null;
+  const { coverImage, logoImage } = normalizeAppearance(appearance);
+  if (coverImage) {
+    return <img src={coverImage} alt={`Portada de ${name}`} className="ma2-business-banner" />;
+  }
+  if (!logoImage) return null;
   return (
-    <div
-      className="ma2-business-cover"
-      style={
-        a.coverImage ? { backgroundImage: `url("${a.coverImage}")` } : undefined
-      }
-      aria-label={`Portada de ${name}`}
-    >
-      {a.logoImage ? (
-        <img
-          src={a.logoImage}
-          alt={`Logo de ${name}`}
-          className="ma2-business-logo"
-        />
-      ) : null}
+    <div className="ma2-business-cover">
+      <img src={logoImage} alt={`Logo de ${name}`} className="ma2-business-logo" />
     </div>
   );
 }
