@@ -19,3 +19,20 @@ test('renewals distinguish today from the next seven days and exclude unsold uni
  const s=stockDashboardSummary([row('a',{status:'assigned',expires_on:'2026-10-19'}),row('b',{status:'expiring',expires_on:'2026-10-26'}),row('c',{expires_on:'2026-10-19'}),row('d',{status:'assigned',expires_on:'2026-10-18'})],'2026-10-19');
  assert.equal(s.renewToday,1);assert.equal(s.renewUpcoming,1);
 });
+
+test('platform counts merge case and aliases without mixing separate plans', () => {
+  const summary = stockDashboardSummary([
+    row('a', { platform: 'prime video' }),
+    row('b', { platform: '  Prime   Video  ' }),
+    row('c', { platform: 'PRIME VIDEO' }),
+    row('d', { platform: 'Amazon Prime Video', status: 'assigned' }),
+    row('e', { platform: 'Prime Video Sin Anuncios' }),
+    row('f', { platform: 'MUBI' }),
+    row('g', { platform: 'mubi', status: 'expired' }),
+  ], '2026-10-19');
+
+  assert.deepEqual(summary.platforms.find(group => group.platform === 'Prime Video'),
+    { key: 'pri-base', platform: 'Prime Video', available: 3, sold: 1 });
+  assert.equal(summary.platforms.find(group => group.platform === 'Prime Video S/A')?.available, 1);
+  assert.equal(summary.platforms.filter(group => group.key === 'custom:mubi').length, 1);
+});

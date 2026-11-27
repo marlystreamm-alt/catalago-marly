@@ -28,3 +28,11 @@ export function recognizeOrderProduct(name:string) {
   return null;
 }
 export function isPlanFamily(name:string){return /^(disney|hbo|max|netflix|paramount|prime|amazon prime|vix|crunchyroll|fox one)\b/i.test(normalized(name));}
+
+export function stockPlatform(name: string) {
+  const label = name.trim().replace(/\s+/g, " ") || "Sin plataforma";
+  const plan = masterPlan(label);
+  return plan
+    ? { key: plan.code.toLowerCase(), label: plan.name }
+    : { key: `custom:${label.toLocaleLowerCase("es-MX")}`, label };
+}
