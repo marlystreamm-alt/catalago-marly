@@ -1,11 +1,10 @@
 import { StoreNotices } from "@/components/workspace/store-notices";
-import { SellerWorkspace } from "@/components/workspace/seller-workspace";
 import { CustomerStore } from "@/components/customer/customer-store";
 import { AccessLoading } from "@/components/customer/access-loading";
 import { BusinessCover } from "@/components/catalog/business-cover";
 import { appearanceStyle, normalizeAppearance } from "@/lib/appearance/theme";
 import { copyText } from "@/lib/browser/clipboard";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -59,10 +58,14 @@ import { CartDialog } from "@/components/catalog/cart-dialog";
 import { DirectoryMenuRequestsDialog } from "@/components/catalog/directory-menu-requests-dialog";
 import { DirectoryListingRequestDialog } from "@/components/catalog/directory-listing-request-dialog";
 
-import { AdminDashboard } from "@/components/catalog/admin-dashboard";
 import { SessionAccess } from "@/components/catalog/session-access";
 
 import { CATALOG_IDS, type CatalogId, type Service, type SortMode } from "@/lib/catalog/types";
+
+const SellerWorkspace = lazy(async () => {
+  const { SellerWorkspace } = await import("@/components/workspace/seller-workspace");
+  return { default: SellerWorkspace };
+});
 
 /** Enlaces públicos con filtros: /?cat=clientes&q=netflix&categoria=streaming&activos=1&fav=1&orden=precio */
 const searchSchema = z.object({
@@ -503,7 +506,9 @@ function CatalogPage() {
   if (!hydrated) return <AccessLoading/>;
   if (hydrated && !isAdmin && search.panel && search.admin_recovery!=="1") return <CustomerStore slug="ma2" initialView="inicio"/>;
   if (hydrated && !isAdmin && !search.panel) return <CustomerStore slug="ma2" initialView="inicio"/>;
-  if (isAdmin && homeView) return <SellerWorkspace />;
+  if (isAdmin && homeView) {
+    return <Suspense fallback={<AccessLoading />}><SellerWorkspace /></Suspense>;
+  }
 
   return (
     <main
@@ -637,7 +642,6 @@ function CatalogPage() {
 
 
         {!isAdmin ? <StoreNotices /> : null}
-        {isAdmin && homeView ? <AdminDashboard /> : null}
 
         <div hidden={isAdmin && homeView}>
           {!online ? (
