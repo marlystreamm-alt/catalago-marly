@@ -738,7 +738,7 @@ export function SellerWorkspace({ onCatalog }: { onCatalog: (id?: string) => voi
     );
   else if (section === "deliveries") content = <ProtectedDeliveriesDialog embedded />;
   else if (section === "catalogs") content = <MenusDialog embedded />;
-  else if (section === "helpers") content = <HelpersPanel />;
+  else if (section === "helpers") content = <HelpersPanel records={records} />;
   else if (section === "assistant") content = <BusinessAssistant records={records} />;
   else if (section === "games" || section === "memory")
     content = <GamesPanel key={section} memory={section === "memory"} />;

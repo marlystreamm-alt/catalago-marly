@@ -177,7 +177,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     </div>
   );
 }
-export function HelpersPanel() {
+export function HelpersPanel({ records }: { records: OpsRecord[] }) {
   const [businesses, setBusinesses] = useState<MenuBusiness[]>([]);
   const [selected, setSelected] = useState("");
   const [error, setError] = useState("");
@@ -197,12 +197,16 @@ export function HelpersPanel() {
     void load();
   }, []);
   const business = businesses.find((b) => b.id === selected);
+  const clients = records
+    .filter((record) => record.module === "clients" && record.status === "active")
+    .map(({ id, title, clientReference }) => ({ id, title, reference: clientReference }))
+    .sort((a, b) => a.title.localeCompare(b.title, "es-MX"));
   return (
     <div className="space-y-4">
       <div className="seller-card space-y-3">
         <h3 className="font-bold">Equipo de cada catálogo</h3>
         <p className="text-sm text-muted-foreground">
-          Selecciona el negocio para administrar sus ayudantes y accesos existentes.
+          Selecciona el negocio donde trabajará el ayudante. Puedes crearle un usuario o elegir a un cliente existente.
         </p>
         <select
           aria-label="Seleccionar negocio del equipo"
@@ -230,6 +234,7 @@ export function HelpersPanel() {
           code={getSavedCode()}
           business={business}
           section="administradores"
+          clients={clients}
           onBusinessChange={(next) =>
             setBusinesses((all) => all.map((b) => (b.id === next.id ? next : b)))
           }

@@ -608,36 +608,42 @@ export type Database = {
           access_salt: string;
           access_temp: boolean;
           business_id: string;
+          client_id: string | null;
           created_at: string;
           id: string;
           last_login_at: string | null;
           name: string;
           suspended: boolean;
           updated_at: string;
+          username: string | null;
         };
         Insert: {
           access_hash?: string;
           access_salt?: string;
           access_temp?: boolean;
           business_id: string;
+          client_id?: string | null;
           created_at?: string;
           id?: string;
           last_login_at?: string | null;
           name?: string;
           suspended?: boolean;
           updated_at?: string;
+          username?: string | null;
         };
         Update: {
           access_hash?: string;
           access_salt?: string;
           access_temp?: boolean;
           business_id?: string;
+          client_id?: string | null;
           created_at?: string;
           id?: string;
           last_login_at?: string | null;
           name?: string;
           suspended?: boolean;
           updated_at?: string;
+          username?: string | null;
         };
         Relationships: [
           {

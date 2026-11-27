@@ -88,18 +88,24 @@ export function BusinessTools({
   business,
   onBusinessChange,
   section = "todo",
+  clients,
 }: {
   code: string;
   business: MenuBusiness;
   onBusinessChange: (b: MenuBusiness) => void;
   section?: BusinessToolsSection;
+  clients?: Array<{ id: string; title: string; reference?: string }>;
 }) {
   const [audit, setAudit] = useState<MenuAuditEntry[]>([]);
   const [admins, setAdmins] = useState<MenuAdmin[]>([]);
   const [backups, setBackups] = useState<MenuBackupVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [newAdmin, setNewAdmin] = useState("");
-  const [shown, setShown] = useState<{ name: string; password: string } | null>(null);
+  const [source, setSource] = useState<"new" | "client">("new");
+  const [clientId, setClientId] = useState("");
+  const [username, setUsername] = useState("");
+  const [addingAdmin, setAddingAdmin] = useState(false);
+  const [shown, setShown] = useState<{ name: string; username: string; password: string } | null>(null);
   const [fActor, setFActor] = useState("todos");
   const [fKind, setFKind] = useState("todos");
   const [fFrom, setFFrom] = useState("");
@@ -111,6 +117,7 @@ export function BusinessTools({
 
   const fileRef = useRef<HTMLInputElement>(null);
   const businessId = business.id;
+  const availableClients = clients?.filter((client) => !admins.some((admin) => admin.clientId === client.id)) ?? [];
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -232,20 +239,27 @@ export function BusinessTools({
   };
 
   const addAdmin = async () => {
-    if (newAdmin.trim().length < 2) {
-      toast.error("Escribe el nombre del administrador");
-      return;
-    }
+    if (addingAdmin) return;
+    setAddingAdmin(true);
     try {
-      const { password } = await menusAddAdmin({
-        data: { code, businessId, name: newAdmin.trim() },
+      const access = await menusAddAdmin({
+        data: {
+          code,
+          businessId,
+          username,
+          ...(source === "client" ? { clientId } : { name: newAdmin }),
+        },
       });
-      setShown({ name: newAdmin.trim(), password });
+      setShown(access);
       setNewAdmin("");
+      setUsername("");
+      setClientId("");
       await refresh();
-      toast.success("Administrador agregado");
+      toast.success("Acceso de ayudante creado");
     } catch (e) {
       toast.error(errText(e));
+    } finally {
+      setAddingAdmin(false);
     }
   };
 
@@ -256,7 +270,11 @@ export function BusinessTools({
     if (change.remove && !window.confirm(`¿Quitar a ${a.name}?`)) return;
     try {
       const res = await menusSetAdmin({ data: { code, id: a.id, ...change } });
-      if (res.password) setShown({ name: a.name, password: res.password });
+      if (res.password) setShown({
+        name: a.name,
+        username: a.username ? `${business.slug}/${a.username}` : business.accessUsername || business.slug,
+        password: res.password,
+      });
       await refresh();
     } catch (e) {
       toast.error(errText(e));
@@ -269,7 +287,7 @@ export function BusinessTools({
       <section className="card-soft space-y-3 rounded-2xl border border-border bg-card p-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <Users className="size-4 text-primary" />
-          Varios administradores
+          Ayudantes del negocio
         </h3>
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={business.multiAdmin} onCheckedChange={(v) => void toggleMulti(v)} />
@@ -278,40 +296,87 @@ export function BusinessTools({
           </span>
         </label>
         <p className="text-xs text-muted-foreground">
-          Todos entran en /acceso con el mismo enlace y tienen exactamente los permisos que
-          autorizaste arriba.
+          Los ayudantes entran por <a href="/acceso" className="font-semibold underline">Acceso al negocio</a>
+          {" "}y usan las funciones habilitadas para este negocio.
         </p>
 
         {business.multiAdmin ? (
           <>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                value={newAdmin}
-                placeholder="Nombre (ej. Laura, mostrador)"
-                onChange={(e) => setNewAdmin(e.target.value)}
-                className="min-w-0 flex-1"
-                aria-label="Nombre del administrador"
-              />
-              <Button size="sm" className="rounded-xl" onClick={() => void addAdmin()}>
+            <form className="space-y-3" onSubmit={(event) => {
+              event.preventDefault();
+              void addAdmin();
+            }}>
+              {clients && (
+                <fieldset className="flex flex-wrap gap-3 text-sm">
+                  <legend className="mb-1 font-medium">¿A quién quieres dar acceso?</legend>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name={`helper-source-${businessId}`} checked={source === "new"} onChange={() => setSource("new")} />
+                    Crear usuario
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name={`helper-source-${businessId}`} checked={source === "client"} onChange={() => setSource("client")} disabled={!availableClients.length} />
+                    Elegir de mis clientes
+                  </label>
+                  {!availableClients.length && <p className="w-full text-xs text-muted-foreground">No hay clientes activos disponibles para vincular a este negocio.</p>}
+                </fieldset>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {source === "client" ? (
+                  <label className="grid gap-1 text-sm font-medium">
+                    Cliente
+                    <select className="buyer-select" required value={clientId} onChange={(event) => setClientId(event.target.value)}>
+                      <option value="">Selecciona un cliente</option>
+                      {availableClients.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.title}{client.reference ? ` · ${client.reference}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label className="grid gap-1 text-sm font-medium">
+                    Nombre del ayudante
+                    <Input required minLength={2} maxLength={160} value={newAdmin} onChange={(event) => setNewAdmin(event.target.value)} />
+                  </label>
+                )}
+                <label className="grid gap-1 text-sm font-medium">
+                  Usuario del ayudante
+                  <Input required minLength={3} maxLength={30} value={username}
+                    onChange={(event) => setUsername(event.target.value.toLowerCase())}
+                    autoCapitalize="none" autoCorrect="off" placeholder="ej. laura"
+                    pattern="[a-z0-9][a-z0-9._\-]{2,29}" />
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Entrará como <strong>{business.slug}/{username || "usuario"}</strong> con una contraseña temporal propia.
+              </p>
+              <Button type="submit" size="sm" className="rounded-xl" disabled={addingAdmin || loading}>
                 <Plus className="mr-1 size-4" />
-                Agregar
+                {addingAdmin ? "Creando acceso…" : "Crear acceso"}
               </Button>
-            </div>
+            </form>
             {shown ? (
               <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary p-2">
-                <span className="text-xs">{shown.name}:</span>
-                <code className="min-w-0 break-all text-sm font-semibold">{shown.password}</code>
+                <div className="min-w-0 text-sm">
+                  <p className="font-semibold">{shown.name}</p>
+                  <p className="break-all">Usuario <code>{shown.username}</code></p>
+                  <p className="break-all">Contraseña temporal <code>{shown.password}</code></p>
+                </div>
                 <Button
                   size="sm"
                   variant="outline"
                   className="rounded-xl"
-                  onClick={() => {
-                    void copyText(shown.password);
-                    toast.success("Contraseña copiada");
+                  onClick={async () => {
+                    try {
+                      await copyText(`Acceso: ${window.location.origin}/acceso\nUsuario: ${shown.username}\nContraseña temporal: ${shown.password}`);
+                      toast.success("Acceso copiado");
+                    } catch {
+                      toast.error("No se pudo copiar el acceso");
+                    }
                   }}
                 >
                   <Copy className="mr-1 size-3.5" />
-                  Copiar
+                  Copiar acceso
                 </Button>
               </div>
             ) : null}
@@ -337,6 +402,8 @@ export function BusinessTools({
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
+                      {a.username ? `${business.slug}/${a.username} · ` : ""}
+                      {a.clientId ? "Cliente vinculado · " : ""}
                       {a.temp ? "Contraseña temporal sin cambiar" : "Contraseña propia"}
                       {a.lastLoginAt ? ` · último acceso ${when(a.lastLoginAt)}` : " · sin entrar"}
                     </p>

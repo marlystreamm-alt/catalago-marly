@@ -128,6 +128,8 @@ export type MenuAdmin = {
   id: string;
   businessId: string;
   name: string;
+  username: string | null;
+  clientId: string | null;
   suspended: boolean;
   temp: boolean;
   lastLoginAt: string | null;

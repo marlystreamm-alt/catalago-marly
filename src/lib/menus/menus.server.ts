@@ -350,6 +350,7 @@ export async function requireOwnerCtx(token: string): Promise<{
       .from("menu_admins")
       .select("suspended")
       .eq("id", adminId)
+      .eq("business_id", business.id)
       .maybeSingle();
     if (!row || bool((row as Row)["suspended"], false))
       throw new Error("Tu acceso está suspendido");
@@ -369,15 +370,21 @@ export function requireFeature(business: MenuBusiness, key: FeatureKey) {
 export async function ownerLogin(username: string, password: string) {
   const db = await admin();
   const clean = username.trim().toLowerCase();
-  let { data } = await db
-    .from("menu_businesses")
-    .select("*")
-    .eq("access_username", clean)
-    .maybeSingle();
-  // Compatibilidad con clientes antiguos: también acepta el slug mientras se les asigna usuario.
-  if (!data) {
-    const legacy = await db.from("menu_businesses").select("*").eq("slug", clean).maybeSingle();
-    data = legacy.data;
+  const [businessLogin, helperName] = clean.split("/");
+  let data;
+  if (helperName !== undefined) {
+    if (!businessLogin || !/^[a-z0-9][a-z0-9._-]{2,29}$/.test(helperName) || clean !== `${businessLogin}/${helperName}`)
+      throw new Error("Usuario o contraseña incorrectos");
+    const lookup = await db.from("menu_businesses").select("*").eq("slug", businessLogin).maybeSingle();
+    data = lookup.data;
+  } else {
+    const lookup = await db.from("menu_businesses").select("*").eq("access_username", clean).maybeSingle();
+    data = lookup.data;
+    // Los propietarios y ayudantes anteriores también pueden usar el slug de su negocio.
+    if (!data) {
+      const legacy = await db.from("menu_businesses").select("*").eq("slug", clean).maybeSingle();
+      data = legacy.data;
+    }
   }
   if (!data) throw new Error("Usuario o contraseña incorrectos");
   const business = rowToBusiness(data as Row);
@@ -387,13 +394,13 @@ export async function ownerLogin(username: string, password: string) {
   let actor = business.ownerName || "Dueño";
   let temp = business.accessTemp;
   let adminId: string | null = null;
-  let matched = Boolean(hash && salt) && (await hashPassword(password, salt)) === hash;
+  let matched = helperName === undefined && Boolean(hash && salt) && (await hashPassword(password, salt)) === hash;
 
   if (!matched && business.multiAdmin) {
-    const { data: admins } = await db
-      .from("menu_admins")
-      .select("*")
-      .eq("business_id", business.id);
+    const team = db.from("menu_admins").select("*").eq("business_id", business.id);
+    const { data: admins } = await (helperName === undefined
+      ? team.is("username", null)
+      : team.eq("username", helperName));
     for (const row of admins ?? []) {
       const r = row as Row;
       const s = str(r["access_salt"]);
@@ -410,10 +417,10 @@ export async function ownerLogin(username: string, password: string) {
   }
 
   if (!matched) {
-    if (!hash || !salt) throw new Error("Este negocio todavía no tiene contraseña asignada");
+    if (helperName === undefined && (!hash || !salt)) throw new Error("Este negocio todavía no tiene contraseña asignada");
     throw new Error("Usuario o contraseña incorrectos");
   }
-  if (!adminId && business.accessSuspended) throw new Error("Tu acceso está suspendido");
+  if (business.accessSuspended) throw new Error("Tu acceso está suspendido");
   const status = businessStatus(business);
   if (status === "apagado" || status === "vencido")
     throw new Error(status === "vencido" ? "Tu acceso venció" : "Tu catálogo está apagado");

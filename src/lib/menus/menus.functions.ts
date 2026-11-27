@@ -233,7 +233,7 @@ export const menusGenerateAccess = createServerFn({ method: "POST" })
       access_suspended: false,
     }).eq("id", data.id);
     if (error) throw new Error(error.message);
-    return { password };
+    return { name, username: `${business.slug}/${data.username}`, password };
   });
 
 /** Suspende, reactiva o borra el acceso del dueño. */
@@ -672,6 +672,8 @@ export const menusAdminsList = createServerFn({ method: "POST" })
         id: String(row["id"]),
         businessId: String(row["business_id"]),
         name: String(row["name"] ?? ""),
+        username: r.username,
+        clientId: r.client_id,
         suspended: Boolean(row["suspended"]),
         temp: Boolean(row["access_temp"]),
         lastLoginAt: row["last_login_at"] ? String(row["last_login_at"]) : null,
@@ -683,31 +685,58 @@ export const menusAdminsList = createServerFn({ method: "POST" })
 /** Agrega un administrador con su propia contraseña temporal. */
 export const menusAddAdmin = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
-    z.object({ code, businessId: z.string().min(1), name: z.string().min(1).max(60) }).parse(d),
+    z.object({
+      code,
+      businessId: z.string().uuid(),
+      name: z.string().trim().min(2).max(160).optional(),
+      username: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9._-]{2,29}$/),
+      clientId: z.string().uuid().optional(),
+    }).refine((value) => Boolean(value.name || value.clientId), "Escribe un nombre o selecciona un cliente").parse(d),
   )
-  .handler(async ({ data }): Promise<{ password: string }> => {
+  .handler(async ({ data }): Promise<{ name: string; username: string; password: string }> => {
     await gate(data.code);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { hashPassword, randomSalt, tempPassword, logAudit } = await import("./menus.server");
+    const { data: business, error: businessError } = await supabaseAdmin
+      .from("menu_businesses")
+      .select("slug, multi_admin")
+      .eq("id", data.businessId)
+      .single();
+    if (businessError || !business?.multi_admin || !business.slug)
+      throw new Error("Activa los ayudantes para este negocio antes de crear un usuario.");
+
+    let name = data.name ?? "";
+    if (data.clientId) {
+      const { readRecord } = await import("@/lib/workspace/operations.server");
+      const client = await readRecord(data.clientId);
+      if (client.module !== "clients" || client.status !== "active" ||
+          (client.data.shopId && client.data.shopId !== "main"))
+        throw new Error("Selecciona un cliente activo de MA².");
+      name = client.title;
+    }
+
     const password = tempPassword();
     const salt = randomSalt();
     const { error } = await supabaseAdmin.from("menu_admins").insert({
       business_id: data.businessId,
-      name: data.name.trim(),
+      client_id: data.clientId,
+      username: data.username,
+      name,
       access_salt: salt,
       access_hash: await hashPassword(password, salt),
       access_temp: true,
     });
-    if (error) throw new Error(error.message);
+    if (error?.code === "23505") throw new Error("Ese usuario o cliente ya tiene acceso a este negocio.");
+    if (error) throw new Error("No se pudo crear el acceso del ayudante.");
     await logAudit({
       businessId: data.businessId,
       actorKind: "admin",
       actorName: "Administrador",
       action: "acceso",
-      target: data.name.trim(),
+      target: name,
       field: "Agregó un administrador",
     });
-    return { password };
+    return { name, username: `${business.slug}/${data.username}`, password };
   });
 
 /** Suspende, reactiva, regenera contraseña o elimina un administrador adicional. */

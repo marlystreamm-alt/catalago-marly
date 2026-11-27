@@ -7,7 +7,7 @@ const token = z.string().min(10);
 
 export const ownerSignIn = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
-    z.object({ username: z.string().min(1).max(80), password: z.string().min(4).max(120) }).parse(d),
+    z.object({ username: z.string().min(1).max(200), password: z.string().min(4).max(120) }).parse(d),
   )
   .handler(async ({ data }): Promise<{ token: string; mustChangePassword: boolean }> => {
     const { ownerLogin } = await import("./menus.server");
