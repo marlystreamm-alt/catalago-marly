@@ -19,16 +19,19 @@ export function CustomerRecharge({
   token,
   onBalanceChange,
   shopSlug,
+  permanentReference,
 }: {
   id: string;
   token: string;
   onBalanceChange: () => Promise<void>;
   shopSlug?: string;
+  permanentReference?: string;
 }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof rechargePortalLoad>> | null>(null);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [temporary,setTemporary]=useState(false);
   const load = useCallback(async () => {
     try {
       setData(
@@ -45,7 +48,7 @@ export function CustomerRecharge({
     void load();
   }, [load]);
   useEffect(() => {
-    if (!data?.requests.some((r) => r.status === "pending")) return;
+    if (!data?.settings?.enabled || (!permanentReference&&!data?.requests.some((r) => r.status === "pending"))) return;
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") {
         void load();
@@ -53,7 +56,7 @@ export function CustomerRecharge({
       }
     }, 30000);
     return () => clearInterval(timer);
-  }, [data?.requests, load, onBalanceChange]);
+  }, [data?.requests, data?.settings?.enabled, permanentReference, load, onBalanceChange]);
   const s = data?.settings;
   return (
     <section className="seller-card space-y-3">
@@ -65,7 +68,8 @@ export function CustomerRecharge({
       ) : null}
       {s?.enabled ? (
         <>
-          <p className="text-sm text-muted-foreground">
+          {permanentReference&&/^\d{7}$/.test(permanentReference)&&<div className="rounded-xl border p-3 space-y-2"><p className="font-semibold">Tu referencia permanente</p><p className="text-2xl font-bold tracking-widest">{permanentReference}</p><Button size="sm" variant="outline" onClick={()=>void copyText(permanentReference)}>Copiar referencia</Button><p className="text-sm">Usa siempre estos 7 dígitos, sin letras ni guiones, en cada transferencia de ${s.minimum} a ${s.maximum} MXN. No necesitas generar otra referencia. Tu saldo se acredita cuando se verifica el aviso bancario.</p><Button variant="ghost" size="sm" onClick={()=>setTemporary(v=>!v)}>{temporary?"Ocultar alternativa":"Generar una referencia temporal (alternativa)"}</Button></div>}
+          {(!permanentReference||temporary)&&<><p className="text-sm text-muted-foreground">
             Genera tu referencia y transfiere el importe exacto antes de que venza. El abono se
             comprueba por correo cada 5 minutos; puede tardar más si el aviso bancario se retrasa.
           </p>
@@ -101,7 +105,7 @@ export function CustomerRecharge({
               aria-label="Importe de recarga en pesos"
             />
             <Button disabled={busy}>Generar referencia</Button>
-          </form>
+          </form></>}
           <div className="ma2-brand-promo p-3 text-sm space-y-1">
             <p>
               <b>Banco:</b> {s.bank}
@@ -117,7 +121,7 @@ export function CustomerRecharge({
             </Button>
             {s.note ? <p className="whitespace-pre-wrap">{s.note}</p> : null}
             {s.bonusPercent > 0 ? (
-              <p>Saldo de regalo: {s.bonusPercent}% sobre el monto solicitado.</p>
+              <p>Saldo de regalo con referencia temporal: {s.bonusPercent}% sobre el monto solicitado.</p>
             ) : null}
           </div>
         </>

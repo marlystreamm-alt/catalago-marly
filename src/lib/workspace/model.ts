@@ -281,4 +281,4 @@ export function validWhatsApp(value:string){
 }
 export const validClientEmail=(value:string)=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())&&value.trim().length<=254;
 export const validFullName=(value:string)=>value.trim().split(/\s+/).filter(Boolean).length>=2;
-export const transferReferenceMessage=(reference?:string)=>reference?`\n\n💳 Cuando realices una transferencia, coloca esta referencia permanente en el concepto de pago: ${reference}. Si generas una recarga automática, utiliza la referencia de esa recarga.`:"";
+export const transferReferenceMessage=(reference?:string)=>reference?`\n\n💳 Cuando realices una transferencia, coloca esta referencia permanente en el campo de referencia de pago: ${reference}. No necesitas generar otra. Si elegiste una referencia temporal, usa la indicada para esa recarga.`:"";

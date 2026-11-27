@@ -41,3 +41,7 @@
 # Lector privado de avisos bancarios para recargas automáticas.
 [functions."recharge-mail"]
   schedule = "*/5 * * * *"
+
+# Cierre diario a las 00:30 de Monterrey, con reintentos idempotentes.
+[functions."finance-daily-cut"]
+  schedule = "*/15 6-7 * * *"

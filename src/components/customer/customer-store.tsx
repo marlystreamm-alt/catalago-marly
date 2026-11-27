@@ -593,7 +593,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             ) : null}
             {tab === "saldo" ? (
               <>
-                <CustomerRecharge id="" token="" shopSlug={slug} onBalanceChange={load} />
+                <CustomerRecharge id="" token="" shopSlug={slug} permanentReference={data.clientReference} onBalanceChange={load} />
                 <div className="seller-card mt-4">
                   <h3 className="font-bold">Recargar con el negocio</h3>
                   <p className="text-sm text-muted-foreground my-3">
