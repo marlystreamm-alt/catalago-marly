@@ -320,10 +320,10 @@ body.seller-mode { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0
 .seller-app input:not([type="range"]):not([type="checkbox"]),.seller-app textarea,.seller-app select,body.seller-mode [role="dialog"] input:not([type="range"]):not([type="checkbox"]),body.seller-mode [role="dialog"] textarea,body.seller-mode [role="dialog"] select { background:color-mix(in oklch,var(--primary) 6%,var(--card)); border-color:color-mix(in oklch,var(--border) 75%,transparent); border-radius:9px; }
 .seller-app select,body.seller-mode [role="dialog"] select { width:100%; padding:10px 12px; border:1px solid var(--border); min-width:0; }
 .seller-form-grid { display:grid; gap:14px; grid-template-columns:repeat(2,minmax(0,1fr)); }
-.seller-empty { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:10px; text-align:center; padding:62px 24px; background:var(--card); border:1px solid var(--border); border-radius:15px; min-height:260px; }
-.seller-empty>span { font-size:50px; line-height:1.4; margin-bottom:12px; }
+.seller-empty { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; text-align:center; padding:20px 14px; background:var(--card); border:1px solid var(--border); border-radius:12px; }
+.seller-empty>span { font-size:20px; line-height:1.2; }
 .seller-empty h3 { font-size:15px; font-weight:800; }
-.seller-empty p { font-size:13px; max-width:320px; color:var(--muted-foreground); }
+.seller-empty p { flex-basis:100%; font-size:13px; max-width:320px; color:var(--muted-foreground); }
 .seller-mini-stat { border-radius:10px; background:color-mix(in oklch,var(--primary) 5%,var(--card)); padding:10px; display:grid; gap:4px; }
 .seller-mini-stat small { color:var(--muted-foreground); font-size:10px; }
 .seller-table-wrap { overflow:auto; margin-top:15px; }
@@ -434,3 +434,35 @@ body.ma2-appearance-active [role="dialog"],body.ma2-appearance-active [role="lis
 .dark [data-season]:not([data-season="normal"]) .ma2-brand-promo .text-muted-foreground {
   color: var(--muted-foreground);
 }
+
+/* Compact rows for the administration lists. */
+.seller-disclosure {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.seller-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.seller-disclosure > summary::-webkit-details-marker { display: none; }
+.seller-disclosure > summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  margin: 0 2px 4px auto;
+  border: solid var(--muted-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.seller-disclosure[open] > summary::after { transform: translateY(3px) rotate(225deg); }
+.seller-disclosure > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 10px; }
+.seller-disclosure-body { padding: 12px; border-top: 1px solid var(--border); }
+.seller-date-field { width: 100%; min-width: 0; }
