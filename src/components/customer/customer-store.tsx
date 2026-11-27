@@ -94,6 +94,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoverySent, setRecoverySent] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [identityOptions,setIdentityOptions]=useState({google:false,email:false});
@@ -164,6 +165,13 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
     window.addEventListener("focus",refresh);return ()=>window.removeEventListener("focus",refresh);
   },[Boolean(data),tab,load,loadProducts]);
   const support = `https://wa.me/${phoneNumber(shop?.whatsapp || "")}?text=${encodeURIComponent(`Hola, necesito ayuda con mi cuenta de ${shop?.name || "la tienda"}.`)}`;
+  function openRecovery(message = "") {
+    setRecoveryEmail("");
+    setRecoverySent(false);
+    setRecoveryError("");
+    setRecoveryNotice(message);
+    setRecoveryOpen(true);
+  }
   const action = async (fn: () => Promise<void>) => {
     setBusy(true);
     setError("");
@@ -343,6 +351,12 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
                   await customerSignUp({ data: { slug, email, password, name, whatsapp: wa } });
                 } else {
                   const result = await customerSignIn({ data: { slug, email, password } });
+                  if (!result.ok) {
+                    setPassword("");
+                    setShowLoginPassword(false);
+                    openRecovery("Llegaste al límite de 5 intentos. Recupera tu contraseña para volver a entrar.");
+                    return;
+                  }
                   if (result.role === "admin") {
                     try {
                       clearCode();
@@ -455,12 +469,7 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             </Button>
             <p className="text-center text-sm text-muted-foreground">{mode==="register"?"¿Ya tienes cuenta?":"¿Todavía no tienes cuenta?"} <button type="button" className="font-bold text-primary underline-offset-4 hover:underline" onClick={()=>{setMode(mode==="register"?"login":"register");setPassword("");setConfirmation("");setShowLoginPassword(false);setError("");}}>{mode==="register"?"Entrar":"Regístrate aquí"}</button></p>
             {!shop.id && mode === "login" && (
-              <Button type="button" variant="ghost" className="w-full" disabled={busy} onClick={() => {
-                setRecoveryEmail("");
-                setRecoverySent(false);
-                setRecoveryError("");
-                setRecoveryOpen(true);
-              }}>
+              <Button type="button" variant="ghost" className="w-full" disabled={busy} onClick={() => openRecovery()}>
                 Olvidé mi contraseña
               </Button>
             )}
@@ -986,8 +995,8 @@ export function CustomerStore({ slug, initialView = "inicio", initialQuery = "",
             <DialogTitle>Recuperar contraseña</DialogTitle>
             <DialogDescription>
               {recoverySent
-                ? "Si el correo está registrado, recibirás un enlace para crear una contraseña nueva. Revisa también correo no deseado."
-                : "Escribe de nuevo el correo con el que registraste tu cuenta."}
+                ? "Si el correo está registrado, recibirás un enlace para crear una contraseña nueva. Si no lo ves en tu bandeja de entrada, revisa la carpeta de Spam o correo no deseado."
+                : [recoveryNotice, "Escribe de nuevo el correo con el que registraste tu cuenta."].filter(Boolean).join(" ")}
             </DialogDescription>
           </DialogHeader>
           {recoverySent ? (

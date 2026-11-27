@@ -61,6 +61,15 @@ export async function customerThrottle(kind: string, key: string, max: number) {
     if (r.error || !r.data) throw new Error("Demasiados intentos. Espera 15 minutos.");
   }
 }
+export async function customerLoginIpThrottle() {
+  const ip = getRequestHeader("x-nf-client-connection-ip") || "shared";
+  const result = await opsDB().rpc("ma2_customer_limit", {
+    p_key: await hashToken(`login:ip:${ip}`),
+    p_max: 30,
+    p_seconds: 900,
+  });
+  if (result.error || !result.data) throw new Error("Demasiados intentos. Espera 15 minutos.");
+}
 export async function customerSession(accountId: string) {
   const token = crypto.randomUUID() + crypto.randomUUID();
   const r = await opsDB()

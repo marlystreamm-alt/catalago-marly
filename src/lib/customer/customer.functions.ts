@@ -66,8 +66,12 @@ export const customerSignIn = createServerFn({ method: "POST" })
     const c = await server(),
       s = await ops(),
       store = await c.customerShop(data.slug);
-    await c.customerThrottle("login", store.slug + ":" + data.email, 10);
-    if(!store.id&&data.email===(await import("./main-admin.server")).mainAdminEmail()){
+    const isMainAdmin = !store.id && data.email === (await import("./main-admin.server")).mainAdminEmail();
+    const needsRecovery = !store.id && !isMainAdmin &&
+      !(await import("./identity-policy")).isCyberdocLogin(data.email);
+    if (needsRecovery) await c.customerLoginIpThrottle();
+    else await c.customerThrottle("login", store.slug + ":" + data.email, 10);
+    if (isMainAdmin) {
       try{
         const session=await (await import("./main-admin.server")).mainAdminSignIn(data.password);
         await c.customerLogoutSession();
@@ -78,15 +82,36 @@ export const customerSignIn = createServerFn({ method: "POST" })
     q = store.id ? q.eq("business_id", store.id) : q.is("business_id", null);
     const { data: a, error } = await q.maybeSingle();
     if (error) throw new Error("No se pudo comprobar el acceso");
+    // A verified reset changes the salt and starts a new attempt counter.
+    const attemptKey = needsRecovery
+      ? await s.hashToken(`customer-password:${data.email}:${a?.salt || "unknown"}`)
+      : null;
+    let attempt = 0;
+    if (attemptKey) {
+      const reserved = await s.opsDB().rpc("ma2_customer_login_attempt", { p_key: attemptKey });
+      if (reserved.error || typeof reserved.data !== "number") {
+        throw new Error("No se pudo comprobar el acceso. Intenta más tarde.");
+      }
+      attempt = reserved.data;
+      if (attempt > 5) return { ok: false as const, recoveryRequired: true };
+    }
     const p = await import("./password.server");
     const matches = await p.customerMatches(
       data.password,
       a?.salt || "0".repeat(32),
       a?.password_hash || "0".repeat(64),
     );
-    if (!a || !a.active || !matches) throw new Error("Correo o contraseña incorrectos");
+    if (!a || !a.active || !matches) {
+      if (attempt === 5) return { ok: false as const, recoveryRequired: true };
+      throw new Error("Correo o contraseña incorrectos");
+    }
     const client=await s.readRecord(a.client_id);
     if(client.module!=="clients"||client.status!=="active")throw new Error("Correo o contraseña incorrectos");
+    if (attemptKey) {
+      const cleared = await s.opsDB().from("ma2_customer_limits")
+        .update({ attempts: 0 }).eq("key", attemptKey);
+      if (cleared.error) throw new Error("No se pudo abrir la sesión. Intenta más tarde.");
+    }
     await c.customerSession(a.id);
     return {ok:true as const,role:(!store.id&&a.price_tier==="reseller"?"reseller":"customer") as "reseller"|"customer"};
   });
