@@ -505,6 +505,7 @@ export function SellerWorkspace() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
+  const [orderChannel, setOrderChannel] = useState<"web" | "cyberdoc" | "manual">("web");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
@@ -637,8 +638,20 @@ export function SellerWorkspace() {
       {orderTabs}
       <ProtectedDeliveriesDialog embedded />
     </div> : <div className="space-y-4">
-      <CyberDocsOrdersDialog
-        key={tab + ":" + (selectedOrderId || "all")}
+      <label className="seller-field">
+        <span>Origen del pedido</span>
+        <select className="buyer-select" value={orderChannel} onChange={event => {
+          setOrderChannel(event.target.value as typeof orderChannel);
+          setSelectedOrderId(null);
+        }}>
+          <option value="web">Tienda web</option>
+          <option value="cyberdoc">Cyberdoc</option>
+          <option value="manual">Entregas manuales externas</option>
+        </select>
+      </label>
+      {orderChannel === "manual" ? orderTabs : <CyberDocsOrdersDialog
+        key={orderChannel + ":" + tab + ":" + (selectedOrderId || "all")}
+        channel={orderChannel}
         embedded
         initialSelectedId={selectedOrderId}
         stage={tab === "delivered" ? "deliveries" : tab === "processing" || tab === "closed" ? tab : "orders"}
@@ -647,15 +660,16 @@ export function SellerWorkspace() {
           setSelectedOrderId(id);
           setTab(stage === "deliveries" ? "delivered" : stage);
         }}
-      />
-      {(tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
+      />}
+      {orderChannel === "web" && (tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
         onOpenOrder={(id, delivered, processing) => {
           setSelectedOrderId(id);
           setTab(delivered ? "delivered" : processing ? "processing" : "main");
         }}
       />}
-      {tab==="delivered"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Entregas del inventario</summary><StockInsights sales showSummary={false}/></details>}
-      {tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Encargos registrados manualmente</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</details>}{tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
+      {orderChannel === "manual" && (tab === "processing" || tab === "closed") &&
+        <p className="seller-card text-sm text-muted-foreground">Las entregas manuales externas se consultan en Pedidos o Entregadas.</p>}
+      {orderChannel==="manual"&&tab==="main"&&<details className="seller-card"><summary className="font-semibold cursor-pointer">Pedidos manuales externos</summary>{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</details>}{orderChannel==="manual"&&tab==="delivered"&&<details className="seller-card" open><summary className="font-semibold cursor-pointer">Combos y entregas manuales</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>}
     </div>;
   else if (section === "reports")
     content = (
