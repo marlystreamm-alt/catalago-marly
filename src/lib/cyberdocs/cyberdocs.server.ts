@@ -140,8 +140,12 @@ export async function ingestCyberDocsOrder(
     .select("id,status,order_id")
     .eq("event_key", eventKey)
     .maybeSingle();
-  if (previous) {
+  if (previous && previous.status !== "error") {
     return { ok: true, duplicate: true, orderId: nullable(previous.order_id) ?? undefined };
+  }
+  if (previous?.status === "error") {
+    const { error } = await db.from("cyberdocs_webhook_events").delete().eq("id", previous.id).eq("status", "error");
+    if (error) throw new Error(error.message);
   }
 
   const { data: webhookRow, error: webhookError } = await db
