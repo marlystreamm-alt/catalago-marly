@@ -237,7 +237,7 @@ export function CyberDocsOrdersDialog({
       return;
     }
     const query = message ? `?text=${encodeURIComponent(message)}` : "";
-    window.open(`https://wa.me/${digits}${query}`, "_blank", "noopener,noreferrer");
+    window.location.assign(`https://wa.me/${digits}${query}`);
   };
   const sortedStock = useMemo(() => {
     const needle = (selected?.serviceName || "").toLowerCase();
@@ -1047,6 +1047,7 @@ export function CyberDocsOrdersDialog({
                           <X className="size-4" />
                         </Button>
                       </div>
+                      {selected.protectedDeliveryId&&<div className="rounded-xl border border-primary/30 bg-primary/5 p-3 space-y-2"><p className="text-sm font-semibold">{selected.status==="completed"?"Entrega registrada":"Entrega preparada"}</p><div className="flex flex-wrap gap-2"><Button size="sm" onClick={()=>void copyDelivery()}><Link2 className="mr-1 size-4"/>Copiar enlace protegido</Button><Button size="sm" variant="outline" onClick={()=>void shareDeliveryMessage(selected.sourceKey==="web_catalog"?"combined":"password",true)}><MessageCircle className="mr-1 size-4"/>{selected.sourceKey==="web_catalog"?"Enviar entrega por WhatsApp":"Enviar contraseña por WhatsApp"}</Button><Button size="sm" variant="outline" onClick={async()=>{try{await copyAndComplete(await cyberdocsCopyCredentials({data:{code,orderId:selected.id}}),selected);}catch(e){toast.error(errorText(e));}}}><Copy className="mr-1 size-4"/>Copiar credenciales</Button></div></div>}
                       <div className="grid gap-2 rounded-xl bg-muted/30 p-3 text-xs sm:grid-cols-2">
                         {selected.contactValue && selected.contactLabel !== "WhatsApp" && !extraOrderDetails(selected.parsedPayload || {}).some(([,v]) => v === selected.contactValue) ? <p><b>{selected.contactLabel || "Contacto"}:</b> {selected.contactValue}</p> : null}
                         {extraOrderDetails(selected.parsedPayload || {}).map(([k,v]) => <p key={k}><b>{k.replaceAll("_", " ")}:</b> {String(v)}</p>)}
@@ -1201,16 +1202,11 @@ export function CyberDocsOrdersDialog({
                           <p className="text-xs">{selected.status === "completed" ? "Puedes consultar y compartir esta entrega sin volver a procesarla." : "Al copiar el enlace o las credenciales, el pedido pasa a Entregadas."}</p>
                           {selected.protectedDeliveryId ? (
                             <>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <Button size="sm" onClick={() => void shareDeliveryMessage("combined")}><Copy className="mr-1 size-4" />Copiar mensaje</Button>
-                                <Button size="sm" variant="outline" onClick={async () => { try { await copyAndComplete(await cyberdocsCopyCredentials({data:{code,orderId:selected.id}}), selected); } catch(e) { toast.error(errorText(e)); } }}><Copy className="mr-1 size-4" />Copiar credenciales</Button>
-                                <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("combined", true)}><MessageCircle className="mr-1 size-4" />WhatsApp</Button>
-                              </div>
                               <p className="mt-2 text-xs">Usa tu mensaje de LINK + CONTRASEÑA; si el documento no tiene contraseña, usa tu mensaje de LINK.</p>
                               <details className="mt-3">
                                 <summary className="cursor-pointer text-xs font-semibold">Enlace, contraseña y mensajes por separado</summary>
                                 <div className="mt-2 flex flex-wrap gap-2">
-                                  <Button size="sm" variant="outline" onClick={() => void copyDelivery()}><Link2 className="mr-1 size-4" />Copiar solo enlace</Button>
+                                  <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("combined")}><Copy className="mr-1 size-4" />Copiar mensaje completo</Button>
                                   <Button size="sm" variant="outline" onClick={() => void copyDocumentPassword(true)}><KeyRound className="mr-1 size-4" />Ver contraseña</Button>
                                   <Button size="sm" variant="outline" onClick={() => void copyDocumentPassword()}><Copy className="mr-1 size-4" />Copiar solo contraseña</Button>
                                   <Button size="sm" variant="outline" onClick={() => void shareDeliveryMessage("link")}>Copiar mensaje LINK</Button>

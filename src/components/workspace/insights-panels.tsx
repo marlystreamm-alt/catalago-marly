@@ -4,6 +4,8 @@ import { Download, RefreshCw, Settings } from "lucide-react";
 import { stockPlatform, platformFamily } from "@/lib/stock/master-products";
 import { StockPlatformMark } from "./stock-platform-mark";
 import { copyText } from "@/lib/browser/clipboard";
+import { comboCopyCredentials } from "@/lib/stock/combo.functions";
+import { cyberdocsListOrders } from "@/lib/cyberdocs/cyberdocs.functions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InventoryFilterMenu } from "./inventory-filter-menu";
@@ -18,8 +20,9 @@ import { EmptyState, errorText, exportRows } from "./resource-panel";
 import { BusinessTools } from "@/components/catalog/business-tools";
 import { menusList } from "@/lib/menus/menus.functions";
 import type { MenuBusiness } from "@/lib/menus/types";
-export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged, scope }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void; scope?:"deliveries"|"review"|"closed" }) {
+export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged, scope, comboRecords=[], onShowClosed }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void; scope?:"deliveries"|"review"|"closed"|"vigencias"; comboRecords?:OpsRecord[]; onShowClosed?:()=>void }) {
   const [items, setItems] = useState<StockItem[]>([]);
+  const [pendingOrderIds,setPendingOrderIds]=useState<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
@@ -34,7 +37,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     setError("");
     try {
       const data = { code: getSavedCode() };
-      const current = await stockAdminList({ data });
+      const [current,orders] = await Promise.all([stockAdminList({ data }),scope==="deliveries"||scope==="vigencias"?cyberdocsListOrders({data}):Promise.resolve([])]);
+      setPendingOrderIds(new Set(orders.filter(order=>!["completed","cancelled","rejected"].includes(order.status)).map(order=>order.id)));
       setItems(sales ? [...current, ...await stockAdminReleasedSales({data})] : current);
     } catch (e) {
       setError(errorText(e));
@@ -60,10 +64,12 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   const isReview=(r:StockItem)=>r.status==="review"&&tone(r)!=="expired";
   const isClosed=(r:StockItem)=>r.renewalStatus==="Sin suscripción";
   const needsValidation=(r:StockItem)=>!isClosed(r)&&(isReview(r)||tone(r)==="expired");
-  const inScope=(r:StockItem)=>scope==="review"?needsValidation(r):scope==="closed"?isClosed(r):scope==="deliveries"?!isClosed(r)&&!needsValidation(r)&&Boolean(r.deliveredOn||r.clientName)&&r.status!=="available":true;
+  const isDelivered=(r:StockItem)=>!isClosed(r)&&!needsValidation(r)&&Boolean(r.deliveredOn||r.clientName)&&r.status!=="available";
+  const inScope=(r:StockItem)=>scope==="vigencias"?!pendingOrderIds.has(r.relatedOrderId)&&(needsValidation(r)||isDelivered(r)):scope==="review"?needsValidation(r):scope==="closed"?isClosed(r):scope==="deliveries"?!pendingOrderIds.has(r.relatedOrderId)&&isDelivered(r):true;
   const scoped=assigned.filter(inScope).filter(r=>!scope||(!parents.has(r.id)&&r.accountType!=="split_parent")).filter(r=>(!platform||platformFamily(r.platform)===platform)&&(kind==="all"||r.stockKind===kind));
   const rows = scoped.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
+      if(scope==="vigencias")return days==="all"||(days==="review"?needsValidation(r):tone(r)===days);
       if(scope==="review"||scope==="closed")return days==="all"||tone(r)===days;
       if(days==="review")return isReview(r);
       return !isReview(r)&&(days==="all" || tone(r)===days);
@@ -73,12 +79,16 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   const requiresCheck = (row: StockItem) => !sales && (tone(row) === "expired" || isReview(row));
   const checkedRoots = new Set<string>();
   const visibleRows = rows.filter(row => {
-    if (!requiresCheck(row) || scope==="review"||scope==="closed") return true;
+    if (!requiresCheck(row) || scope) return true;
     const id = row.parentStockId || row.id;
     if (checkedRoots.has(id)) return false;
     checkedRoots.add(id);
     return true;
   });
+  const comboById=new Map(comboRecords.map(record=>[record.id,record]));
+  const groupedRows=new Map<string,StockItem[]>();
+  for(const row of visibleRows){const id=scope==="deliveries"&&row.relatedOrderId&&comboById.has(row.relatedOrderId)?row.relatedOrderId:row.id;const group=groupedRows.get(id)||[];group.push(row);groupedRows.set(id,group);}
+  if(scope==="deliveries"&&!query.trim()&&!platform&&kind==="all"&&days==="all")for(const combo of comboRecords)if(!groupedRows.has(combo.id))groupedRows.set(combo.id,[]);
   const verifyFamily = async (root: StockItem, family: StockItem[], active: boolean) => {
     if (active && familyExpiry <= today) return toast.error("Elige una fecha de vigencia futura.");
     if (!window.confirm(active
@@ -123,6 +133,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   };
   return (
     <div className="space-y-4">
+      {scope==="closed"&&<h2 className="text-sm font-semibold">Historial de bajas</h2>}
       <div className="flex items-center gap-1.5">
         <Input className="h-10 min-w-0 flex-1" aria-label="Buscar ventas o vencimientos" value={query}
           onChange={(event) => setQuery(event.target.value)} placeholder="Buscar…" />
@@ -131,10 +142,11 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
             <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label>
             <label className="grid gap-1.5 text-xs font-medium"><span>Tipo de cuenta</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label>
           </>}
-          <label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope?[["review","Validar cuenta"]]:[]),...(scope!=="deliveries"?[["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>(scope==="review"||scope==="closed"||!isReview(r))&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>
+          <label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope||scope==="vigencias"?[["review","Validar cuenta"]]:[]),...(scope!=="deliveries"?[["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(scope==="vigencias"?needsValidation:isReview).length:scoped.filter(r=>(scope==="vigencias"||scope==="review"||scope==="closed"||!isReview(r))&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>
         </InventoryFilterMenu>}
         <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones de inventario" title="Opciones de inventario"><Settings className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-xl">
         <DropdownMenuItem disabled={busy} onSelect={()=>void load()}><RefreshCw/>Actualizar</DropdownMenuItem>
+        {onShowClosed&&scope!=="closed"&&<DropdownMenuItem onSelect={onShowClosed}>Historial de bajas</DropdownMenuItem>}
         <DropdownMenuItem onSelect={() =>
             exportRows(
               rows.map((r) => ({
@@ -153,7 +165,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         </DropdownMenuContent></DropdownMenu>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
-      {!sales&&scope&&!busy&&<p className="px-1 text-sm text-muted-foreground" role="status"><strong className="text-foreground">{rows.length}</strong> {scope==="review"?"pendientes de validar":scope==="closed"?"bajas confirmadas":"entregas vigentes"}</p>}
+      {!sales&&scope&&!busy&&<p className="px-1 text-sm text-muted-foreground" role="status"><strong className="text-foreground">{scope==="deliveries"?groupedRows.size:rows.length}</strong> {scope==="vigencias"?"cuentas · "+scoped.filter(needsValidation).length+" por validar":scope==="review"?"pendientes de validar":scope==="closed"?"bajas confirmadas":"entregas"}</p>}
       {sales && showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
@@ -172,7 +184,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
       ) : null}
       {busy ? (
         <p role="status">Cargando registros…</p>
-      ) : !rows.length ? (
+      ) : !groupedRows.size ? (
         <EmptyState
           icon={sales ? "🧾" : "🎉"}
           title={sales ? "Sin ventas para esta búsqueda" : scope==="review"?"No hay cuentas pendientes de validar":scope==="closed"?"No hay bajas confirmadas":"No hay entregas para esta búsqueda"}
@@ -180,7 +192,9 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         />
       ) : (
         <div className="seller-record-grid items-start">
-          {visibleRows.map((r) => {
+          {[...groupedRows].map(([id,group]) => {
+          const combo=scope==="deliveries"?comboById.get(id):undefined;
+          const units=group.map((r) => {
             const root = scope?r:items.find(item=>item.id===(r.parentStockId||r.id));
             const profiles = root ? items.filter(item=>item.parentStockId===root.id) : [];
             const checking = requiresCheck(r) && Boolean(root);
@@ -199,7 +213,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                   <span className="block truncate text-xs text-muted-foreground">{checking && profiles.length ? `${profiles.length} perfiles vinculados` : `${r.clientName || "Sin cliente"} · ${r.stockKind === "profile" ? "Perfil" : "Completa"}`}</span>
                   {!sales&&<span className="block text-xs text-muted-foreground">{r.expiresOn?`Vence: ${r.expiresOn.split("-").reverse().join("/")}`:"Sin fecha de vigencia"}</span>}
                 </span>
-                <span className="flex shrink-0 flex-col items-end gap-1"><span className={`rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[isClosed(r)||withoutSubscription?"expired":color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>{scope==="review"&&<span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Por validar</span>}</span>
+                <span className="flex shrink-0 flex-col items-end gap-1"><span className={`rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[isClosed(r)||withoutSubscription?"expired":color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>{(scope==="review"||scope==="vigencias"&&needsValidation(r))&&<span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Por validar</span>}</span>
               </summary>
               <div className="seller-disclosure-body">
               <p className="text-xs text-muted-foreground">
@@ -265,6 +279,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
               {renewing?.id===r.id&&<form className="mt-3 space-y-2 rounded-xl border p-3" onSubmit={e=>{e.preventDefault();void saveRenewal(r,newDate);}}><label className="seller-field"><span>Nueva fecha de vencimiento</span><Input required type="date" value={newDate} onChange={e=>setNewDate(e.target.value)}/></label><div className="seller-actions"><Button size="sm" disabled={busy}>Confirmar renovación</Button><Button type="button" variant="ghost" size="sm" onClick={()=>setRenewing(null)}>Cancelar</Button></div></form>}
               </div>
             </details>;
+          });
+          return combo?<details key={id} className="seller-disclosure"><summary><span className="min-w-0 flex-1"><strong className="block text-sm">{combo.title}</strong><small className="text-muted-foreground">{group.length?`${group[0].clientName||"Cliente"} · Combo · ${group.length} cuentas vigentes`:"Combo · Historial"}</small></span></summary><div className="seller-disclosure-body space-y-2"><p className="text-xs text-muted-foreground">{combo.data.message}</p><Button size="sm" variant="outline" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:combo.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales del combo</Button>{combo.data.reply&&<Button size="sm" variant="outline" onClick={()=>void copyText(combo.data.reply)}>Copiar entrega</Button>}{units}</div></details>:units[0];
           })}
         </div>
       )}

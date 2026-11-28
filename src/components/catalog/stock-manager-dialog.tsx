@@ -173,6 +173,7 @@ export function StockManagerDialog({
   initialClient,
   compact = false,
   onDelivered,
+  onShowClosed,
   ownerToken,
   ownerFeatures,
   whatsappTemplate = "Hola {cliente}, aquí tienes tu entrega: {link}",
@@ -184,6 +185,7 @@ export function StockManagerDialog({
   initialClient?: {id:string;name:string;whatsapp:string;email?:string;clientReference?:string};
   compact?: boolean;
   onDelivered?: () => void;
+  onShowClosed?: () => void;
   ownerToken?: string;
   ownerFeatures?: FeatureMap;
   whatsappTemplate?: string;
@@ -671,6 +673,7 @@ export function StockManagerDialog({
           </InventoryFilterMenu>}
           <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones de inventario" title="Opciones de inventario"><Settings className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl">
             <DropdownMenuItem disabled={busy} onSelect={()=>void load()}><RefreshCw/>Actualizar</DropdownMenuItem>
+            {onShowClosed&&<DropdownMenuItem onSelect={onShowClosed}><History/>Historial de bajas</DropdownMenuItem>}
             {can("stock_export")&&<DropdownMenuItem onSelect={exportBackup}><Download/>Exportar respaldo</DropdownMenuItem>}
             {admin&&<DropdownMenuItem disabled={busy} onSelect={async()=>{try{setDeletedStock(await stockAdminDeletedList({data:{code:getSavedCode()}}));}catch(error){toast.error(err(error));}}}><History/>Papelera de inventario</DropdownMenuItem>}
           </DropdownMenuContent></DropdownMenu>

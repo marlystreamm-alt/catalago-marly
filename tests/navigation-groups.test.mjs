@@ -15,11 +15,13 @@ test("the admin menu keeps each visible section in its requested group", async (
   assert.deepEqual(groups.get("extras"), ["documents", "songs", "games", "memory"]);
   const actual = [...groups].flatMap(([main, children]) => [main, ...children]);
   assert.equal(new Set(actual).size, actual.length);
-  assert.deepEqual(actual.sort(), ids.filter(id=>!["expiry","orders","shop","combos"].includes(id)).sort());
+  assert.deepEqual(actual.sort(), ids.filter(id=>!["expiry","shop","combos"].includes(id)).sort());
   for (const removed of ["catalogs", "assistant", "codes", "deliveries"]) assert.ok(!ids.includes(removed));
   assert.match(source, /Opciones de clientes[\s\S]*?sectionLinks\("clients"\)/);
-  assert.match(source, /const orderPanel = tab === "protected"[\s\S]*?<ProtectedDeliveriesDialog embedded/);
-  assert.match(source, /\['stock','Stock'\],\['deliveries','Entregas'\],\['review','Validar'\],\['closed','Bajas'\]/);
+  assert.match(source, /else if\(section==="orders"\)/);
+  assert.match(source, /\['stock','Stock'\],\['deliveries','Entregas'\],\['vigencias','Vigencias'\]/);
+  assert.doesNotMatch(source,/Gráfica de ventas · últimos 7 días|Vencidas \/ bajas/);
+  assert.match(source,/FinancePanel summaryContent/);
   assert.match(source, /Ventas del mes/);
   assert.match(source, /Ganancia estimada del mes/);
 });
