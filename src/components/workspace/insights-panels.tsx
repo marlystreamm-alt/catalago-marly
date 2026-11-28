@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, RefreshCw } from "lucide-react";
-import { stockPlatform } from "@/lib/stock/master-products";
+import { stockPlatform, platformFamily } from "@/lib/stock/master-products";
 import { StockPlatformMark } from "./stock-platform-mark";
+import { copyText } from "@/lib/browser/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminVerifyFamily, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
+import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminVerifyFamily, stockAdminVerifyUnit, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
 import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
@@ -15,12 +16,14 @@ import { EmptyState, errorText, exportRows } from "./resource-panel";
 import { BusinessTools } from "@/components/catalog/business-tools";
 import { menusList } from "@/lib/menus/menus.functions";
 import type { MenuBusiness } from "@/lib/menus/types";
-export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void }) {
+export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged, scope }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void; scope?:"deliveries"|"review"|"closed" }) {
   const [items, setItems] = useState<StockItem[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
   const [days, setDays] = useState("all");
+  const [platform,setPlatform]=useState("");
+  const [kind,setKind]=useState("all");
   const [renewing,setRenewing]=useState<StockItem|null>(null);
   const [newDate,setNewDate]=useState("");
   const [reactivating,setReactivating]=useState(false);
@@ -53,16 +56,22 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     );
   const tone=(r:StockItem)=>r.status==="expired" && !parents.has(r.id) && r.accountType!=="split_parent"?"expired":renewalTone(daysRemaining(r.expiresOn,today),limits);
   const isReview=(r:StockItem)=>r.status==="review"&&tone(r)!=="expired";
-  const rows = assigned.filter((r) => {
+  const isClosed=(r:StockItem)=>r.renewalStatus==="Sin suscripción";
+  const needsValidation=(r:StockItem)=>!isClosed(r)&&(isReview(r)||tone(r)==="expired");
+  const inScope=(r:StockItem)=>scope==="review"?needsValidation(r):scope==="closed"?isClosed(r):scope==="deliveries"?!isClosed(r)&&!needsValidation(r)&&Boolean(r.deliveredOn||r.clientName)&&r.status!=="available":true;
+  const scoped=assigned.filter(inScope).filter(r=>!scope||(!parents.has(r.id)&&r.accountType!=="split_parent")).filter(r=>(!platform||platformFamily(r.platform)===platform)&&(kind==="all"||r.stockKind===kind));
+  const rows = scoped.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
+      if(scope==="review"||scope==="closed")return true;
       if(days==="review")return isReview(r);
       return !isReview(r)&&(days==="all" || tone(r)===days);
-    }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
+    }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):scope==="review"||scope==="closed"?(b.expiresOn||"").localeCompare(a.expiresOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
   const [familyExpiry, setFamilyExpiry] = useState("");
+  const [unitExpiries,setUnitExpiries]=useState<Record<string,string>>({});
   const requiresCheck = (row: StockItem) => !sales && (tone(row) === "expired" || isReview(row));
   const checkedRoots = new Set<string>();
   const visibleRows = rows.filter(row => {
-    if (!requiresCheck(row)) return true;
+    if (!requiresCheck(row) || scope==="review"||scope==="closed") return true;
     const id = row.parentStockId || row.id;
     if (checkedRoots.has(id)) return false;
     checkedRoots.add(id);
@@ -85,6 +94,14 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     } catch (error) { toast.error(errorText(error)); }
     finally { setBusy(false); }
   };
+  const verifyUnit=async(item:StockItem,active:boolean)=>{
+    const expiresOn=unitExpiries[item.id]||"";
+    if(active&&expiresOn<=today)return toast.error("Indica la vigencia real futura.");
+    if(!confirm(active?"¿Confirmas que funciona y que retiraste el acceso anterior de esta unidad?":"¿Confirmas que esta unidad ya no tiene suscripción?"))return;
+    setBusy(true);
+    try{await stockAdminVerifyUnit({data:{code:getSavedCode(),id:item.id,version:item.updatedAt,active,expiresOn:active?expiresOn:undefined}});setUnitExpiries(current=>({...current,[item.id]:""}));await load();onChanged?.();toast.success(active?"Cuenta disponible":"Baja confirmada");}
+    catch(e){toast.error(errorText(e));}finally{setBusy(false);}
+  };
   const saveRenewal=async(r:StockItem,date?:string)=>{
     setBusy(true);
     try{if(reactivating&&date){await stockAdminReactivate({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}else{await stockAdminRenewal({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,expiresOn:date}});}setRenewing(null);setReactivating(false);await load();onChanged?.();toast.success(reactivating?"Cuenta reactivada":date?"Renovación guardada":"Marcado como avisado");}
@@ -99,7 +116,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     }
     if(action==="expire"&&!confirm("¿Marcar como vencida?"))return;
     setBusy(true);
-    try{const result=await stockAdminReview({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,action,expiresOn}});await load();onChanged?.();setDays(result.status==="review"?"review":result.status==="expired"?"expired":"all");toast.success(result.status==="available"?"Cuenta liberada":result.status==="review"?"Enviada a Validar cuenta":"Enviada a Vencidas");}
+    try{const result=await stockAdminReview({data:{code:getSavedCode(),id:r.id,version:r.updatedAt,action,expiresOn}});await load();onChanged?.();setDays(scope?"all":result.status==="review"?"review":result.status==="expired"?"expired":"all");toast.success(result.status==="available"?"Cuenta liberada":"Enviada a Validar cuenta");}
     catch(e){toast.error(errorText(e));}finally{setBusy(false);}
   };
   return (
@@ -130,23 +147,23 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         </Button>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
-      {!sales ? (
-        <div className="seller-tabs">
+      {scope&&<div className="grid grid-cols-2 gap-2"><label className="seller-field"><span>Plataforma</span><select className="buyer-select" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label><label className="seller-field"><span>Tipo de cuenta</span><select className="buyer-select" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label></div>}
+      {!sales && scope!=="review" && scope!=="closed" ? (
+        <label className="seller-field"><span>Vigencia</span><select className="buyer-select" value={days} onChange={e=>setDays(e.target.value)}>
           {[
             ["all", "Todos"],
-            ["review", "Validar cuenta"],
-            ["expired", "⚫ Vencidos"],
+            ...(!scope?[["review", "Validar cuenta"],["expired", "⚫ Vencidos"]]:[]),
             ["red", `🔴 0–${limits.red} días`],
             ["yellow", `🟡 ${limits.red+1}–${limits.yellow} días`],
             ["green", `🟢 ${limits.yellow+1}+ días`],
             ["unknown", "Sin fecha"],
           ].map(([v, l]) => (
-            <button key={v} className={days === v ? "active" : ""} onClick={() => setDays(v)}>
-              {l} ({v==="review"?assigned.filter(isReview).length:assigned.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})
-            </button>
+            <option key={v} value={v}>
+              {l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})
+            </option>
           ))}
-        </div>
-      ) : showSummary ? (
+        </select></label>
+      ) : sales && showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
             <p>Ventas registradas</p>
@@ -167,13 +184,13 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
       ) : !rows.length ? (
         <EmptyState
           icon={sales ? "🧾" : "🎉"}
-          title={sales ? "Sin ventas para esta búsqueda" : "Nada por vencer aquí"}
+          title={sales ? "Sin ventas para esta búsqueda" : scope==="review"?"No hay cuentas pendientes de validar":scope==="closed"?"No hay bajas confirmadas":"No hay entregas para esta búsqueda"}
           description="Cambia el filtro para consultar otros registros."
         />
       ) : (
         <div className="seller-record-grid items-start">
           {visibleRows.map((r) => {
-            const root = items.find(item=>item.id===(r.parentStockId||r.id));
+            const root = scope?r:items.find(item=>item.id===(r.parentStockId||r.id));
             const profiles = root ? items.filter(item=>item.parentStockId===root.id) : [];
             const checking = requiresCheck(r) && Boolean(root);
             const family = root ? [root,...profiles] : [];
@@ -190,13 +207,14 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                   <span className="block truncate text-sm font-semibold">{label}</span>
                   <span className="block truncate text-xs text-muted-foreground">{checking && profiles.length ? `${profiles.length} perfiles vinculados` : `${r.clientName || "Sin cliente"} · ${r.stockKind === "profile" ? "Perfil" : "Completa"}`}</span>
                 </span>
-                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{withoutSubscription?"Sin suscripción":isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
+                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
               </summary>
               <div className="seller-disclosure-body">
               <p className="text-xs text-muted-foreground">
                 {sales ? `Entrega: ${r.deliveredOn} · ${money(r.salePrice)}` : `Vencimiento: ${r.expiresOn || "Sin asignar"}`}
               </p>
               {!sales&&r.renewalNotifiedAt&&<p className="mt-1 text-xs text-muted-foreground">✓ Avisado el {r.renewalNotifiedAt.slice(0,10)}</p>}
+              {scope==="deliveries"&&<details className="mt-3 rounded-xl border p-3"><summary className="cursor-pointer font-medium text-sm">Datos de entrega</summary><p className="mt-2 text-xs text-muted-foreground">Entrega {r.deliveredOn||"Sin fecha"} · {money(r.salePrice)}</p><dl className="mt-2 space-y-1 text-sm break-all"><dt className="font-semibold">Usuario</dt><dd>{r.username||"Sin usuario"}</dd><dt className="font-semibold">Contraseña</dt><dd>{r.password||"Sin contraseña"}</dd>{r.profilePin&&<><dt className="font-semibold">Perfil / PIN</dt><dd>{r.profilePin}</dd></>}</dl><Button type="button" className="mt-2" size="sm" variant="outline" onClick={async()=>{try{await copyText([r.platform,r.username,r.password,r.profilePin].filter(Boolean).join("\n"));toast.success("Entrega copiada");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales</Button></details>}
               {checking && root && <div className="mt-3 space-y-3">
                 <details className="rounded-xl border p-3">
                   <summary className="cursor-pointer font-semibold">Datos de acceso y perfiles</summary>
@@ -217,10 +235,10 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 </details>
                 <div className="seller-actions">
                   <label className="seller-field"><span>Vigencia verificada</span><Input type="date"
-                    value={familyExpiry} onChange={e=>setFamilyExpiry(e.target.value)} /></label>
-                  <Button size="sm" disabled={busy||!familyExpiry} onClick={()=>void verifyFamily(root,family,true)}>Funciona · Liberar</Button>
+                    value={scope?unitExpiries[r.id]||"":familyExpiry} onChange={e=>scope?setUnitExpiries(current=>({...current,[r.id]:e.target.value})):setFamilyExpiry(e.target.value)} /></label>
+                  <Button size="sm" disabled={busy||!(scope?unitExpiries[r.id]:familyExpiry)} onClick={()=>void (scope?verifyUnit(r,true):verifyFamily(root,family,true))}>Funciona · Liberar</Button>
                   {!withoutSubscription && <Button size="sm" variant="outline" disabled={busy}
-                    onClick={()=>void verifyFamily(root,family,false)}>Sin suscripción</Button>}
+                    onClick={()=>void (scope?verifyUnit(r,false):verifyFamily(root,family,false))}>Sin suscripción</Button>}
                 </div>
               </div>}
               {(!checking || Boolean(r.clientName || r.deliveredOn)) && <details className="mt-3">

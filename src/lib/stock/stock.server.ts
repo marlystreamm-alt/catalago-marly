@@ -63,7 +63,7 @@ export async function logStockHistory(stockId:string,businessId:string|null,acti
  const db=await admin(); const {error}=await db.from("stock_history").insert({stock_id:stockId,business_id:businessId,action,detail}); if(error) throw new Error(error.message);
 }
 
-export async function reviewStock(id: string, businessId: string | null, version: string, action: "nonrenewal" | "release" | "expire", expiresOn?: string) {
+export async function reviewStock(id: string, businessId: string | null, version: string, action: "nonrenewal" | "release" | "expire" | "verified_release" | "verified_invalid", expiresOn?: string) {
   const db = await admin();
   let query = db.from("stock_items").select("id,updated_at,protected_delivery_id,status,expires_on").eq("id", id);
   query = businessId ? query.eq("business_id", businessId) : query.is("business_id", null);
@@ -85,6 +85,17 @@ export async function reviewStock(id: string, businessId: string | null, version
   const result = await opsDB().rpc("ma2_review_stock", { p_id: id, p_business: businessId, p_version: version, p_action: action, p_expiry: expiresOn || null, p_document: document });
   if (result.error) throw new Error(result.error.message);
   return { status: String(result.data) };
+}
+
+/** Validate a single sellable unit without changing sibling profiles. */
+export async function verifyStockUnit(id:string,version:string,active:boolean,expiry?:string){
+  const db=await admin();
+  const {data,error}=await db.from("stock_items").select("id,status,expires_on,account_type,updated_at").eq("id",id).is("business_id",null).maybeSingle();
+  if(error||!data||data.updated_at!==version||data.account_type==="split_parent")throw new Error("La cuenta cambió o es un contenedor de perfiles.");
+  const children=await db.from("stock_items").select("id").eq("parent_stock_id",id).limit(1);
+  if(children.error||children.data?.length)throw new Error("Valida los perfiles individualmente.");
+  if(!["expired","review"].includes(data.status)&&!(data.expires_on&&data.expires_on<businessToday()))throw new Error("La cuenta todavía está vigente.");
+  return reviewStock(id,null,version,active?"verified_release":"verified_invalid",expiry);
 }
 
 export async function expireStockReviews() {

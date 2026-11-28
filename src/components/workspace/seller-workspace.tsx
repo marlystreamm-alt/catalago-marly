@@ -95,9 +95,7 @@ const SECTIONS = [
 export type Section = (typeof SECTIONS)[number][0];
 const NAV_GROUPS: {main:Section; label?:string; children:Section[]}[] = [
   {main:"home",children:[]},
-  {main:"expiry",children:[]},
-  {main:"orders",label:"Pedidos y entregas",children:[]},
-  {main:"inventory",children:["shop","combos"]},
+  {main:"inventory",children:[]},
   {main:"clients",children:["questions","referrals","wallet","credit"]},
   {main:"reports",children:[]},
   {main:"finance",children:[]},
@@ -138,7 +136,7 @@ export function SellerLayout({
   const [expanded,setExpanded]=useState<Section|null>(null);
   const selected = SECTIONS.find((s) => s[0] === section)!;
   const go=(id:Section)=>{onSection(id);setOpen(false);};
-  const parent = NAV_GROUPS.find((group) => group.children.includes(section))?.main ?? "home";
+  const parent = section==="shop"||section==="combos"?"inventory":NAV_GROUPS.find((group) => group.children.includes(section))?.main ?? "home";
   const navButton=(id:Section,label?:string)=>{const item=SECTIONS.find(s=>s[0]===id)!;return <button key={id} onClick={()=>go(id)} className={`w-full ${id===section?"active":""}`} aria-current={id===section?"page":undefined}><span aria-hidden="true">{item[1]}</span>{label||item[2]}</button>;};
   const nav = (
     <>
@@ -505,6 +503,9 @@ export function SellerWorkspace() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
+  const [inventoryView,setInventoryView]=useState<"stock"|"deliveries"|"review"|"closed">("stock");
+  const [pendingOpen,setPendingOpen]=useState(false);
+  const [historyOpen,setHistoryOpen]=useState(false);
   const [orderChannel, setOrderChannel] = useState<"all" | "web" | "cyberdoc">("all");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
@@ -548,14 +549,20 @@ export function SellerWorkspace() {
     void mainAppearanceLoad().then(a=>{setDesign(a);setSavedDesign(a);}).catch(()=>toast.error("No se pudo cargar la apariencia"));
   }, []);
   const navigate = (s: Section) => {
-    setSection(s);
-    setTab("main");
+    setSection(s==="orders"||s==="expiry"?"inventory":s);
+    setInventoryView(s==="expiry"?"deliveries":"stock");
+    setPendingOpen(s==="orders");
+    setHistoryOpen(false);
+    setTab(s==="expiry"?"delivered":"main");
     setOrderChannel("all");
     setSelectedOrderId(null);
     setAddStock(false);
     setAssignClient(null);
     setStockPlatformFilter(null);
     window.scrollTo({ top: 0, behavior: "instant" });
+  };
+  const changeInventoryView=(view:typeof inventoryView)=>{
+    setInventoryView(view);setTab(view==="deliveries"?"delivered":"main");setSelectedOrderId(null);setAssignClient(null);setStockPlatformFilter(null);setAddStock(false);setPendingOpen(false);setHistoryOpen(false);
   };
   const assign = (id: string) => { const client = records.find(r => r.id === id && r.module === "clients" && r.status === "active"); if (!client) return toast.error("El cliente no está disponible. Actualiza clientes e inténtalo de nuevo."); navigate("inventory"); setAssignClient(client); };
   const resource = (module: Module,subset=records) => (
@@ -580,14 +587,13 @@ export function SellerWorkspace() {
       ))}
     </div>
   );
-  const orderTabs = (
-    <div className="seller-tabs min-w-0 flex-1" aria-label="Estado de pedidos">
-      {([["main", "Pedidos"], ["processing", "En proceso"], ["delivered", "Entregadas"], ["closed", "Cancelados / rechazados"], ["protected", "Entregas protegidas"]] as const).map(([key, label]) => (
-        <button key={key} type="button" className={tab === key ? "active" : ""} aria-pressed={tab === key}
-          onClick={() => { setSelectedOrderId(null); setTab(key); }}>{label}</button>
-      ))}
-    </div>
-  );
+  const orderTabs = <label className="seller-field min-w-0 flex-1"><span>Estado</span><select className="buyer-select" value={tab} onChange={event=>{setSelectedOrderId(null);setTab(event.target.value);}}>{(inventoryView==="deliveries"?[["delivered","Entregadas"],["protected","Documentos protegidos"]]:[["main","Pendientes"],["processing","En proceso"],["closed","Cancelados / rechazados"]]).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>;
+  const orderPanel = tab === "protected" ? <div className="space-y-3">{orderTabs}<ProtectedDeliveriesDialog embedded /></div> : <div className="space-y-3">
+    <label className="seller-field"><span>Origen del pedido</span><select className="buyer-select" value={orderChannel} onChange={event=>{setOrderChannel(event.target.value as typeof orderChannel);setSelectedOrderId(null);}}><option value="all">Tienda web y Cyberdoc</option><option value="web">Tienda web</option><option value="cyberdoc">Cyberdoc</option></select></label>
+    <CyberDocsOrdersDialog key={orderChannel+":"+tab+":"+(selectedOrderId||"all")} channel={orderChannel==="all"?undefined:orderChannel} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":tab==="processing"||tab==="closed"?tab:"orders"} navigation={orderTabs} onStageChange={(id,stage)=>{setSelectedOrderId(id);setTab(stage==="deliveries"?"delivered":stage);if(stage==="deliveries"){setInventoryView("deliveries");setHistoryOpen(true);}void load();}}/>
+    {orderChannel!=="cyberdoc"&&(tab==="main"||tab==="delivered")&&<WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} onOpenOrder={(id,delivered,processing)=>{setSelectedOrderId(id);setTab(delivered?"delivered":processing?"processing":"main");if(delivered){setInventoryView("deliveries");setHistoryOpen(true);}}}/>}
+  </div>;
+  const renewalConfig=records.find(r=>r.module==="config"&&r.status==="active")?.data;
   let content: ReactNode;
   if (section === "home")
     content = (
@@ -602,14 +608,22 @@ export function SellerWorkspace() {
       />
     )}</div>);
   else if (section === "shop") content = <ProductPricing/>;
-  else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs"><button className="active">Inventario</button><button onClick={()=>navigate("shop")}>Productos y precios</button><button onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</button><button onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</button></div><StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab={assignClient ? "available" : "all"} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} />
+  else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs" aria-label="Inventario">{([['stock','Stock'],['deliveries','Entregas'],['review','Validar'],['closed','Bajas']] as const).map(([key,label])=><button key={key} className={inventoryView===key?"active":""} aria-pressed={inventoryView===key} onClick={()=>changeInventoryView(key)}>{label}</button>)}</div>
+      {inventoryView==="stock"&&<>
+      <details className="seller-disclosure" open={pendingOpen} onToggle={e=>setPendingOpen(e.currentTarget.open)}><summary className="font-semibold">Pedidos pendientes {summary?.pending??0}</summary><div className="seller-disclosure-body">{pendingOpen&&orderPanel}</div></details>
+      <StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded compact initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab="available" onDelivered={()=>{changeInventoryView("deliveries");void load();}} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} />
+      <details className="seller-card"><summary className="font-semibold cursor-pointer">Productos, precios y combos</summary><div className="seller-actions mt-2"><Button variant="outline" size="sm" onClick={()=>navigate("shop")}>Productos y precios</Button><Button variant="outline" size="sm" onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</Button><Button variant="outline" size="sm" onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</Button></div></details>
       <details className="seller-card">
         <summary className="font-semibold cursor-pointer">Pendientes de entregas manuales</summary>
         {resource("requests", records.filter(record => record.module !== "requests" || record.status === "pending"))}
       </details>
+      </>}
+      {inventoryView!=="stock"&&<StockInsights key={inventoryView} scope={inventoryView} limits={renewalLimits(renewalConfig?.renewalRedDays,renewalConfig?.renewalYellowDays)} onChanged={()=>void load()}/>}
+      {inventoryView==="deliveries"&&<>
+      <details className="seller-disclosure" open={historyOpen} onToggle={e=>setHistoryOpen(e.currentTarget.open)}><summary className="font-semibold">Historial de pedidos y documentos</summary><div className="seller-disclosure-body">{historyOpen&&orderPanel}</div></details>
       <details className="seller-card"><summary className="font-semibold cursor-pointer">Historial de entregas manuales y combos</summary><div className="mt-3 space-y-3">{records.filter(r=>r.module==="requests"&&r.status==="completed").map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{r.data.comboStockIds?"Combo de inventario":"Entrega manual"} · {records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p><p>{money(Number(r.data.amount||0))}</p><div className="flex flex-wrap gap-2 mt-2">{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}{r.data.comboStockIds&&r.data.deliveryUrl&&<Button variant="outline" size="sm" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:r.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales sin documento</Button>}{r.data.deliveryUrl&&<Button variant="outline" size="sm" asChild><a href={r.data.deliveryUrl} target="_blank" rel="noopener noreferrer">Documento protegido</a></Button>}</div></article>)}</div></details>
+      </>}
     </div>;
-  else if (section === "expiry") {const cfg=records.find(r=>r.module==="config"&&r.status==="active")?.data;content = <StockInsights limits={renewalLimits(cfg?.renewalRedDays,cfg?.renewalYellowDays)} onChanged={()=>void load()}/>;}
   else if (section === "finance") content = <FinancePanel />;
   else if (section === "wallet")
     content = (
@@ -640,41 +654,6 @@ export function SellerWorkspace() {
         debt={section === "credit"}
       />
     );
-  else if (section === "orders")
-    content = tab === "protected" ? <div className="space-y-4">
-      {orderTabs}
-      <ProtectedDeliveriesDialog embedded />
-    </div> : <div className="space-y-4">
-      <label className="seller-field">
-        <span>Origen del pedido</span>
-        <select className="buyer-select" value={orderChannel} onChange={event => {
-          setOrderChannel(event.target.value as typeof orderChannel);
-          setSelectedOrderId(null);
-        }}>
-          <option value="all">Tienda web y Cyberdoc</option>
-          <option value="web">Tienda web</option>
-          <option value="cyberdoc">Cyberdoc</option>
-        </select>
-      </label>
-      <CyberDocsOrdersDialog
-        key={orderChannel + ":" + tab + ":" + (selectedOrderId || "all")}
-        channel={orderChannel === "all" ? undefined : orderChannel}
-        embedded
-        initialSelectedId={selectedOrderId}
-        stage={tab === "delivered" ? "deliveries" : tab === "processing" || tab === "closed" ? tab : "orders"}
-        navigation={orderTabs}
-        onStageChange={(id, stage) => {
-          setSelectedOrderId(id);
-          setTab(stage === "deliveries" ? "delivered" : stage);
-        }}
-      />
-      {orderChannel !== "cyberdoc" && (tab === "main" || tab === "delivered") && <WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"}
-        onOpenOrder={(id, delivered, processing) => {
-          setSelectedOrderId(id);
-          setTab(delivered ? "delivered" : processing ? "processing" : "main");
-        }}
-      />}
-    </div>;
   else if (section === "reports")
     content = (
       <div className="space-y-3">
@@ -759,7 +738,7 @@ export function SellerWorkspace() {
         )}
       </>
     );
-  else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("inventory");void load();}}/>;
+  else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("expiry");void load();}}/>;
   else if (section === "extras") content = <div className="seller-card">{sectionLinks("extras")}</div>;
   else if (section === "subscription")
     content = (

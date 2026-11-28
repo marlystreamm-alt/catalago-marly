@@ -83,3 +83,7 @@ export const stockAdminVerifyFamily=createServerFn({method:"POST"}).validator((d
   await adminGate(data.code);
   return (await import("./stock.server")).verifyStockFamily(data.root,data.members,data.active,data.expiresOn);
 });
+export const stockAdminVerifyUnit=createServerFn({method:"POST"}).validator((d:unknown)=>z.object({code,id:z.string().uuid(),version:z.string().min(1).max(100),active:z.boolean(),expiresOn:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()}).parse(d)).handler(async({data})=>{
+  await adminGate(data.code);
+  return (await import("./stock.server")).verifyStockUnit(data.id,data.version,data.active,data.expiresOn);
+});

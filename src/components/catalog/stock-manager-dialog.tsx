@@ -3,7 +3,7 @@ import { ContactPhoneInput } from "@/components/workspace/contact-phone-input";
 import { phoneNumber, validWhatsApp, validFullName, validClientEmail, transferReferenceMessage } from "@/lib/workspace/model";
 import { pricingLoad } from "@/lib/customer/pricing.functions";
 import { pricingKey, type PriceRow } from "@/lib/customer/pricing";
-import { MASTER_PLANS, stockPlatform } from "@/lib/stock/master-products";
+import { MASTER_PLANS, stockPlatform, groupPlatforms, platformFamily } from "@/lib/stock/master-products";
 import {stockRevertPlan} from "@/lib/stock/revert";
 import { Switch } from '@/components/ui/switch';
 import { expiresAfterMonths, businessToday } from '@/lib/stock/duration';
@@ -168,6 +168,8 @@ export function StockManagerDialog({
   initialPlatform,
   autoAdd = false,
   initialClient,
+  compact = false,
+  onDelivered,
   ownerToken,
   ownerFeatures,
   whatsappTemplate = "Hola {cliente}, aquí tienes tu entrega: {link}",
@@ -177,6 +179,8 @@ export function StockManagerDialog({
   initialPlatform?: { key: string; platform: string } | null;
   autoAdd?: boolean;
   initialClient?: {id:string;name:string;whatsapp:string;email?:string;clientReference?:string};
+  compact?: boolean;
+  onDelivered?: () => void;
   ownerToken?: string;
   ownerFeatures?: FeatureMap;
   whatsappTemplate?: string;
@@ -191,6 +195,9 @@ export function StockManagerDialog({
   const [items, setItems] = useState<StockItem[]>([]);
   const [stockTab, setStockTab] = useState<StockTab>(initialTab);
   const [q, setQ] = useState("");
+  const [kindFilter,setKindFilter]=useState<"all"|"profile"|"complete">("all");
+  const [familyFilter,setFamilyFilter]=useState("");
+  const [availability,setAvailability]=useState<"all"|"ready"|"incomplete">("all");
   const [platformFilter, setPlatformFilter] = useState(initialPlatform);
   const [cyberdocOrders, setCyberdocOrders] = useState<CyberDocsOrder[]>([]);
 
@@ -292,6 +299,7 @@ export function StockManagerDialog({
   const parentIds = useMemo(() => new Set(items.map(x => x.parentStockId).filter(Boolean)), [items]);
   const isContainer = (x: StockItem) => parentIds.has(x.id) || x.accountType === "split_parent";
   const isExpired = (x: StockItem) => (!isContainer(x) && x.status === "expired") || Boolean(x.expiresOn && x.expiresOn < businessToday());
+  const availableUnits=items.filter(x=>x.status==="available"&&!isContainer(x)&&!isExpired(x));
   const needsReview = (x: StockItem) => x.status === "review" && !isExpired(x);
   const soldItems = items.filter((x) => !isContainer(x) && x.status !== "available" && x.status !== "review" && !isExpired(x));
   const renewalItems = useMemo(
@@ -302,7 +310,7 @@ export function StockManagerDialog({
 
   const tabItems = useMemo(() => {
     let base = [...items];
-    if (stockTab === "available") base = base.filter((x) => admin?availableIds.has(x.id):x.status==="available");
+    if (stockTab === "available") base = base.filter((x) => compact&&!initialClient?x.status==="available"&&!isContainer(x)&&!isExpired(x)&&(availability==="all"||(availability==="ready"?availableIds.has(x.id):!availableIds.has(x.id))):admin?availableIds.has(x.id):x.status==="available");
     if (stockTab === "sold") base = base.filter((x) => !isContainer(x) && x.status !== "available" && x.status !== "review" && !isExpired(x));
     if (stockTab === "review") base = base.filter(needsReview);
     if (stockTab === "expiring")
@@ -312,6 +320,8 @@ export function StockManagerDialog({
     const needle = q.trim().toLowerCase();
     return base
       .filter((x) => !platformFilter || stockPlatform(x.platform).key === platformFilter.key)
+      .filter(x=>kindFilter==="all"||x.stockKind===kindFilter)
+      .filter(x=>!familyFilter||platformFamily(x.platform)===familyFilter)
       .filter((x) => !needle || `${x.platform} ${stockPlatform(x.platform).label} ${x.username} ${x.clientName} ${x.clientWhatsapp} ${x.expiresOn || ""}`.toLowerCase().includes(needle))
       .sort((a, b) => {
         const ad = a.expiresOn ? new Date(a.expiresOn).getTime() : Number.MAX_SAFE_INTEGER;
@@ -319,7 +329,7 @@ export function StockManagerDialog({
         if (stockTab === "expired") return (b.expiresOn || "").localeCompare(a.expiresOn || "") || b.createdAt.localeCompare(a.createdAt);
         return stockTab === "expiring" ? ad - bd : b.createdAt.localeCompare(a.createdAt);
       });
-  }, [items, stockTab, q, admin, availableIds, platformFilter]);
+  }, [items, stockTab, q, admin, availableIds, platformFilter,kindFilter,familyFilter,availability,compact,initialClient]);
 
   async function persist(item: StockItem, success = "Registro guardado") {
     const saved = ownerToken
@@ -566,7 +576,7 @@ export function StockManagerDialog({
   }
 
   function openManualDelivery(item: StockItem) {
-    if (busy || item.status !== "available" || !can("stock_assign")) return;
+    if (busy || item.status !== "available" || !can("stock_assign") || (admin&&!availableIds.has(item.id))) return;
     setDeliver(item);
     deliveryRequestId.current=crypto.randomUUID();
     setDeliveryImages([]);
@@ -655,6 +665,7 @@ export function StockManagerDialog({
           <span className="seller-badge">{platformFilter.platform}</span>
           <Button size="sm" variant="ghost" onClick={() => setPlatformFilter(null)}>Quitar filtro</Button>
         </div>}
+        {compact&&<><p className="text-sm text-muted-foreground">{availableIds.size} listas para vender · {availableUnits.length-availableIds.size} incompletas</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><label className="seller-field"><span>Plataforma</span><select className="buyer-select" value={familyFilter} onChange={e=>setFamilyFilter(e.target.value)}><option value="">Todas</option>{groupPlatforms(availableUnits,x=>x.platform).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(group=><option key={group.name}>{group.name}</option>)}</select></label><label className="seller-field"><span>Tipo de cuenta</span><select className="buyer-select" value={kindFilter} onChange={e=>setKindFilter(e.target.value as typeof kindFilter)}><option value="all">Todos</option><option value="profile">Perfiles</option><option value="complete">Cuentas completas</option></select></label>{!initialClient&&<label className="seller-field"><span>Disponibilidad</span><select className="buyer-select" value={availability} onChange={e=>setAvailability(e.target.value as typeof availability)}><option value="all">Todas</option><option value="ready">Listas para vender</option><option value="incomplete">Datos incompletos</option></select></label>}</div></>}
         <details className="seller-disclosure">
           <summary className="text-sm font-medium">Opciones de inventario</summary>
           <div className="seller-disclosure-body flex flex-wrap gap-2">
@@ -685,7 +696,7 @@ export function StockManagerDialog({
         </section>}
 
           <div className="grid gap-3">
-            <div className="seller-tabs !m-0" aria-label="Estado del inventario">
+            {!compact && <div className="seller-tabs !m-0" aria-label="Estado del inventario">
               {([
                 ["all", "Todos"],
                 ["available", "Disponibles"],
@@ -694,13 +705,15 @@ export function StockManagerDialog({
                 ["review", "Validar cuenta"],
                 ["expired", "Vencidas / bajas"],
               ] as [StockTab, string][]).map(([key, label]) => <button key={key} type="button" className={stockTab === key ? "active" : ""} aria-pressed={stockTab === key} onClick={() => setStockTab(key)}>{label} ({countTab(key)})</button>)}
-            </div>
+            </div>}
 
             {busy ? <Loader2 className="mx-auto size-5 animate-spin" /> : null}
             <div className="overflow-hidden rounded-2xl border">
-              {tabItems.map((x) => {
+              {groupPlatforms(tabItems,x=>x.platform).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(group=><details key={group.name} className="seller-disclosure !rounded-none !border-x-0 !border-t-0" open={initialClient?true:undefined}>
+                <summary><StockPlatformMark name={group.name}/><span className="min-w-0 flex-1 font-semibold">{group.name}</span><span className="text-xs text-muted-foreground">{group.items.filter(x=>x.stockKind==="complete").length} completas · {group.items.filter(x=>x.stockKind==="profile").length} perfiles</span></summary>
+                <div className="seller-disclosure-body">{group.items.map((x) => {
                 const d = daysUntil(x.expiresOn);
-                const statusText = isExpired(x) ? "Caducada" : isContainer(x) ? "Dividida en perfiles · vigente" : x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
+                const statusText = isExpired(x) ? "Caducada" : isContainer(x) ? "Dividida en perfiles · vigente" : x.status==="available"&&admin&&!availableIds.has(x.id)?"Datos incompletos":x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
                 const platform = <><StockPlatformMark name={stockPlatform(x.platform).label} /><span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
                   {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
@@ -718,6 +731,7 @@ export function StockManagerDialog({
                   <details key={x.id} className="seller-disclosure !rounded-none !border-x-0 !border-t-0 last:!border-b-0">
                     <summary>{platform}{status}</summary>
                     <div className="seller-disclosure-body flex flex-wrap gap-2">
+                      {x.status === "available" && availableIds.has(x.id) && can("stock_assign") && <Button size="sm" disabled={busy} onClick={()=>openManualDelivery(x)}>Asignar</Button>}
                       {x.status === "review" && can("stock_edit") && <>
                         {!isExpired(x) && <Button size="sm" disabled={busy} onClick={() => void resolveReview(x,"release")}>Funciona · Liberar</Button>}
                         <Button size="sm" variant="outline" disabled={busy} onClick={() => void resolveReview(x,"expire")}>Caducada</Button>
@@ -731,7 +745,7 @@ export function StockManagerDialog({
                     </div>
                   </details>
                 );
-              })}
+              })}</div></details>)}
               {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay registros en esta subpestaña.</p> : null}
             </div>
           </div>
@@ -746,7 +760,7 @@ export function StockManagerDialog({
                 <Select value={selectedPlatform(form)} onValueChange={value=>setForm(current=>{
                   const option = options.find(item=>item.id===value);
                   if (!option) return {...current,platform:""};
-                  const stockKind = current.id ? current.stockKind : option.kind || current.stockKind;
+                  const stockKind = current.id || splitOnSave ? current.stockKind : option.kind || current.stockKind;
                   return {...current,platform:option.platform,durationMonths:option.months||current.durationMonths,
                     stockKind,accountType: stockKind===current.stockKind ? current.accountType : stockKind==="profile"?"Perfil":"Completa"};
                 })}>
@@ -763,7 +777,7 @@ export function StockManagerDialog({
                 {selectedPlatform(form)==="manual" && <Input className="mt-2" value={form.platform}
                   onChange={e=>setForm({...form,platform:e.target.value})} placeholder="Nombre exacto del servicio" />}
               </div>
-              <div><Label>Tipo de stock</Label><Select value={form.stockKind} disabled={Boolean(form.id)} onValueChange={v=>setForm({...form,stockKind:v as "complete"|"profile",accountType:v==="profile"?"Perfil":"Completa"})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="complete">Cuenta completa</SelectItem><SelectItem value="profile">Perfil individual</SelectItem></SelectContent></Select></div>
+              <div><Label>Tipo de stock</Label><Select value={splitOnSave?"split":form.stockKind} disabled={Boolean(form.id)} onValueChange={v=>{setSplitOnSave(v==="split");if(v==="split")setBulkMode(false);setForm({...form,stockKind:v==="profile"?"profile":"complete",accountType:v==="profile"?"Perfil":"Completa"});}}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="complete">Cuenta completa para vender</SelectItem>{!bulkMode&&can("stock_edit")&&can("stock_add")&&<SelectItem value="split">Cuenta completa para dividir en perfiles</SelectItem>}<SelectItem value="profile">Perfil individual ya separado</SelectItem></SelectContent></Select></div>
               {!bulkMode ? <div><Label>Usuario / correo</Label><Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></div> : null}
               {!bulkMode ? <div><Label>Contraseña</Label><div className="relative"><Input type={showPass && can("stock_view_password") ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pr-10" /><Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setShowPass((v) => !v)}>{showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</Button></div></div> : null}
               {!bulkMode ? <div><Label>Perfil / PIN</Label><Input value={form.profilePin} onChange={(e) => setForm({ ...form, profilePin: e.target.value })} /></div> : null}
@@ -778,9 +792,8 @@ export function StockManagerDialog({
               <div className="sm:col-span-3"><Label>Notas privadas</Label><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
               {bulkMode ? <div className="sm:col-span-3"><Label>Cuentas del lote</Label><Textarea rows={7} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={'correo1@ejemplo.com | contraseña1 | PIN1\ncorreo2@ejemplo.com | contraseña2 | PIN2'} /><p className="mt-1 text-[11px] text-muted-foreground">Una cuenta por renglón: correo/usuario | contraseña | PIN. Las completas se revisan por plataforma y correo. Los perfiles pueden compartir correo.</p></div> : null}
             </div>
-            {!bulkMode && form.stockKind === "complete" && form.status === "available" && can("stock_add") && can("stock_edit") ? (
+            {!bulkMode && form.stockKind === "complete" && form.status === "available" && can("stock_add") && can("stock_edit") && splitOnSave ? (
               <div className="space-y-3 rounded-xl border p-3">
-                <label className="flex items-center justify-between gap-3 text-sm"><span>Guardar y convertir a perfiles</span><Switch checked={splitOnSave} onCheckedChange={setSplitOnSave} /></label>
                 {splitOnSave ? <div><Label>Cantidad de perfiles (1 a 10)</Label><Input type="number" min={1} max={10} step={1} value={profileCount} onChange={e => setProfileCount(e.target.value)} /><p className="mt-2 text-xs text-muted-foreground">Los perfiles conservarán el correo, contraseña, panel y vigencia. La completa quedará fuera de Disponibles.</p></div> : null}
               </div>
             ) : null}
@@ -816,7 +829,7 @@ export function StockManagerDialog({
                 {can("stock_edit") ? <Button size="sm" variant="outline" onClick={() => { setForm({ ...toolsItem }); setBulkMode(false); setSplitOnSave(false); setFormOpen(true); setToolsItem(null); }}><Pencil className="mr-1 size-3.5" />Editar datos</Button> : null}
                 {can("stock_edit") && can("stock_add") && toolsItem.stockKind !== "profile" && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => void convertToProfiles(toolsItem)}>Convertir a perfiles</Button> : null}
                 {can("stock_edit") && toolsItem.stockKind === "profile" ? <Button size="sm" variant="outline" onClick={() => void revertToComplete(toolsItem)}>Revertir a completa</Button> : null}
-                {can("stock_assign") && toolsItem.status === "available" ? <Button size="sm" variant="outline" onClick={() => openManualDelivery(toolsItem)}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
+                {can("stock_assign") && toolsItem.status === "available" && (!admin||availableIds.has(toolsItem.id)) ? <Button size="sm" variant="outline" onClick={() => openManualDelivery(toolsItem)}><PackageCheck className="mr-1 size-3.5" />Entrega manual</Button> : null}
                 <Button size="sm" variant="outline" onClick={() => void openHistory(toolsItem)}><History className="mr-1 size-3.5" />Ver historial</Button>
                 {["assigned","expiring","expired"].includes(toolsItem.status) && (toolsItem.clientName || toolsItem.deliveredOn) && can("stock_edit") ? <><Button size="sm" onClick={() => void informClient(toolsItem)}><BellRing className="mr-1 size-3.5" />Informar al cliente</Button><Button size="sm" variant="outline" onClick={() => void setRenewalStatus(toolsItem, "Quiere renovar")}>Quiere renovar</Button><Button size="sm" variant="outline" onClick={() => void renew(toolsItem)}>Renovar</Button><Button size="sm" variant="outline" onClick={() => void noRenew(toolsItem)}>No renovó</Button></> : null}
                 {can("stock_delete") ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(toolsItem.id)}><Trash2 className="mr-1 size-3.5" />Eliminar</Button> : null}
@@ -846,7 +859,7 @@ export function StockManagerDialog({
                 }} onName={name=>{if(!deliverOrderRef&&!deliverClient.trim())setDeliverClient(name);}}/></div>
                 <div><Label>Fecha de vencimiento</Label><Input type="date" value={deliverStockExpires} onChange={(e) => setDeliverStockExpires(e.target.value)} /></div>
                 <div><Label>Precio de venta</Label><Input type="number" min={0} step="0.01" value={deliverSalePrice} onChange={(e) => setDeliverSalePrice(e.target.value)} />{admin&&<p className="mt-1 text-xs text-muted-foreground">Se registra la venta sin modificar el saldo de la tienda.</p>}</div>
-                {admin ? <div className="sm:col-span-2 space-y-1"><Label>Pedido de Cyberdoc (opcional)</Label>
+                {admin ? <div className="sm:col-span-2 space-y-1"><Label>Vincular pedido web o Cyberdoc (opcional)</Label>
                   <Select value={deliverOrderRef || "manual"} onValueChange={(value) => {
                     const selected = cyberdocOrders.find((order) => order.id === value);
                     setClientChoice("manual");
@@ -858,7 +871,7 @@ export function StockManagerDialog({
                   }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
                     <SelectItem value="manual">Entrega manual sin pedido</SelectItem>
                     {cyberdocOrders.filter((order) => !["completed", "cancelled", "rejected"].includes(order.status) && !order.stockItemId && !order.protectedDeliveryId).map((order) =>
-                      <SelectItem key={order.id} value={order.id}>{order.cyberdocsOrderId} · {order.clientName} · {order.serviceName}</SelectItem>
+                      <SelectItem key={order.id} value={order.id}>{order.sourceLabel || "Pedido"} · {order.cyberdocsOrderId} · {order.clientName} · {order.serviceName}</SelectItem>
                     )}
                   </SelectContent></Select>
                   {deliverOrderRef ? <p className="text-xs text-muted-foreground">Al entregar, el pedido quedará finalizado con este documento, cuenta y vencimiento. Puedes corregir el contacto desde Cyberdoc.</p> : null}
@@ -875,7 +888,7 @@ export function StockManagerDialog({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={Boolean(deliveryResult)} onOpenChange={value => { if (!value) setDeliveryResult(null); }}>
+        <Dialog open={Boolean(deliveryResult)} onOpenChange={value => { if (!value) {setDeliveryResult(null);onDelivered?.();} }}>
           <DialogContent className="max-w-xl">
             <DialogHeader><DialogTitle>Entrega registrada</DialogTitle><DialogDescription>Elige cómo compartir el servicio con tu cliente.</DialogDescription></DialogHeader>
             {deliveryResult ? <div className="grid gap-2">
