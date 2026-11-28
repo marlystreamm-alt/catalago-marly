@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Settings } from "lucide-react";
 import { stockPlatform, platformFamily } from "@/lib/stock/master-products";
 import { StockPlatformMark } from "./stock-platform-mark";
 import { copyText } from "@/lib/browser/clipboard";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { InventoryFilterMenu } from "./inventory-filter-menu";
 import { Input } from "@/components/ui/input";
 import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminVerifyFamily, stockAdminVerifyUnit, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
@@ -121,14 +123,19 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   };
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-1">
-        <Input className="min-w-0 flex-1" aria-label="Buscar ventas o vencimientos" value={query}
-          onChange={(event) => setQuery(event.target.value)} placeholder="Buscar plataforma o cliente" />
-        <Button variant="ghost" size="icon" aria-label="Actualizar vigencias" title="Actualizar"
-          disabled={busy} onClick={() => void load()}><RefreshCw /></Button>
-        <Button
-          variant="ghost" size="icon" aria-label="Exportar CSV" title="Exportar CSV"
-          onClick={() =>
+      <div className="flex items-center gap-1.5">
+        <Input className="h-10 min-w-0 flex-1" aria-label="Buscar ventas o vencimientos" value={query}
+          onChange={(event) => setQuery(event.target.value)} placeholder="Buscar…" />
+        {!sales&&<InventoryFilterMenu count={Number(Boolean(platform))+Number(kind!=="all")+Number(days!=="all")} onClear={()=>{setPlatform("");setKind("all");setDays("all");}}>
+          {scope&&<>
+            <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label>
+            <label className="grid gap-1.5 text-xs font-medium"><span>Tipo de cuenta</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label>
+          </>}
+          {scope!=="review"&&scope!=="closed"&&<label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope?[["review","Validar cuenta"],["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>}
+        </InventoryFilterMenu>}
+        <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones de inventario" title="Opciones de inventario"><Settings className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-xl">
+        <DropdownMenuItem disabled={busy} onSelect={()=>void load()}><RefreshCw/>Actualizar</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() =>
             exportRows(
               rows.map((r) => ({
                 Plataforma: stockPlatform(r.platform).label,
@@ -142,28 +149,11 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
               sales ? "ventas" : "vencimientos",
             )
           }
-        >
-          <Download />
-        </Button>
+        ><Download />Exportar CSV</DropdownMenuItem>
+        </DropdownMenuContent></DropdownMenu>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
-      {scope&&<div className="grid grid-cols-2 gap-2"><label className="seller-field"><span>Plataforma</span><select className="buyer-select" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label><label className="seller-field"><span>Tipo de cuenta</span><select className="buyer-select" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label></div>}
-      {!sales && scope!=="review" && scope!=="closed" ? (
-        <label className="seller-field"><span>Vigencia</span><select className="buyer-select" value={days} onChange={e=>setDays(e.target.value)}>
-          {[
-            ["all", "Todos"],
-            ...(!scope?[["review", "Validar cuenta"],["expired", "⚫ Vencidos"]]:[]),
-            ["red", `🔴 0–${limits.red} días`],
-            ["yellow", `🟡 ${limits.red+1}–${limits.yellow} días`],
-            ["green", `🟢 ${limits.yellow+1}+ días`],
-            ["unknown", "Sin fecha"],
-          ].map(([v, l]) => (
-            <option key={v} value={v}>
-              {l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})
-            </option>
-          ))}
-        </select></label>
-      ) : sales && showSummary ? (
+      {sales && showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
             <p>Ventas registradas</p>

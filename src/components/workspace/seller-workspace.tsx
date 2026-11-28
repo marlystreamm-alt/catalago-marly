@@ -18,6 +18,10 @@ import {
   Copy,
   QrCode,
   Plus,
+  Boxes,
+  PackageCheck,
+  ClipboardCheck,
+  ArchiveX,
 } from "lucide-react";
 import { toast } from "sonner";
 import qrcode from "qrcode-generator";
@@ -608,7 +612,7 @@ export function SellerWorkspace() {
       />
     )}</div>);
   else if (section === "shop") content = <ProductPricing/>;
-  else if (section === "inventory") content = <div className="space-y-3"><div className="seller-tabs" aria-label="Inventario">{([['stock','Stock'],['deliveries','Entregas'],['review','Validar'],['closed','Bajas']] as const).map(([key,label])=><button key={key} className={inventoryView===key?"active":""} aria-pressed={inventoryView===key} onClick={()=>changeInventoryView(key)}>{label}</button>)}</div>
+  else if (section === "inventory") content = <div className="space-y-3"><div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Inventario">{([['stock','Stock'],['deliveries','Entregas'],['review','Validar'],['closed','Bajas']] as const).map(([key,label])=>{const Icon={stock:Boxes,deliveries:PackageCheck,review:ClipboardCheck,closed:ArchiveX}[key];const active=inventoryView===key;return <Button type="button" key={key} variant={active?"default":"outline"} className="h-auto min-h-14 min-w-0 flex-col gap-1 rounded-xl px-1 py-2 text-xs font-semibold sm:flex-row sm:text-sm" aria-pressed={active} onClick={()=>changeInventoryView(key)}><Icon className="size-4 shrink-0" aria-hidden="true"/>{label}</Button>;})}</div>
       {inventoryView==="stock"&&<>
       <details className="seller-disclosure" open={pendingOpen} onToggle={e=>setPendingOpen(e.currentTarget.open)}><summary className="font-semibold">Pedidos pendientes {summary?.pending??0}</summary><div className="seller-disclosure-body">{pendingOpen&&orderPanel}</div></details>
       <StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded compact initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab="available" onDelivered={()=>{changeInventoryView("deliveries");void load();}} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} />

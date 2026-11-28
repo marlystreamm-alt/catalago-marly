@@ -28,11 +28,14 @@ import {
   Plus,
   RefreshCw,
   Settings2,
+  Settings,
   Trash2,
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { InventoryFilterMenu } from "@/components/workspace/inventory-filter-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -654,29 +657,29 @@ export function StockManagerDialog({
           <DialogDescription className="sr-only">Cuentas y perfiles del inventario.</DialogDescription>
         </DialogHeader>}
         {initialClient && <p className="text-sm font-semibold">Asignar cuenta a {initialClient.name}</p>}
-        <div className="flex flex-wrap items-center gap-2">
-          <Input className="min-w-32 flex-1" value={q} onChange={(event) => setQ(event.target.value)}
-            aria-label="Buscar en inventario" placeholder="Buscar plataforma o cliente" />
-          {can("stock_add") && <Button size="sm" onClick={() => {
+        <div className="flex items-center gap-1.5">
+          <Input className="h-10 min-w-0 flex-1" value={q} onChange={(event) => setQ(event.target.value)}
+            aria-label="Buscar en inventario" placeholder="Buscar…" />
+          {can("stock_add") && <Button size="sm" className="h-10 shrink-0 gap-1 px-2.5" aria-label="Agregar stock" onClick={() => {
             setForm(blank()); setSplitOnSave(false); setBulkMode(false); setFormOpen(true);
-          }}><Plus className="size-4" />Agregar stock</Button>}
+          }}><Plus className="size-4" /><span>Agregar<span className="hidden sm:inline"> stock</span></span></Button>}
+          {compact&&<InventoryFilterMenu count={Number(Boolean(platformFilter))+Number(Boolean(familyFilter))+Number(kindFilter!=="all")+Number(availability!=="all")} onClear={()=>{setPlatformFilter(null);setFamilyFilter("");setKindFilter("all");setAvailability("all");}}>
+            {platformFilter&&<div className="flex items-center justify-between gap-1 text-xs"><span>{platformFilter.platform}</span><Button size="sm" variant="ghost" onClick={()=>setPlatformFilter(null)}>Quitar</Button></div>}
+            <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={familyFilter} onChange={e=>setFamilyFilter(e.target.value)}><option value="">Todas</option>{groupPlatforms(availableUnits,x=>x.platform).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(group=><option key={group.name}>{group.name}</option>)}</select></label>
+            <label className="grid gap-1.5 text-xs font-medium"><span>Tipo de cuenta</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={kindFilter} onChange={e=>setKindFilter(e.target.value as typeof kindFilter)}><option value="all">Todos</option><option value="profile">Perfiles</option><option value="complete">Cuentas completas</option></select></label>
+            {!initialClient&&<label className="grid gap-1.5 text-xs font-medium"><span>Disponibilidad</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={availability} onChange={e=>setAvailability(e.target.value as typeof availability)}><option value="all">Todas</option><option value="ready">Listas para vender</option><option value="incomplete">Datos incompletos</option></select></label>}
+          </InventoryFilterMenu>}
+          <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones de inventario" title="Opciones de inventario"><Settings className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56 rounded-xl">
+            <DropdownMenuItem disabled={busy} onSelect={()=>void load()}><RefreshCw/>Actualizar</DropdownMenuItem>
+            {can("stock_export")&&<DropdownMenuItem onSelect={exportBackup}><Download/>Exportar respaldo</DropdownMenuItem>}
+            {admin&&<DropdownMenuItem disabled={busy} onSelect={async()=>{try{setDeletedStock(await stockAdminDeletedList({data:{code:getSavedCode()}}));}catch(error){toast.error(err(error));}}}><History/>Papelera de inventario</DropdownMenuItem>}
+          </DropdownMenuContent></DropdownMenu>
         </div>
-        {platformFilter && <div className="flex flex-wrap items-center gap-2">
+        {platformFilter && !compact && <div className="flex flex-wrap items-center gap-2">
           <span className="seller-badge">{platformFilter.platform}</span>
           <Button size="sm" variant="ghost" onClick={() => setPlatformFilter(null)}>Quitar filtro</Button>
         </div>}
-        {compact&&<><p className="text-sm text-muted-foreground">{availableIds.size} listas para vender · {availableUnits.length-availableIds.size} incompletas</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><label className="seller-field"><span>Plataforma</span><select className="buyer-select" value={familyFilter} onChange={e=>setFamilyFilter(e.target.value)}><option value="">Todas</option>{groupPlatforms(availableUnits,x=>x.platform).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(group=><option key={group.name}>{group.name}</option>)}</select></label><label className="seller-field"><span>Tipo de cuenta</span><select className="buyer-select" value={kindFilter} onChange={e=>setKindFilter(e.target.value as typeof kindFilter)}><option value="all">Todos</option><option value="profile">Perfiles</option><option value="complete">Cuentas completas</option></select></label>{!initialClient&&<label className="seller-field"><span>Disponibilidad</span><select className="buyer-select" value={availability} onChange={e=>setAvailability(e.target.value as typeof availability)}><option value="all">Todas</option><option value="ready">Listas para vender</option><option value="incomplete">Datos incompletos</option></select></label>}</div></>}
-        <details className="seller-disclosure">
-          <summary className="text-sm font-medium">Opciones de inventario</summary>
-          <div className="seller-disclosure-body flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" onClick={() => void load()} disabled={busy}><RefreshCw />Actualizar</Button>
-            {can("stock_export") && <Button size="sm" variant="ghost" onClick={exportBackup}><Download />Exportar respaldo</Button>}
-            {admin && <Button size="sm" variant="ghost" disabled={busy} onClick={async () => {
-              try { setDeletedStock(await stockAdminDeletedList({ data: { code: getSavedCode() } })); }
-              catch (error) { toast.error(err(error)); }
-            }}><History />Papelera de inventario</Button>}
-          </div>
-        </details>
+        {compact&&<p className="text-xs text-muted-foreground">{availableIds.size} listas para vender · {availableUnits.length-availableIds.size} incompletas</p>}
         {deletedStock && <section className="rounded-2xl border p-3 space-y-3">
           <div className="flex items-center justify-between"><h3 className="font-semibold">Papelera de inventario</h3><Button size="sm" variant="ghost" onClick={()=>setDeletedStock(null)}>Cerrar</Button></div>
           {deletedStock.length===0 && <p className="text-sm text-muted-foreground">No hay cuentas eliminadas para recuperar.</p>}
