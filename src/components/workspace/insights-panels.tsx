@@ -64,7 +64,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
   const scoped=assigned.filter(inScope).filter(r=>!scope||(!parents.has(r.id)&&r.accountType!=="split_parent")).filter(r=>(!platform||platformFamily(r.platform)===platform)&&(kind==="all"||r.stockKind===kind));
   const rows = scoped.filter((r) => {
       if (sales) return Boolean(r.deliveredOn);
-      if(scope==="review"||scope==="closed")return true;
+      if(scope==="review"||scope==="closed")return days==="all"||tone(r)===days;
       if(days==="review")return isReview(r);
       return !isReview(r)&&(days==="all" || tone(r)===days);
     }).sort((a,b)=>sales?(b.deliveredOn||"").localeCompare(a.deliveredOn||""):scope==="review"||scope==="closed"?(b.expiresOn||"").localeCompare(a.expiresOn||""):(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
@@ -131,7 +131,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
             <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label>
             <label className="grid gap-1.5 text-xs font-medium"><span>Tipo de cuenta</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label>
           </>}
-          {scope!=="review"&&scope!=="closed"&&<label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope?[["review","Validar cuenta"],["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>!isReview(r)&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>}
+          <label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope?[["review","Validar cuenta"]]:[]),...(scope!=="deliveries"?[["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(isReview).length:scoped.filter(r=>(scope==="review"||scope==="closed"||!isReview(r))&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>
         </InventoryFilterMenu>}
         <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones de inventario" title="Opciones de inventario"><Settings className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-52 rounded-xl">
         <DropdownMenuItem disabled={busy} onSelect={()=>void load()}><RefreshCw/>Actualizar</DropdownMenuItem>
@@ -153,6 +153,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         </DropdownMenuContent></DropdownMenu>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
+      {!sales&&scope&&!busy&&<p className="px-1 text-sm text-muted-foreground" role="status"><strong className="text-foreground">{rows.length}</strong> {scope==="review"?"pendientes de validar":scope==="closed"?"bajas confirmadas":"entregas vigentes"}</p>}
       {sales && showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
@@ -196,8 +197,9 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{label}</span>
                   <span className="block truncate text-xs text-muted-foreground">{checking && profiles.length ? `${profiles.length} perfiles vinculados` : `${r.clientName || "Sin cliente"} · ${r.stockKind === "profile" ? "Perfil" : "Completa"}`}</span>
+                  {!sales&&<span className="block text-xs text-muted-foreground">{r.expiresOn?`Vence: ${r.expiresOn.split("-").reverse().join("/")}`:"Sin fecha de vigencia"}</span>}
                 </span>
-                <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":isReview(r)?"Validar cuenta":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>
+                <span className="flex shrink-0 flex-col items-end gap-1"><span className={`rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[isClosed(r)||withoutSubscription?"expired":color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>{scope==="review"&&<span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Por validar</span>}</span>
               </summary>
               <div className="seller-disclosure-body">
               <p className="text-xs text-muted-foreground">
