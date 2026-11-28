@@ -6,7 +6,11 @@ test("the three order stages share navigation and hide the duplicate filters",as
  const [workspace,cyber,web,notices]=await Promise.all(["src/components/workspace/seller-workspace.tsx","src/components/catalog/cyberdocs-orders-dialog.tsx","src/components/customer/web-orders.tsx","src/components/catalog/notifications-dialog.tsx"].map(read));
  assert.match(workspace,/\["main","Pendientes"\],\["processing","En proceso"\],\["closed","Cancelados \/ rechazados"\]/);
  assert.match(workspace,/\["delivered","Entregadas"\],\["protected","Documentos protegidos"\]/);
- assert.match(cyber,/orders: \["new", "error"\]/);
+ assert.match(cyber,/orders: \["new", "error", "in_process"\]/);
+ assert.doesNotMatch(workspace,/Origen del pedido|orderChannel/);
+ assert.match(workspace,/renderRows=\{unifiedOrders\}/);
+ assert.match(cyber,/visibleOrders.length\+visibleWebRows.length/);
+ assert.match(cyber,/Cuenta asignada · Entrega manual pendiente/);
  assert.match(cyber,/processing: \["in_process"\]/);
  assert.match(cyber,/closed: \["cancelled", "rejected"\]/);
  assert.match(cyber,/onStageChange\(order.id, "closed"\)/);

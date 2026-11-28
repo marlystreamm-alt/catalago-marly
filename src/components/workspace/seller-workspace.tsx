@@ -510,7 +510,6 @@ export function SellerWorkspace() {
   const [inventoryView,setInventoryView]=useState<"stock"|"deliveries"|"review"|"closed">("stock");
   const [pendingOpen,setPendingOpen]=useState(false);
   const [historyOpen,setHistoryOpen]=useState(false);
-  const [orderChannel, setOrderChannel] = useState<"all" | "web" | "cyberdoc">("all");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
@@ -558,7 +557,6 @@ export function SellerWorkspace() {
     setPendingOpen(s==="orders");
     setHistoryOpen(false);
     setTab(s==="expiry"?"delivered":"main");
-    setOrderChannel("all");
     setSelectedOrderId(null);
     setAddStock(false);
     setAssignClient(null);
@@ -592,11 +590,8 @@ export function SellerWorkspace() {
     </div>
   );
   const orderTabs = <label className="seller-field min-w-0 flex-1"><span>Estado</span><select className="buyer-select" value={tab} onChange={event=>{setSelectedOrderId(null);setTab(event.target.value);}}>{(inventoryView==="deliveries"?[["delivered","Entregadas"],["protected","Documentos protegidos"]]:[["main","Pendientes"],["processing","En proceso"],["closed","Cancelados / rechazados"]]).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>;
-  const orderPanel = tab === "protected" ? <div className="space-y-3">{orderTabs}<ProtectedDeliveriesDialog embedded /></div> : <div className="space-y-3">
-    <label className="seller-field"><span>Origen del pedido</span><select className="buyer-select" value={orderChannel} onChange={event=>{setOrderChannel(event.target.value as typeof orderChannel);setSelectedOrderId(null);}}><option value="all">Tienda web y Cyberdoc</option><option value="web">Tienda web</option><option value="cyberdoc">Cyberdoc</option></select></label>
-    <CyberDocsOrdersDialog key={orderChannel+":"+tab+":"+(selectedOrderId||"all")} channel={orderChannel==="all"?undefined:orderChannel} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":tab==="processing"||tab==="closed"?tab:"orders"} navigation={orderTabs} onStageChange={(id,stage)=>{setSelectedOrderId(id);setTab(stage==="deliveries"?"delivered":stage);if(stage==="deliveries"){setInventoryView("deliveries");setHistoryOpen(true);}void load();}}/>
-    {orderChannel!=="cyberdoc"&&(tab==="main"||tab==="delivered")&&<WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} onOpenOrder={(id,delivered,processing)=>{setSelectedOrderId(id);setTab(delivered?"delivered":processing?"processing":"main");if(delivered){setInventoryView("deliveries");setHistoryOpen(true);}}}/>}
-  </div>;
+  const unifiedOrders=(webRows:import("@/components/customer/web-orders").WebOrderRow[]=[],refreshWeb?:()=>Promise<void>,webError="")=><CyberDocsOrdersDialog key={tab+":"+(selectedOrderId||"all")} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":tab==="processing"||tab==="closed"?tab:"orders"} navigation={orderTabs} webRows={webRows} refreshWeb={refreshWeb} webError={webError} onStageChange={(id,stage)=>{setSelectedOrderId(id);setTab(stage==="deliveries"?"delivered":stage);if(stage==="deliveries"){setInventoryView("deliveries");setHistoryOpen(true);}void load();}}/>;
+  const orderPanel = tab === "protected" ? <div className="space-y-3">{orderTabs}<ProtectedDeliveriesDialog embedded /></div> : (tab==="main"||tab==="delivered")?<WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} renderRows={unifiedOrders} onOpenOrder={(id,delivered,processing)=>{setSelectedOrderId(id);setTab(delivered?"delivered":processing?"processing":"main");if(delivered){setInventoryView("deliveries");setHistoryOpen(true);}}}/>:unifiedOrders();
   const renewalConfig=records.find(r=>r.module==="config"&&r.status==="active")?.data;
   let content: ReactNode;
   if (section === "home")

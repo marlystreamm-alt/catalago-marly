@@ -1,6 +1,7 @@
 import { ToolFrame } from '@/components/workspace/tool-frame';
 import { transferReferenceMessage, validFullName, validClientEmail, validWhatsApp, phoneNumber } from "@/lib/workspace/model";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { WebOrderRow } from "@/components/customer/web-orders";
 import {
   ArrowLeft,
   Archive,
@@ -100,7 +101,7 @@ const dateTime = (value: string | null) =>
       )
     : "Sin registro";
 const orderStageStatuses = {
-  orders: ["new", "error"],
+  orders: ["new", "error", "in_process"],
   processing: ["in_process"],
   deliveries: ["completed"],
   closed: ["cancelled", "rejected"],
@@ -149,13 +150,16 @@ async function fileToAttachment(file: File): Promise<DeliveryAttachment> {
 }
 
 export function CyberDocsOrdersDialog({
-  embedded = false, initialSelectedId = null, stage = "all", channel, navigation, onStageChange,
+  embedded = false, initialSelectedId = null, stage = "all", channel, navigation, onStageChange, webRows=[], webError="", refreshWeb,
 }: {
   embedded?: boolean;
   initialSelectedId?: string | null;
   stage?: "all" | keyof typeof orderStageStatuses;
   channel?: "web" | "cyberdoc";
   navigation?: ReactNode;
+  webRows?:WebOrderRow[];
+  webError?:string;
+  refreshWeb?:()=>Promise<void>;
   onStageChange?: (id: string, stage: "processing" | "deliveries" | "closed") => void;
 } = {}) {
   const isMobile = useIsMobile();
@@ -749,6 +753,7 @@ export function CyberDocsOrdersDialog({
     .filter(order => stage === "all" || orderStageStatuses[stage].some(status => status === order.status))
     .filter((order) => orderFilter === "all" || (orderFilter === "pending" ? order.status === "new" : order.status === orderFilter))
     .filter(order => [order.id, order.cyberdocsOrderId, order.serviceName, order.clientName, order.whatsapp, order.whatsapp?.replace(/\D/g, "")].some(value => value?.toLowerCase().includes(orderSearch.trim().toLowerCase()))), [orders, orderFilter, orderSearch, stage]);
+  const visibleWebRows=webRows.filter(r=>r.search.toLowerCase().includes(orderSearch.trim().toLowerCase()));
   const selectableVisibleIds = useMemo(
     () => visibleOrders.filter((order) => !terminal(order)).map((order) => order.id),
     [visibleOrders],
@@ -953,7 +958,8 @@ export function CyberDocsOrdersDialog({
 
         <section className="grid gap-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregadas":stage==="processing"?"En proceso":stage==="closed"?"Cancelados / rechazados":"Pedidos"} ({visibleOrders.length})</p>
+            <p className="text-sm font-semibold">{stage==="deliveries"?"Entregadas":stage==="processing"?"En proceso":stage==="closed"?"Cancelados / rechazados":"Pedidos"} ({visibleOrders.length+visibleWebRows.length})</p>
+            {refreshWeb&&<Button variant="ghost" size="icon" aria-label="Actualizar pedidos" disabled={busy} onClick={()=>void Promise.all([refresh(),refreshWeb()])}><RefreshCw className="size-4"/></Button>}
             {!navigation && stage!=="deliveries"&&<Badge variant="outline">Pendientes {pending}</Badge>}
           </div>
           {selectableVisibleIds.length ? (
@@ -982,15 +988,16 @@ export function CyberDocsOrdersDialog({
               ) : null}
             </div>
           ) : null}
-          {!visibleOrders.length && !busy ? (
+          {webError&&<p role="alert" className="text-sm text-destructive">{webError}</p>}
+          {!visibleOrders.length && !visibleWebRows.length && !busy ? (
             <p className="rounded-2xl border border-dashed p-5 text-center text-sm text-muted-foreground">No hay pedidos en este filtro.</p>
           ) : null}
 
           <div className="grid gap-2 lg:grid-cols-2 lg:gap-3">
-            {visibleOrders.map((order) => {
+            {[...visibleWebRows.map(row=>({createdAt:row.createdAt,node:row.content})),...visibleOrders.map((order) => {
               const expanded = selectedId === order.id;
               const renewalDays = daysUntilDate(order.expiresOn);
-              return (
+              return {createdAt:order.createdAt,node:(
                 <article key={order.id} className={`min-w-0 rounded-2xl border bg-card transition ${expanded ? "border-primary shadow-sm lg:col-span-2" : ""}`}>
                   <div className="flex items-start gap-1 p-3">
                     {!terminal(order) ? (
@@ -1018,7 +1025,8 @@ export function CyberDocsOrdersDialog({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{order.serviceName || "Pedido CyberDocs"}</p>
                         <p className="truncate text-xs text-muted-foreground">{order.clientName || order.whatsapp || "Cliente sin nombre"}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{order.sourceLabel || "Telegram"} · {dateTime(order.createdAt)} · {order.cyberdocsOrderId}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{order.sourceKey==="web_catalog"?"Tienda web":order.sourceLabel||"Cyberdoc"} · {dateTime(order.createdAt)} · {order.cyberdocsOrderId}</p>
+                        {!terminal(order)&&order.sourceKey!=="web_catalog"&&order.stockItemId&&<p className="mt-1 text-xs font-medium text-primary">Cuenta asignada · Entrega manual pendiente</p>}
                         {order.expiresOn ? <p className="mt-1 text-[11px] font-medium text-amber-700">Vence {order.expiresOn}{renewalDays !== null ? ` · ${renewalDays < 0 ? "vencido" : renewalDays === 0 ? "hoy" : `en ${renewalDays} día(s)`}` : ""}</p> : null}
                       </div>
                       <Badge variant={terminal(order) ? "secondary" : "default"}>{CYBERDOCS_STATUS_TEXT[order.status]}</Badge>
@@ -1238,8 +1246,8 @@ export function CyberDocsOrdersDialog({
                     </div>
                   ) : null}
                 </article>
-              );
-            })}
+              )};
+            })].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).map(row=>row.node)}
           </div>
         </section>
     </ToolFrame>
