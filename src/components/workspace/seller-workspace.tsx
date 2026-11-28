@@ -21,6 +21,7 @@ import {
   Boxes,
   PackageCheck,
   ClipboardCheck,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import qrcode from "qrcode-generator";
@@ -433,7 +434,7 @@ export function SellerWorkspace() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("main");
-  const [inventoryView,setInventoryView]=useState<"stock"|"deliveries"|"vigencias"|"closed">("stock");
+  const [inventoryView,setInventoryView]=useState<"stock"|"deliveries"|"vigencias"|"combos"|"closed">("stock");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [stockPlatformFilter, setStockPlatformFilter] = useState<{ key: string; platform: string } | null>(null);
   const [assignClient, setAssignClient] = useState<OpsRecord | null>(null);
@@ -476,8 +477,8 @@ export function SellerWorkspace() {
     void mainAppearanceLoad().then(a=>{setDesign(a);setSavedDesign(a);}).catch(()=>toast.error("No se pudo cargar la apariencia"));
   }, []);
   const navigate = (s: Section) => {
-    setSection(s==="expiry"?"inventory":s);
-    setInventoryView(s==="expiry"?"vigencias":"stock");
+    setSection(s==="expiry"||s==="combos"?"inventory":s);
+    setInventoryView(s==="expiry"?"vigencias":s==="combos"?"combos":"stock");
     setTab(s==="expiry"?"delivered":"main");
     setSelectedOrderId(null);
     setAddStock(false);
@@ -529,15 +530,12 @@ export function SellerWorkspace() {
     )}</div>);
   else if (section === "shop") content = <ProductPricing/>;
   else if(section==="orders") content=<div className="space-y-3">{orderPanel}{tab==="main"&&<details className="seller-disclosure"><summary>Solicitudes manuales pendientes</summary><div className="seller-disclosure-body">{resource("requests",records.filter(r=>r.module!=="requests"||r.status==="pending"))}</div></details>}</div>;
-  else if (section === "inventory") content = <div className="space-y-3"><div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Inventario">{([['stock','Stock'],['deliveries','Entregas'],['vigencias','Vigencias']] as const).map(([key,label])=>{const Icon={stock:Boxes,deliveries:PackageCheck,vigencias:ClipboardCheck}[key];const active=inventoryView===key;return <Button type="button" key={key} variant={active?"default":"outline"} className="h-auto min-h-14 min-w-0 flex-col gap-1 rounded-xl px-1 py-2 text-xs font-semibold sm:flex-row sm:text-sm" aria-pressed={active} onClick={()=>changeInventoryView(key)}><Icon className="size-4 shrink-0" aria-hidden="true"/>{label}</Button>;})}</div>
+  else if (section === "inventory") content = <div className="space-y-3"><div className="grid grid-cols-4 gap-1.5" role="group" aria-label="Inventario">{([['stock','Stock'],['deliveries','Entregas'],['vigencias','Vigencias'],['combos','Combos']] as const).map(([key,label])=>{const Icon={stock:Boxes,deliveries:PackageCheck,vigencias:ClipboardCheck,combos:Layers}[key];const active=inventoryView===key;return <Button type="button" key={key} variant={active?"default":"outline"} className="h-auto min-h-14 min-w-0 flex-col gap-1 rounded-xl px-1 py-2 text-xs font-semibold sm:flex-row sm:text-sm" aria-pressed={active} onClick={()=>changeInventoryView(key)}><Icon className="size-4 shrink-0" aria-hidden="true"/>{label}</Button>;})}</div>
       {inventoryView==="stock"&&<>
       <StockManagerDialog key={assignClient?.id || stockPlatformFilter?.key || String(addStock)} embedded compact initialPlatform={stockPlatformFilter} autoAdd={addStock} initialTab="available" onShowClosed={()=>changeInventoryView("closed")} onDelivered={()=>{changeInventoryView("deliveries");void load();}} initialClient={assignClient ? {id:assignClient.id,name:assignClient.title,whatsapp:assignClient.data.whatsapp || "",email:assignClient.data.email||"",clientReference:assignClient.clientReference} : undefined} />
-      <details className="seller-card"><summary className="font-semibold cursor-pointer">Productos, precios y combos</summary><div className="seller-actions mt-2"><Button variant="outline" size="sm" onClick={()=>navigate("shop")}>Productos y precios</Button><Button variant="outline" size="sm" onClick={()=>{navigate("combos");setTab("profile");}}>Combos de perfiles</Button><Button variant="outline" size="sm" onClick={()=>{navigate("combos");setTab("complete");}}>Combos completas</Button></div></details>
+      <Button variant="outline" size="sm" onClick={()=>navigate("shop")}>Productos y precios</Button>
       </>}
-      {inventoryView!=="stock"&&<StockInsights key={inventoryView} scope={inventoryView} comboRecords={records.filter(r=>r.module==="requests"&&r.status==="completed"&&Boolean(r.data.comboStockIds))} onShowClosed={()=>changeInventoryView("closed")} limits={renewalLimits(renewalConfig?.renewalRedDays,renewalConfig?.renewalYellowDays)} onChanged={()=>void load()}/>}
-      {inventoryView==="deliveries"&&<>
-      <details className="seller-disclosure"><summary>Historial de servicios manuales</summary><div className="seller-disclosure-body space-y-2">{records.filter(r=>r.module==="requests"&&r.status==="completed"&&!r.data.comboStockIds).map(r=><article className="rounded-xl border p-3" key={r.id}><strong>{r.title}</strong><p className="text-xs text-muted-foreground">{records.find(c=>c.id===r.data.clientId)?.title||"Cliente"} · {new Date(r.createdAt).toLocaleString("es-MX")}</p>{r.data.reply&&<Button variant="outline" size="sm" onClick={()=>void copyText(r.data.reply)}>Copiar entrega</Button>}</article>)}</div></details>
-      </>}
+      {inventoryView==="combos"?<StockComboPlanner records={records} onDelivered={()=>{changeInventoryView("deliveries");void load();}}/>:inventoryView!=="stock"&&<StockInsights key={inventoryView} scope={inventoryView} comboRecords={records.filter(r=>r.module==="requests"&&r.status==="completed"&&Boolean(r.data.comboStockIds))} manualRecords={records.filter(r=>r.module==="requests"&&r.status==="completed"&&!r.data.comboStockIds)} clients={records.filter(r=>r.module==="clients")} onShowClosed={()=>changeInventoryView("closed")} limits={renewalLimits(renewalConfig?.renewalRedDays,renewalConfig?.renewalYellowDays)} onChanged={()=>void load()}/>}
     </div>;
   else if (section === "finance") content = <FinancePanel summaryContent={<>{summary&&<SalesMetrics summary={summary} clients={records.filter(r=>r.module==="clients").length} onNavigate={navigate}/>}<details className="seller-disclosure"><summary>Consultar ventas registradas</summary><div className="seller-disclosure-body"><StockInsights sales showSummary={false}/></div></details></>} />;
   else if (section === "wallet")
@@ -653,7 +651,6 @@ export function SellerWorkspace() {
         )}
       </>
     );
-  else if (section === "combos") content=<StockComboPlanner initialKind={tab==="complete"?"complete":"profile"} records={records} onDelivered={()=>{navigate("inventory");setInventoryView("deliveries");void load();}}/>;
   else if (section === "extras") content = <div className="seller-card">{sectionLinks("extras")}</div>;
   else if (section === "subscription")
     content = (

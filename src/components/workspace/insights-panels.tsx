@@ -12,6 +12,7 @@ import { InventoryFilterMenu } from "./inventory-filter-menu";
 import { Input } from "@/components/ui/input";
 import { stockAdminList, stockAdminRenewal, stockAdminReactivate, stockAdminReview, stockAdminVerifyFamily, stockAdminVerifyUnit, stockAdminReleasedSales } from "@/lib/stock/stock.functions";
 import { businessToday, expiresAfterMonths } from "@/lib/stock/duration";
+import { deliveryDateKey } from "@/lib/stock/delivery-sort";
 import { daysRemaining, renewalTone, TONE_CLASSES, DEFAULT_RENEWAL_LIMITS, type RenewalLimits } from "@/lib/stock/traffic-light";
 import { getSavedCode } from "@/lib/notify/client";
 import type { StockItem } from "@/lib/stock/types";
@@ -20,9 +21,10 @@ import { EmptyState, errorText, exportRows } from "./resource-panel";
 import { BusinessTools } from "@/components/catalog/business-tools";
 import { menusList } from "@/lib/menus/menus.functions";
 import type { MenuBusiness } from "@/lib/menus/types";
-export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged, scope, comboRecords=[], onShowClosed }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void; scope?:"deliveries"|"review"|"closed"|"vigencias"; comboRecords?:OpsRecord[]; onShowClosed?:()=>void }) {
+export function StockInsights({ sales = false, showSummary = true, limits=DEFAULT_RENEWAL_LIMITS, onChanged, scope, comboRecords=[], manualRecords=[], clients=[], onShowClosed }: { sales?: boolean; showSummary?:boolean; limits?:RenewalLimits; onChanged?:()=>void; scope?:"deliveries"|"review"|"closed"|"vigencias"; comboRecords?:OpsRecord[]; manualRecords?:OpsRecord[]; clients?:OpsRecord[]; onShowClosed?:()=>void }) {
   const [items, setItems] = useState<StockItem[]>([]);
   const [pendingOrderIds,setPendingOrderIds]=useState<Set<string>>(new Set());
+  const [orderDeliveryDates,setOrderDeliveryDates]=useState<Record<string,string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
@@ -39,6 +41,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
       const data = { code: getSavedCode() };
       const [current,orders] = await Promise.all([stockAdminList({ data }),scope==="deliveries"||scope==="vigencias"?cyberdocsListOrders({data}):Promise.resolve([])]);
       setPendingOrderIds(new Set(orders.filter(order=>!["completed","cancelled","rejected"].includes(order.status)).map(order=>order.id)));
+      setOrderDeliveryDates(Object.fromEntries(orders.filter(order=>order.status==="completed").map(order=>[order.id,order.finalizedAt||order.deliveredOn||""])));
       setItems(sales ? [...current, ...await stockAdminReleasedSales({data})] : current);
     } catch (e) {
       setError(errorText(e));
@@ -86,9 +89,17 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
     return true;
   });
   const comboById=new Map(comboRecords.map(record=>[record.id,record]));
+  const manualById=new Map(manualRecords.map(record=>[record.id,record]));
+  const clientById=new Map(clients.map(record=>[record.id,record]));
   const groupedRows=new Map<string,StockItem[]>();
   for(const row of visibleRows){const id=scope==="deliveries"&&row.relatedOrderId&&comboById.has(row.relatedOrderId)?row.relatedOrderId:row.id;const group=groupedRows.get(id)||[];group.push(row);groupedRows.set(id,group);}
   if(scope==="deliveries"&&!query.trim()&&!platform&&kind==="all"&&days==="all")for(const combo of comboRecords)if(!groupedRows.has(combo.id))groupedRows.set(combo.id,[]);
+  const representedManual=new Set(items.filter(row=>inScope(row)&&!parents.has(row.id)&&row.accountType!=="split_parent").flatMap(row=>[row.relatedOrderId,row.protectedDeliveryId]).filter(Boolean));
+  const manualRows=scope==="deliveries"&&kind==="all"&&["all","unknown"].includes(days)?manualRecords.filter(record=>!representedManual.has(record.id)&&(!platform||platformFamily(record.data.platform||record.title)===platform)&&`${record.title} ${clientById.get(record.data.clientId)?.title||""} ${clientById.get(record.data.clientId)?.data.whatsapp||""}`.toLowerCase().includes(query.trim().toLowerCase())):[];
+  const manualDate=(record:OpsRecord)=>record.data.deliveredOn||record.data.completedAt||(record.data.manualStockId?record.createdAt:record.updatedAt)||record.createdAt;
+  const entries=[...groupedRows].map(([id,group])=>{const combo=comboById.get(id),row=group[0],record=row?manualById.get(row.relatedOrderId)||manualById.get(row.protectedDeliveryId):undefined;const time=record?.createdAt||orderDeliveryDates[row?.relatedOrderId||""];return {id,group,manual:undefined as OpsRecord|undefined,date:combo?deliveryDateKey(combo.createdAt):deliveryDateKey(row?.deliveredOn||time,time)}});
+  for(const manual of manualRows)entries.push({id:manual.id,group:[],manual,date:deliveryDateKey(manualDate(manual))});
+  if(scope==="deliveries")entries.sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
   const verifyFamily = async (root: StockItem, family: StockItem[], active: boolean) => {
     if (active && familyExpiry <= today) return toast.error("Elige una fecha de vigencia futura.");
     if (!window.confirm(active
@@ -139,7 +150,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
           onChange={(event) => setQuery(event.target.value)} placeholder="Buscar…" />
         {!sales&&<InventoryFilterMenu count={Number(Boolean(platform))+Number(kind!=="all")+Number(days!=="all")} onClear={()=>{setPlatform("");setKind("all");setDays("all");}}>
           {scope&&<>
-            <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set(assigned.filter(inScope).map(r=>platformFamily(r.platform)))].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label>
+            <label className="grid gap-1.5 text-xs font-medium"><span>Plataforma</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={platform} onChange={e=>setPlatform(e.target.value)}><option value="">Todas</option>{[...new Set([...assigned.filter(inScope).map(r=>platformFamily(r.platform)),...(scope==="deliveries"?manualRecords.map(r=>platformFamily(r.data.platform||r.title)):[])])].sort((a,b)=>a.localeCompare(b,"es")).map(name=><option key={name}>{name}</option>)}</select></label>
             <label className="grid gap-1.5 text-xs font-medium"><span>Tipo de cuenta</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={kind} onChange={e=>setKind(e.target.value)}><option value="all">Todos</option><option value="complete">Completas</option><option value="profile">Perfiles</option></select></label>
           </>}
           <label className="grid gap-1.5 text-xs font-medium"><span>Vigencia</span><select className="h-10 w-full rounded-lg border bg-background px-2 text-sm" value={days} onChange={e=>setDays(e.target.value)}>{[["all","Todos"],...(!scope||scope==="vigencias"?[["review","Validar cuenta"]]:[]),...(scope!=="deliveries"?[["expired","⚫ Vencidos"]]:[]),["red",`🔴 0–${limits.red} días`],["yellow",`🟡 ${limits.red+1}–${limits.yellow} días`],["green",`🟢 ${limits.yellow+1}+ días`],["unknown","Sin fecha"]].map(([v,l])=><option key={v} value={v}>{l} ({v==="review"?scoped.filter(scope==="vigencias"?needsValidation:isReview).length:scoped.filter(r=>(scope==="vigencias"||scope==="review"||scope==="closed"||!isReview(r))&&(v==="all"||tone(r)===v)).length})</option>)}</select></label>
@@ -165,7 +176,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         </DropdownMenuContent></DropdownMenu>
       </div>
       {error ? <div className="seller-error">{error}</div> : null}
-      {!sales&&scope&&!busy&&<p className="px-1 text-sm text-muted-foreground" role="status"><strong className="text-foreground">{scope==="deliveries"?groupedRows.size:rows.length}</strong> {scope==="vigencias"?"cuentas · "+scoped.filter(needsValidation).length+" por validar":scope==="review"?"pendientes de validar":scope==="closed"?"bajas confirmadas":"entregas"}</p>}
+      {!sales&&scope&&!busy&&<p className="px-1 text-sm text-muted-foreground" role="status"><strong className="text-foreground">{scope==="deliveries"?entries.length:rows.length}</strong> {scope==="vigencias"?"cuentas · "+scoped.filter(needsValidation).length+" por validar":scope==="review"?"pendientes de validar":scope==="closed"?"bajas confirmadas":"entregas · de la más antigua a la más reciente"}</p>}
       {sales && showSummary ? (
         <div className="seller-grid">
           <article className="seller-card">
@@ -184,7 +195,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
       ) : null}
       {busy ? (
         <p role="status">Cargando registros…</p>
-      ) : !groupedRows.size ? (
+      ) : !entries.length ? (
         <EmptyState
           icon={sales ? "🧾" : "🎉"}
           title={sales ? "Sin ventas para esta búsqueda" : scope==="review"?"No hay cuentas pendientes de validar":scope==="closed"?"No hay bajas confirmadas":"No hay entregas para esta búsqueda"}
@@ -192,7 +203,8 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
         />
       ) : (
         <div className="seller-record-grid items-start">
-          {[...groupedRows].map(([id,group]) => {
+          {entries.map(({id,group,manual,date}) => {
+          if(manual){const client=clientById.get(manual.data.clientId);const label=stockPlatform(manual.data.platform||manual.title).label;return <details key={id} className="seller-disclosure"><summary><StockPlatformMark name={label}/><span className="min-w-0 flex-1"><strong className="block text-sm">{manual.title}</strong><small className="block text-muted-foreground">{client?.title||"Cliente"} · Manual</small><small className="block text-muted-foreground">Entrega: {date.startsWith("9999")?"Sin fecha":date.slice(0,10).split("-").reverse().join("/")}{date.includes(" ")?` · ${date.slice(11,16)}`:""}</small></span></summary><div className="seller-disclosure-body space-y-2">{manual.data.reply&&manual.data.reply!=="Entrega manual"&&<Button size="sm" variant="outline" onClick={async()=>{try{await copyText(manual.data.reply);toast.success("Entrega copiada");}catch(e){toast.error(errorText(e));}}}>Copiar entrega</Button>}{manual.data.deliveryUrl&&<Button size="sm" variant="outline" onClick={async()=>{try{await copyText(manual.data.deliveryUrl);toast.success("Enlace copiado");}catch(e){toast.error(errorText(e));}}}>Copiar enlace de entrega</Button>}{!manual.data.reply&&!manual.data.deliveryUrl&&<p className="text-xs text-muted-foreground">Sin información de entrega guardada.</p>}</div></details>;}
           const combo=scope==="deliveries"?comboById.get(id):undefined;
           const units=group.map((r) => {
             const root = scope?r:items.find(item=>item.id===(r.parentStockId||r.id));
@@ -212,6 +224,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
                   <span className="block truncate text-sm font-semibold">{label}</span>
                   <span className="block truncate text-xs text-muted-foreground">{checking && profiles.length ? `${profiles.length} perfiles vinculados` : `${r.clientName || "Sin cliente"} · ${r.stockKind === "profile" ? "Perfil" : "Completa"}`}</span>
                   {!sales&&<span className="block text-xs text-muted-foreground">{r.expiresOn?`Vence: ${r.expiresOn.split("-").reverse().join("/")}`:"Sin fecha de vigencia"}</span>}
+                  {scope==="deliveries"&&<span className="block text-xs text-muted-foreground">Entrega: {r.deliveredOn?r.deliveredOn.split("-").reverse().join("/"):"Sin fecha"}</span>}
                 </span>
                 <span className="flex shrink-0 flex-col items-end gap-1"><span className={`rounded-full border px-2 py-1 text-xs font-bold ${TONE_CLASSES[isClosed(r)||withoutSubscription?"expired":color]}`}>{isClosed(r)||withoutSubscription?"Sin suscripción":color === "expired" ? "Vencido" : delta === null ? "Sin fecha" : delta === 0 ? "Vence hoy" : `${delta} día${delta === 1 ? "" : "s"}`}</span>{(scope==="review"||scope==="vigencias"&&needsValidation(r))&&<span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Por validar</span>}</span>
               </summary>
@@ -280,7 +293,7 @@ export function StockInsights({ sales = false, showSummary = true, limits=DEFAUL
               </div>
             </details>;
           });
-          return combo?<details key={id} className="seller-disclosure"><summary><span className="min-w-0 flex-1"><strong className="block text-sm">{combo.title}</strong><small className="text-muted-foreground">{group.length?`${group[0].clientName||"Cliente"} · Combo · ${group.length} cuentas vigentes`:"Combo · Historial"}</small></span></summary><div className="seller-disclosure-body space-y-2"><p className="text-xs text-muted-foreground">{combo.data.message}</p><Button size="sm" variant="outline" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:combo.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales del combo</Button>{combo.data.reply&&<Button size="sm" variant="outline" onClick={()=>void copyText(combo.data.reply)}>Copiar entrega</Button>}{units}</div></details>:units[0];
+          return combo?<details key={id} className="seller-disclosure"><summary><span className="min-w-0 flex-1"><strong className="block text-sm">{combo.title}</strong><small className="block text-muted-foreground">{group.length?`${group[0].clientName||"Cliente"} · Combo · ${group.length} cuentas vigentes`:"Combo · Historial"}</small><small className="block text-muted-foreground">Entrega: {date.slice(0,10).split("-").reverse().join("/")}</small></span></summary><div className="seller-disclosure-body space-y-2"><p className="text-xs text-muted-foreground">{combo.data.message}</p><Button size="sm" variant="outline" onClick={async()=>{try{await copyText(await comboCopyCredentials({data:{code:getSavedCode(),id:combo.id}}));toast.success("Credenciales copiadas");}catch(e){toast.error(errorText(e));}}}>Copiar credenciales del combo</Button>{combo.data.reply&&<Button size="sm" variant="outline" onClick={()=>void copyText(combo.data.reply)}>Copiar entrega</Button>}{units}</div></details>:units[0];
           })}
         </div>
       )}
