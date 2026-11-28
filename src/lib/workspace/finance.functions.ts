@@ -114,12 +114,13 @@ const cutAmounts = auth.extend({
   counted: z.number().int().min(-100000000).max(100000000),
   excluded: z.array(id).max(1000),
   reviewed: z.array(id).max(1000),
+  additional: z.array(id).max(1000),
 });
 async function saveSelectedCut(data: z.infer<typeof cutAmounts>, cutId: string | null, account: string | null, day: string | null) {
   const db = await admin(data.code);
-  const result = await db.rpc("ma2_finance_save_selected_cut", {
+  const result = await db.rpc("ma2_finance_save_expanded_cut", {
     p_cut:cutId, p_account:account, p_day:day, p_counted:data.counted,
-    p_excluded:data.excluded, p_reviewed:data.reviewed,
+    p_excluded:data.excluded, p_reviewed:data.reviewed, p_additional:data.additional,
   });
   if (result.error) throw Error(result.error.message || "No se pudo guardar el corte");
   return snapshot();

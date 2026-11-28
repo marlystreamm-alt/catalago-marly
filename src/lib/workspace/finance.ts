@@ -1,5 +1,5 @@
 export type FinanceAccount={id:string;name:string;opening_cents:number;created_at:string};
-export type FinanceMove={id:string;kind:"income"|"expense"|"transfer";account_id:string;to_account_id:string|null;amount_cents:number;occurred_on:string;category:string;note:string;reference:string;source_key:string|null;voided_at:string|null};
+export type FinanceMove={id:string;kind:"income"|"expense"|"transfer";account_id:string;to_account_id:string|null;amount_cents:number;occurred_on:string;category:string;note:string;reference:string;source_key:string|null;voided_at:string|null;created_at?:string};
 export type FinanceSource={key:string;kind:"income"|"expense";amount:number;date:string;category:string;title:string;receivedAt?:string;reference?:string|null;bankTransfer?:string;legacyKeys?:string[]};
 export type FinanceDebt={id:string;kind:"receivable"|"payable";name:string;amount_cents:number;due_on:string|null;note:string;created_at:string};
 export const financeToday=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Monterrey",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
