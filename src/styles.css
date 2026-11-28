@@ -310,9 +310,9 @@ body.seller-mode { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0
 .seller-badge.status-active,.seller-badge.status-resolved,.seller-badge.status-completed,.seller-badge.status-answered { background:#e5f8ef; color:#15734c; }
 .seller-badge.status-pending,.seller-badge.status-in_progress { background:#fff1cf; color:#946216; }
 .seller-badge.status-expired,.seller-badge.status-inactive { background:#fee7e7; color:#aa3333; }
-.seller-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:4px; background:color-mix(in oklch,var(--primary) 5%,transparent); border-radius:11px; padding:5px; margin:14px 0; }
-.seller-tabs button { padding:9px 13px; font-size:12px; border-radius:8px; cursor:pointer; color:var(--muted-foreground); }
-.seller-tabs button.active { color:var(--primary); background:var(--card); font-weight:700; box-shadow:0 1px 5px #12353d0a; }
+.seller-tabs { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; margin:10px 0; }
+.seller-tabs button { flex:1 1 104px; min-height:44px; padding:9px 8px; font-size:12px; font-weight:600; border:1px solid var(--border); border-radius:12px; cursor:pointer; color:var(--foreground); background:var(--card); box-shadow:0 1px 3px #12353d12; }
+.seller-tabs button.active { color:var(--primary-foreground); background:var(--primary); border-color:var(--primary); font-weight:700; }
 .seller-search { display:flex; align-items:center; gap:8px; padding:0 14px; border:1px solid var(--border); border-radius:12px; background:var(--card); color:var(--muted-foreground); }
 .seller-search input { border:0; box-shadow:none; background:transparent; }
 .seller-field { display:grid; gap:7px; font-size:12px; }

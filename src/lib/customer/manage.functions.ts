@@ -80,6 +80,23 @@ export const customerManageLoad = createServerFn({ method: "POST" })
         })),
     };
   });
+/** Main-shop customer history: metadata only, never passwords or delivery tokens. */
+export const mainClientHistory = createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({code:z.string().min(4).max(200)}).parse(v))
+  .handler(async({data})=>{
+    const ctx=await context(data),db=ctx.s.opsDB();
+    const page=async(build:(from:number)=>PromiseLike<{data:any[]|null;error:unknown}>)=>{const rows:any[]=[];for(let from=0;;from+=1000){const result=await build(from);if(result.error)throw new Error("No se pudo cargar el historial de clientes");rows.push(...(result.data||[]));if((result.data?.length||0)<1000)return rows;}};
+    const [accounts,purchases,stock,released,orders]=await Promise.all([
+      page(from=>db.from("ma2_customer_accounts").select("id,client_id,email,active,must_change,price_tier").is("business_id",null).order("id").range(from,from+999)),
+      page(from=>db.from("ma2_customer_orders").select("id,client_id,stock_id,title,amount_cents,expires_on,created_at").is("business_id",null).order("id").range(from,from+999)),
+      page(from=>db.from("stock_items").select("id,platform,account_type,client_whatsapp,client_name,delivered_on,expires_on,sale_price,related_order_id,status").is("business_id",null).not("delivered_on","is",null).order("id").range(from,from+999)),
+      page(from=>db.from("ma2_released_stock_sales").select("id,stock_id,platform,account_type,client_whatsapp,client_name,delivered_on,expires_on,sale_price").is("business_id",null).order("id").range(from,from+999)),
+      page(from=>db.from("cyberdocs_orders").select("id,source_key,client_name,whatsapp,contact_label,contact_value,service_name,status,stock_item_id,notification_order_id,assigned_at,delivered_on,expires_on,finalized_at,created_at").order("id").range(from,from+999)),
+    ]);
+    const replacements:any[]=[];
+    for(let i=0;i<purchases.length;i+=100){const result=await db.from("ma2_report_replacements").select("purchase_id,report_id,replacement_stock_id,created_at").in("purchase_id",purchases.slice(i,i+100).map(p=>p.id));if(result.error)throw new Error("No se pudo cargar el historial de reposiciones");replacements.push(...(result.data||[]));}
+    return {accounts,purchases,stock,released,orders:orders.map(({contact_label,contact_value,...o})=>({...o,whatsapp:o.whatsapp||(String(contact_label).toLowerCase()==="whatsapp"?contact_value:"")})),replacements};
+  });
 export const customerContactTier = createServerFn({method:"POST"})
   .validator((v:unknown)=>auth.extend({clientId:z.string().uuid(),tier:z.enum(["retail","reseller"])}).parse(v))
   .handler(async ({data})=>{

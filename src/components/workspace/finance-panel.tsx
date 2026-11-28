@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {RefreshCw} from "lucide-react";
+import {RefreshCw,LayoutDashboard,ArrowLeftRight,Wallet,ClipboardList,CalendarDays} from "lucide-react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {getSavedCode} from "@/lib/notify/client";
@@ -88,11 +88,12 @@ export function FinancePanel({summaryContent}:{summaryContent?:React.ReactNode}=
  const reconcile=(key:string,date:string,includePrevious=false)=>{if(!account)return toast.error("Selecciona la cuenta en la que se movió el dinero");if(!confirm(includePrevious?"¿Autorizas incluir este pago en el corte del día anterior?":"¿Confirmas que este importe efectivamente entró o salió de la cuenta seleccionada y aún no lo registraste?"))return;void run(()=>financeReconcile({data:{code:code(),sourceKey:key,account,date,includePrevious}}));};
  return <div className="space-y-3">
   <div className="seller-tabs !my-0">
-    {[["summary","Resumen"],["moves","Movimientos"],["accounts","Cuentas"],["pending","Conciliación"],["cuts","Cortes"]].map(([value,label]) =>
+    {[["summary","Resumen"],["moves","Movimientos"],["accounts","Cuentas"],["pending","Conciliación"],["cuts","Cortes"]].map(([value,label]) =>{const Icon=({summary:LayoutDashboard,moves:ArrowLeftRight,accounts:Wallet,pending:ClipboardList,cuts:CalendarDays} as Record<string,typeof LayoutDashboard>)[value];return (
       <button type="button" key={value} aria-pressed={tab===value} className={tab===value?"active":""} onClick={()=>setTab(value)}>
+        <Icon className="mx-auto mb-1 size-4" aria-hidden="true"/>
         {label}{value==="pending"?` (${pendingSources.length})`:""}
       </button>
-    )}
+    );})}
   </div>
   <div className="flex items-start gap-2">
     <details className="seller-disclosure min-w-0 flex-1">

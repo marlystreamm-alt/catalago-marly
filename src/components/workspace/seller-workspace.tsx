@@ -1,5 +1,5 @@
 import { groupPlatforms } from "@/lib/stock/master-products";
-import { CustomerManager } from "@/components/customer/customer-manager";
+import { UnifiedClients } from "./unified-clients";
 import { WebOrders } from "@/components/customer/web-orders";
 import { RechargePanel } from "@/components/recharges/recharge-panel";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -22,6 +22,8 @@ import {
   PackageCheck,
   ClipboardCheck,
   Layers,
+  ClipboardList,
+  ArchiveX,
 } from "lucide-react";
 import { toast } from "sonner";
 import qrcode from "qrcode-generator";
@@ -512,7 +514,7 @@ export function SellerWorkspace() {
       ))}
     </div>
   );
-  const orderTabs = <label className="seller-field min-w-0 flex-1"><span>Estado</span><select className="buyer-select" value={tab} onChange={event=>{setSelectedOrderId(null);setTab(event.target.value);}}>{[["main","Pendientes"],["delivered","Entregados"],["closed","Cancelados / rechazados"]].map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>;
+  const orderTabs = <div className="grid grid-cols-3 gap-1.5 min-w-0 flex-1" role="group" aria-label="Estado de pedidos">{([["main","Pendientes",ClipboardList],["delivered","Entregados",PackageCheck],["closed","Cancelados",ArchiveX]] as const).map(([key,label,Icon])=><Button key={key} type="button" className="h-auto min-h-14 min-w-0 flex-col gap-1 rounded-xl px-1 py-2 text-xs font-semibold" variant={tab===key?"default":"outline"} aria-pressed={tab===key} onClick={()=>{setSelectedOrderId(null);setTab(key);}}><Icon className="size-4"/>{label}</Button>)}</div>;
   const unifiedOrders=(webRows:import("@/components/customer/web-orders").WebOrderRow[]=[],refreshWeb?:()=>Promise<void>,webError="")=><CyberDocsOrdersDialog key={tab+":"+(selectedOrderId||"all")} embedded initialSelectedId={selectedOrderId} stage={tab==="delivered"?"deliveries":tab==="closed"?"closed":"orders"} navigation={orderTabs} webRows={webRows} refreshWeb={refreshWeb} webError={webError} onStageChange={(id,stage)=>{setSelectedOrderId(id);setTab(stage==="deliveries"?"delivered":stage==="closed"?"closed":"main");void load();}}/>;
   const orderPanel = (tab==="main"||tab==="delivered")?<WebOrders key={tab} stage={tab==="delivered"?"deliveries":"orders"} renderRows={unifiedOrders} onOpenOrder={(id,delivered)=>{setSelectedOrderId(id);setTab(delivered?"delivered":"main");}}/>:unifiedOrders();
   const renewalConfig=records.find(r=>r.module==="config"&&r.status==="active")?.data;
@@ -600,8 +602,7 @@ export function SellerWorkspace() {
           <summary className="text-sm font-semibold">Opciones de clientes</summary>
           <div className="seller-disclosure-body">{sectionLinks("clients")}</div>
         </details>
-        <CustomerManager slug="ma2" records={records} onAssign={assign} />
-        {resource("clients")}
+        <UnifiedClients records={records} entries={entries} reload={load} onAssign={assign} onWallet={id=>{setWalletClient(id);navigate("wallet");}}/>
       </div>
     );
   else if (section === "gallery")

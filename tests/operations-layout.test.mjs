@@ -4,7 +4,7 @@ import {readFile} from "node:fs/promises";
 const read=p=>readFile(new URL("../"+p,import.meta.url),"utf8");
 test("the three order stages share navigation and hide the duplicate filters",async()=>{
  const [workspace,cyber,web,notices]=await Promise.all(["src/components/workspace/seller-workspace.tsx","src/components/catalog/cyberdocs-orders-dialog.tsx","src/components/customer/web-orders.tsx","src/components/catalog/notifications-dialog.tsx"].map(read));
- assert.match(workspace,/\["main","Pendientes"\],\["delivered","Entregados"\],\["closed","Cancelados \/ rechazados"\]/);
+ assert.match(workspace,/\["main","Pendientes",ClipboardList\],\["delivered","Entregados",PackageCheck\],\["closed","Cancelados",ArchiveX\]/);
  assert.match(workspace,/main:"orders",children:\[\]/);
  assert.match(workspace,/\['stock','Stock'\],\['deliveries','Entregas'\],\['vigencias','Vigencias'\]/);
  assert.match(cyber,/Copiar enlace protegido/);

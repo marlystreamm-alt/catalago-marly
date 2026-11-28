@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -10,7 +10,10 @@ import {
   Pencil,
   Archive,
   RefreshCw,
+  Settings,
 } from "lucide-react";
+import {InventoryFilterMenu} from "./inventory-filter-menu";
+import {DropdownMenu,DropdownMenuContent,DropdownMenuItem,DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +56,7 @@ export type Entry = {
   kind: string;
   note: string;
   created_at: string;
+  request_id?:string;
 };
 export function balanceFor(entries: Entry[], id: string, debt = false) {
   return (
@@ -89,6 +93,10 @@ export function ResourcePanel({
   reload,
   onWallet,
   onAssign,
+  clientExtras,
+  clientOrigin,
+  clientMatch,
+  clientActivity,
 }: {
   module: Module;
   records: OpsRecord[];
@@ -96,10 +104,15 @@ export function ResourcePanel({
   reload: () => Promise<void>;
   onAssign?: (id: string) => void;
   onWallet?: (id: string, debt?: boolean) => void;
+  clientExtras?:(record:OpsRecord)=>ReactNode;
+  clientOrigin?:(record:OpsRecord)=>string[];
+  clientMatch?:(record:OpsRecord,query:string)=>boolean;
+  clientActivity?:(record:OpsRecord)=>boolean;
 }) {
   const def = DEFINITIONS[module];
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState(module === "reports" ? "pending" : "all");
+  const [origin,setOrigin]=useState("all");
   const [editing, setEditing] = useState<OpsRecord | null>(null);
   const [opened, setOpened] = useState(false);
   const [title, setTitle] = useState("");
@@ -114,12 +127,13 @@ export function ResourcePanel({
       records.filter(
         (r) =>
           r.module === module &&
-          (filter === "all" || r.status === filter || (module === "reports" && filter === "pending" && r.status === "in_progress")) &&
-          `${r.title} ${r.clientReference||""} ${records.find(c=>c.module==="clients" && c.id===r.data.clientId)?.title || ""} ${Object.values(r.data).join(" ")}`
+          (filter === "all" || (module==="clients"&&clientActivity?(clientActivity(r)?"active":"inactive")===filter:r.status === filter) || (module === "reports" && filter === "pending" && r.status === "in_progress")) &&
+          (module!=="clients"||origin==="all"||clientOrigin?.(r).includes(origin))&&
+          (`${r.title} ${r.clientReference||""} ${records.find(c=>c.module==="clients" && c.id===r.data.clientId)?.title || ""} ${Object.values(r.data).join(" ")}`
             .toLowerCase()
-            .includes(query.toLowerCase()),
-      ),
-    [records, module, query, filter],
+            .includes(query.toLowerCase())||Boolean(module==="clients"&&clientMatch?.(r,query))),
+      ).sort((a,b)=>module==="clients"&&clientActivity?Number(clientActivity(b))-Number(clientActivity(a)):0),
+    [records, module, query, filter,origin,clientOrigin,clientMatch,clientActivity],
   );
   const fresh = () => {
     setEditing(null);
@@ -149,16 +163,16 @@ export function ResourcePanel({
         <div className="seller-card"><p className="text-sm text-muted-foreground">Pendientes</p><strong>{records.filter(r=>r.module==="reports" && r.status!=="resolved").length}</strong></div>
         <div className="seller-card"><p className="text-sm text-muted-foreground">Resueltos</p><strong>{records.filter(r=>r.module==="reports" && r.status==="resolved").length}</strong></div>
       </div>}
-      <div className="seller-actions">
-        <Button onClick={fresh}>
+      <div className="flex items-center gap-1.5">
+        <Input className="h-10 min-w-0 flex-1" aria-label={`Buscar ${def.title}`} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar…"/>
+        <Button onClick={fresh} className="h-10 shrink-0 gap-1 px-2.5">
           <Plus className="size-4" />
-          Agregar {def.singular}
+          Agregar<span className="hidden sm:inline"> {def.singular}</span>
         </Button>
+        <InventoryFilterMenu count={Number(filter!=="all")+Number(origin!=="all")} onClear={()=>{setFilter("all");setOrigin("all");}}><label className="grid gap-1 text-xs font-medium">Estado<select className="buyer-select" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Todos</option>{def.statuses.map(s=><option value={s} key={s}>{STATUS[s]||s}</option>)}</select></label>{module==="clients"&&clientOrigin&&<label className="grid gap-1 text-xs font-medium">Origen<select className="buyer-select" value={origin} onChange={e=>setOrigin(e.target.value)}><option value="all">Todos</option><option value="web">🌎 Tienda web</option><option value="cyberdoc">🔗 Cyberdoc</option><option value="manual">🌻 Manual</option></select></label>}</InventoryFilterMenu>
+        <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" size="icon" className="size-10 shrink-0" aria-label="Opciones"><Settings className="size-4"/></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56">
         {module === "clients" ? (
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={async () => {
+          <DropdownMenuItem disabled={busy} onSelect={async () => {
               setBusy(true);
               try {
                 const result = await opsImportClients({ data: { code: getSavedCode() } });
@@ -169,17 +183,11 @@ export function ResourcePanel({
               } finally {
                 setBusy(false);
               }
-            }}
-          >
-            Importar clientes de mis entregas
-          </Button>
+            }}>
+            <Upload/>Importar clientes de entregas
+          </DropdownMenuItem>
         ) : null}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Exportar registros"
-          title="Exportar registros"
-          onClick={() =>
+        <DropdownMenuItem onSelect={() =>
             exportRows(
               rows.map((r) => ({
                 Nombre: r.title,
@@ -191,39 +199,15 @@ export function ResourcePanel({
             )
           }
         >
-          <Download className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={busy}
-          onClick={() => void reload()}
-          aria-label="Actualizar registros"
-        >
-          <RefreshCw className="size-4" />
-        </Button>
-      </div>
-      <div className="seller-search">
-        <Search className="size-4" />
-        <Input
-          aria-label={`Buscar ${def.title}`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre, plataforma o cliente…"
-        />
+          <Download className="size-4" />Exportar registros
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={busy} onSelect={()=>void reload()}><RefreshCw/>Actualizar</DropdownMenuItem>
+        </DropdownMenuContent></DropdownMenu>
       </div>
       {module === "reports" ? <div className="seller-tabs">
         <button type="button" aria-pressed={filter === "pending"} className={filter === "pending" ? "active" : ""} onClick={()=>setFilter("pending")}>Pendientes</button>
         <button type="button" aria-pressed={filter === "resolved"} className={filter === "resolved" ? "active" : ""} onClick={()=>setFilter("resolved")}>Resueltos</button>
-      </div> : <div className="seller-tabs">
-        <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
-          Todos ({records.filter((r) => r.module === module).length})
-        </button>
-        {def.statuses.map((s) => (
-          <button key={s} className={filter === s ? "active" : ""} onClick={() => setFilter(s)}>
-            {STATUS[s]}
-          </button>
-        ))}
-      </div>}
+      </div> : <p className="text-xs text-muted-foreground">{rows.length} registros</p>}
       {!rows.length ? (
         <EmptyState
           icon={def.icon}
@@ -234,8 +218,8 @@ export function ResourcePanel({
           {rows.map((r) => (
             <details className="seller-disclosure" key={r.id}>
               <summary>
-                <span className="min-w-0 flex-1 break-words text-sm font-semibold">{r.title}</span>
-                <span className={`seller-badge status-${r.status}`}>{STATUS[r.status] || r.status}</span>
+                <span className="min-w-0 flex-1 break-words text-sm font-semibold">{r.title}{module==="clients"&&clientOrigin&&<small className="block text-muted-foreground font-normal">{clientOrigin(r).map(o=>o==="web"?"🌎 Tienda web":o==="cyberdoc"?"🔗 Cyberdoc":"🌻 Manual").join(" · ")}</small>}</span>
+                {module==="clients"&&clientActivity?<span className="flex shrink-0 items-center gap-1.5 text-xs" title={clientActivity(r)?"Asignación reciente":"Más de un mes sin asignación"}><span className={`size-2.5 rounded-full ${clientActivity(r)?"bg-emerald-500":"bg-red-500"}`}/>{clientActivity(r)?"Activo":"Inactivo"}</span>:<span className={`seller-badge status-${r.status}`}>{STATUS[r.status] || r.status}</span>}
               </summary>
               <div className="seller-disclosure-body">
               {names.get(r.data.clientId) && <p className="text-sm text-muted-foreground">{names.get(r.data.clientId)}</p>}
@@ -273,6 +257,7 @@ export function ResourcePanel({
                 </p>
               ) : null}
               {r.data.filename ? <p className="my-2 text-sm">📎 {r.data.filename}</p> : null}
+              {module==="clients"&&clientExtras?.(r)}
               <div className="seller-actions mt-4">
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => void edit(r)}>
                   <Pencil className="size-3.5" />
