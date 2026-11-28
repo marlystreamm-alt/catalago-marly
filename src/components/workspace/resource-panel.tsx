@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import type {WebOrderRow} from "@/components/customer/web-orders";
 import { toast } from "sonner";
 import {
   Plus,
@@ -97,6 +98,7 @@ export function ResourcePanel({
   clientOrigin,
   clientMatch,
   clientActivity,
+  renderRows,
 }: {
   module: Module;
   records: OpsRecord[];
@@ -108,6 +110,7 @@ export function ResourcePanel({
   clientOrigin?:(record:OpsRecord)=>string[];
   clientMatch?:(record:OpsRecord,query:string)=>boolean;
   clientActivity?:(record:OpsRecord)=>boolean;
+  renderRows?:(rows:WebOrderRow[],add:()=>void)=>ReactNode;
 }) {
   const def = DEFINITIONS[module];
   const [query, setQuery] = useState("");
@@ -159,7 +162,7 @@ export function ResourcePanel({
   };
   return (
     <div className="space-y-4">
-      {module === "reports" && <div className="grid grid-cols-2 gap-3">
+      {!renderRows&&<>{module === "reports" && <div className="grid grid-cols-2 gap-3">
         <div className="seller-card"><p className="text-sm text-muted-foreground">Pendientes</p><strong>{records.filter(r=>r.module==="reports" && r.status!=="resolved").length}</strong></div>
         <div className="seller-card"><p className="text-sm text-muted-foreground">Resueltos</p><strong>{records.filter(r=>r.module==="reports" && r.status==="resolved").length}</strong></div>
       </div>}
@@ -207,18 +210,11 @@ export function ResourcePanel({
       {module === "reports" ? <div className="seller-tabs">
         <button type="button" aria-pressed={filter === "pending"} className={filter === "pending" ? "active" : ""} onClick={()=>setFilter("pending")}>Pendientes</button>
         <button type="button" aria-pressed={filter === "resolved"} className={filter === "resolved" ? "active" : ""} onClick={()=>setFilter("resolved")}>Resueltos</button>
-      </div> : <p className="text-xs text-muted-foreground">{rows.length} registros</p>}
-      {!rows.length ? (
-        <EmptyState
-          icon={def.icon}
-          title={query ? "Sin resultados" : `Sin ${def.title.toLowerCase()} todavía`}
-        />
-      ) : (
-        <div className="seller-record-grid items-start">
-          {rows.map((r) => (
+      </div> : <p className="text-xs text-muted-foreground">{rows.length} registros</p>}</>}
+      {(() => {const cardRows=rows.map((r):WebOrderRow=>({id:r.id,createdAt:r.createdAt,search:[r.id,r.title,names.get(r.data.clientId),clients.find(c=>c.id===r.data.clientId)?.data.whatsapp,...Object.values(r.data)].filter(Boolean).join(" "),content:(
             <details className="seller-disclosure" key={r.id}>
               <summary>
-                <span className="min-w-0 flex-1 break-words text-sm font-semibold">{r.title}{module==="clients"&&clientOrigin&&<small className="block text-muted-foreground font-normal">{clientOrigin(r).map(o=>o==="web"?"🌎 Tienda web":o==="cyberdoc"?"🔗 Cyberdoc":"🌻 Manual").join(" · ")}</small>}</span>
+                <span className="min-w-0 flex-1 break-words text-sm font-semibold">{r.title}{module==="clients"&&clientOrigin&&<small className="block text-muted-foreground font-normal">{clientOrigin(r).map(o=>o==="web"?"🌎 Tienda web":o==="cyberdoc"?"🔗 Cyberdoc":"🌻 Manual").join(" · ")}</small>}{renderRows&&module==="requests"&&<small className="block text-muted-foreground font-normal">🌻 Manual · {names.get(r.data.clientId)||"Cliente"}</small>}</span>
                 {module==="clients"&&clientActivity?<span className="flex shrink-0 items-center gap-1.5 text-xs" title={clientActivity(r)?"Asignación reciente":"Más de un mes sin asignación"}><span className={`size-2.5 rounded-full ${clientActivity(r)?"bg-emerald-500":"bg-red-500"}`}/>{clientActivity(r)?"Activo":"Inactivo"}</span>:<span className={`seller-badge status-${r.status}`}>{STATUS[r.status] || r.status}</span>}
               </summary>
               <div className="seller-disclosure-body">
@@ -365,9 +361,7 @@ export function ResourcePanel({
               </div>
               </div>
             </details>
-          ))}
-        </div>
-      )}
+          )}));return renderRows?renderRows(cardRows,fresh):cardRows.length?<div className="seller-record-grid items-start">{cardRows.map(row=>row.content)}</div>:<EmptyState icon={def.icon} title={query?"Sin resultados":`Sin ${def.title.toLowerCase()} todavía`}/>;})()}
       <Dialog
         open={opened}
         onOpenChange={(v) => {

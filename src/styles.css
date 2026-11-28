@@ -313,6 +313,7 @@ body.seller-mode { --primary:oklch(.60 .105 216); --primary-foreground:oklch(1 0
 .seller-tabs { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; margin:10px 0; }
 .seller-tabs button { flex:1 1 104px; min-height:44px; padding:9px 8px; font-size:12px; font-weight:600; border:1px solid var(--border); border-radius:12px; cursor:pointer; color:var(--foreground); background:var(--card); box-shadow:0 1px 3px #12353d12; }
 .seller-tabs button.active { color:var(--primary-foreground); background:var(--primary); border-color:var(--primary); font-weight:700; }
+.ma2-order-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); width:100%; }
 .seller-search { display:flex; align-items:center; gap:8px; padding:0 14px; border:1px solid var(--border); border-radius:12px; background:var(--card); color:var(--muted-foreground); }
 .seller-search input { border:0; box-shadow:none; background:transparent; }
 .seller-field { display:grid; gap:7px; font-size:12px; }

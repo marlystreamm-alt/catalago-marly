@@ -13,6 +13,12 @@ test("the three order stages share navigation and hide the duplicate filters",as
  assert.doesNotMatch(workspace,/Origen del pedido|orderChannel/);
  assert.match(workspace,/renderRows=\{unifiedOrders\}/);
  assert.match(cyber,/visibleOrders.length\+visibleWebRows.length/);
+ assert.match(workspace,/className="ma2-order-tabs gap-1.5"/);
+ assert.doesNotMatch(workspace,/Solicitudes manuales pendientes/);
+ assert.match(workspace,/manualRows=\{manualRows\}/);
+ assert.match(cyber,/manualRows.filter\(r=>!linkedIds.has\(r.id\)\)/);
+ const css=await read("src/styles.css");
+ assert.match(css,/\.ma2-order-tabs \{ display:grid; grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
  assert.match(cyber,/Cuenta asignada · Entrega manual pendiente/);
  assert.match(cyber,/processing: \["in_process"\]/);
  assert.match(cyber,/closed: \["cancelled", "rejected"\]/);
