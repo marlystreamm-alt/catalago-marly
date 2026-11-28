@@ -712,14 +712,12 @@ export function StockManagerDialog({
 
             {busy ? <Loader2 className="mx-auto size-5 animate-spin" /> : null}
             <div className="overflow-hidden rounded-2xl border">
-              {groupPlatforms(tabItems,x=>x.platform).sort((a,b)=>a.name.localeCompare(b.name,"es")).map(group=><details key={group.name} className="seller-disclosure !rounded-none !border-x-0 !border-t-0" open={initialClient?true:undefined}>
-                <summary><StockPlatformMark name={group.name}/><span className="min-w-0 flex-1 font-semibold">{group.name}</span><span className="text-xs text-muted-foreground">{group.items.filter(x=>x.stockKind==="complete").length} completas · {group.items.filter(x=>x.stockKind==="profile").length} perfiles</span></summary>
-                <div className="seller-disclosure-body">{group.items.map((x) => {
+              {tabItems.map((x) => {
                 const d = daysUntil(x.expiresOn);
                 const statusText = isExpired(x) ? "Caducada" : isContainer(x) ? "Dividida en perfiles · vigente" : x.status==="available"&&admin&&!availableIds.has(x.id)?"Datos incompletos":x.status === "review" ? "Validar cuenta" : ["assigned", "expiring"].includes(x.status) && d !== null && d <= 7 && d >= 0 ? `Por vencer · ${d === 0 ? "hoy" : `${d}d`}` : STOCK_STATUS_LABELS[x.status];
                 const platform = <><StockPlatformMark name={stockPlatform(x.platform).label} /><span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold">{stockPlatform(x.platform).label}</span>
-                  {x.accountType && <span className="block truncate text-xs text-muted-foreground">{x.accountType}</span>}
+                  <span className="block text-xs font-medium text-muted-foreground">{x.stockKind === "profile" ? "Perfil" : "Completa"}</span>
                 </span></>;
                 const status = <span className="flex shrink-0 items-center gap-1.5 text-xs">
                   <span className={`size-2 shrink-0 rounded-full ${statusDot(x)}`} />{statusText}
@@ -748,8 +746,8 @@ export function StockManagerDialog({
                     </div>
                   </details>
                 );
-              })}</div></details>)}
-              {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay registros en esta subpestaña.</p> : null}
+              })}
+              {!tabItems.length ? <p className="p-6 text-center text-sm text-muted-foreground">No hay cuentas para esta búsqueda.</p> : null}
             </div>
           </div>
 
