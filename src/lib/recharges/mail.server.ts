@@ -121,7 +121,7 @@ export async function scanRechargeMail() {
             cursor = m.uid;
             continue;
           }
-          const extracted = parseBankNotice(parsed.text || "");
+          const extracted = parseBankNotice([parsed.subject, parsed.text].filter(Boolean).join("\n"));
           const verified = authenticatedBankHeader(
             mail.source.toString("utf8"),
             sender,
@@ -131,9 +131,17 @@ export async function scanRechargeMail() {
           const transfer = extracted.tracking
             ? await hashToken(`${row.settings.email.toLowerCase()}:${extracted.tracking}`)
             : null;
+          const financeDirection = verified
+            ? extracted.incoming ? "income" : extracted.outgoing ? "expense" : null
+            : null;
+          const financeKey = transfer || (extracted.operation
+            ? await hashToken(`${row.settings.email.toLowerCase()}:${sender}:folio:${extracted.operation}`)
+            : parsed.messageId ? await hashToken(`${row.settings.email.toLowerCase()}:${sender}:mail:${parsed.messageId}`) : key);
           const reason = !verified
             ? "No pasó la autenticación del remitente"
-            : !extracted.incoming
+            : extracted.outgoing
+              ? "Transferencia enviada · Finanzas"
+              : !extracted.incoming
               ? "El aviso no identifica una transferencia recibida"
               : extracted.referenceAmbiguous
                 ? "El aviso contiene referencias contradictorias"
@@ -141,7 +149,9 @@ export async function scanRechargeMail() {
                 ? "No se encontró un importe único"
                 : !extracted.tracking
                   ? "No se encontró una clave de rastreo"
-                  : "Pendiente de coincidencia";
+                  : !extracted.reference
+                    ? "Depósito sin referencia de recarga · Finanzas"
+                    : "Pendiente de coincidencia";
           const event = {
             source_key: key,
             config_signature: row.tested_signature,
@@ -150,6 +160,8 @@ export async function scanRechargeMail() {
             reference: extracted.reference,
             tracking: extracted.tracking,
             transfer_key: transfer,
+            finance_direction: financeDirection,
+            finance_key: financeDirection ? financeKey : null,
             verified: verified && extracted.incoming && !extracted.referenceAmbiguous,
             status: !extracted.incoming ? "ignored" : "review",
             reason,
@@ -160,7 +172,7 @@ export async function scanRechargeMail() {
             .select("id")
             .maybeSingle();
           if (inserted.error) throw new Error("No se pudo registrar un aviso");
-          if (inserted.data && event.verified && event.amount_cents && transfer) {
+          if (inserted.data && event.verified && event.reference && event.amount_cents && transfer) {
             const result = await opsDB().rpc("ma2_recharge_settle", { p_event: inserted.data.id });
             if (result.error)
               throw new Error("No se pudo acreditar un aviso. Quedó pendiente de revisión.");
@@ -189,6 +201,7 @@ export async function scanRechargeMail() {
       .select("id")
       .eq("status", "review")
       .eq("verified", true)
+      .eq("reason", "Pendiente de coincidencia")
       .gte("created_at", new Date(Date.now() - 86400000).toISOString())
       .order("created_at")
       .limit(20);

@@ -1,11 +1,12 @@
 export function parseBankNotice(text: string) {
   const body = text.normalize("NFKC").replace(/\u00a0/g, " ");
-  const incoming =
-    /recibiste\s+(?:una\s+)?transferencia|(?:has\s+)?recibido\s+(?:una\s+)?transferencia|dep[oó]sito\s+recibido|abono\s+recibido/i.test(
-      body,
-    ) && !/transferencia\s+(?:rechazada|cancelada)|enviaste\s+una\s+transferencia/i.test(body);
+  const received = /recibiste\s+(?:una\s+)?transferencia|(?:has\s+)?recibido\s+(?:una\s+)?transferencia|(?:dep[oó]sito|abono)\s+recibido|transferencia\s+recibida/i.test(body);
+  const sent = /(?:realizaste|enviaste|hiciste|has\s+(?:enviado|realizado))\s+(?:una\s+)?transferencia|transferencia\s+(?:enviada|realizada)|env[ií]o\s+de\s+transferencia/i.test(body);
+  const completed = !/transferencia\s+(?:rechazada|cancelada|pendiente|programada|fallida)|no\s+se\s+(?:pudo\s+)?(?:envi[oó]|enviar|realiz[oó]|realizar)/i.test(body);
+  const incoming = completed && received && !sent;
+  const outgoing = completed && sent && !received;
   const amounts = [
-    ...body.matchAll(/(?:monto|importe|cantidad)\s*:\s*\$?\s*([\d.,]+)(?:\s*(?:pesos|MXN))?/gi),
+    ...body.matchAll(/\b(?:monto|importe|cantidad)(?:\s+de\s+(?:la\s+)?transferencia)?\s*:\s*\$?\s*([\d.,]+)(?:\s*(?:pesos|MXN))?/gi),
   ].map((m) => {
     let n = m[1];
     if (n.includes(".") && n.includes(",")) n = n.replaceAll(",", "");
@@ -25,10 +26,14 @@ export function parseBankNotice(text: string) {
     t = unique(traces);
   return {
     incoming,
+    ...(outgoing ? { outgoing: true } : {}),
     amountCents: a.length === 1 && a[0] && a[0] > 0 && a[0] <= 100_000_000 ? a[0] : null,
     reference: r.length === 1 ? r[0] : null,
     ...(r.length > 1 ? { referenceAmbiguous: true } : {}),
     tracking: t.length === 1 ? t[0] : null,
+    ...(t.length === 0 && outgoing
+      ? { operation: body.match(/(?:folio|n[uú]mero)\s+de\s+(?:operaci[oó]n|transferencia)\s*:\s*([A-Z0-9-]{5,80})(?![\w-])/i)?.[1]?.toUpperCase() }
+      : {}),
   };
 }
 /** Trust only Gmail's first, server-added Authentication-Results field. */

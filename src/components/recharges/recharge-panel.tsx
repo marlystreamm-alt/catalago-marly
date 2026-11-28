@@ -37,15 +37,17 @@ const message = (e: unknown) =>
 export function RechargePanel({
   records,
   onChanged,
+  settingsOnly = false,
 }: {
   records: OpsRecord[];
   onChanged: () => Promise<void>;
+  settingsOnly?: boolean;
 }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof rechargeAdminLoad>> | null>(null);
   const [draft, setDraft] = useState<RechargeSettings>(blank);
   const [password, setPassword] = useState("");
   const [senders, setSenders] = useState("");
-  const [tab, setTab] = useState("requests");
+  const [tab, setTab] = useState(settingsOnly ? "settings" : "requests");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
@@ -122,7 +124,7 @@ export function RechargePanel({
         </Button>
         </div>
       </details>
-      <div className="seller-tabs">
+      {!settingsOnly && <div className="seller-tabs">
         {[
           ["requests", "Recargas"],
           ["events", "Avisos leídos"],
@@ -139,7 +141,7 @@ export function RechargePanel({
             {l}
           </button>
         ))}
-      </div>
+      </div>}
       {error ? (
         <div role="alert" className="seller-error">
           <p>{error}</p>
@@ -171,9 +173,9 @@ export function RechargePanel({
               });
             }}
           >
-            <h3 className="font-bold">Cómo te pagan</h3>
+            <h3 className="font-bold">{settingsOnly ? "Conexión compartida con Recargas automáticas" : "Cómo te pagan"}</h3>
             <label className="flex justify-between gap-3 text-sm">
-              <span>Activar recargas automáticas</span>
+              <span>Activar lectura de correo y recargas automáticas</span>
               <Switch
                 checked={draft.enabled}
                 disabled={!data?.tested && !draft.enabled}
@@ -184,6 +186,7 @@ export function RechargePanel({
               Guarda primero con las recargas apagadas, prueba Gmail y después activa. Cambiar
               correo, cuenta o remitentes cancela las referencias pendientes.
             </p>
+            {!settingsOnly && <>
             <div className="seller-form-grid">
               {(
                 [
@@ -237,17 +240,7 @@ export function RechargePanel({
                 </label>
               ))}
             </div>
-            <label className="flex justify-between gap-3 text-sm">
-              <span>Centavos únicos para identificar pagos sin referencia</span>
-              <Switch
-                checked={draft.uniqueCents}
-                onCheckedChange={(v) => setDraft((d) => ({ ...d, uniqueCents: v }))}
-              />
-            </label>
-            <p className="text-xs text-muted-foreground">
-              Si los activas, el cliente deberá transferir el importe exacto con centavos. Si el
-              aviso trae una referencia válida, se comprueban referencia e importe juntos.
-            </p>
+            </>}
             <h3 className="font-bold">Correo que recibe los avisos</h3>
             <p className="text-xs text-muted-foreground">
               Usa un correo dedicado a los avisos de esta cuenta receptora. Se lee Gmail sin enviar
@@ -288,7 +281,7 @@ export function RechargePanel({
             </label>
             <p className="text-xs text-muted-foreground">
               Los abonos exigen autenticación del remitente en Gmail, aviso de dinero recibido,
-              clave de rastreo y coincidencia de importe y referencia o centavos únicos.
+              clave de rastreo y coincidencia de referencia e importe exacto de una solicitud vigente.
             </p>
             <div className="seller-actions">
               <Button disabled={busy} type="submit">
@@ -341,7 +334,7 @@ export function RechargePanel({
             </Button>
             {result ? (
               <dl className="rounded-xl bg-muted/40 p-3 text-sm space-y-1">
-                <div>Transferencia recibida: {result.incoming ? "Sí" : "No identificada"}</div>
+                <div>{result.incoming ? "Entrada" : result.outgoing ? "Salida" : "Tipo de movimiento sin identificar"}</div>
                 <div>
                   Importe:{" "}
                   {result.amountCents ? money(result.amountCents / 100) : "No encontrado o ambiguo"}

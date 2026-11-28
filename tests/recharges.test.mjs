@@ -28,6 +28,19 @@ test("receipt parser rejects ambiguous, missing, negative and outgoing amounts",
   assert.equal(parseBankNotice(notice.replace("15.00", "15,50")).amountCents, 1550);
   assert.equal(parseBankNotice(notice + "\nReferencia: 9999999").reference, null);
 });
+test("sent transfers are identified separately from incoming deposits", () => {
+  const sent = "Realizaste una transferencia\nMonto: $150.25\nFolio de operación: ABC123456";
+  const parsed = parseBankNotice(sent);
+  assert.equal(parsed.incoming, false);
+  assert.equal(parsed.outgoing, true);
+  assert.equal(parsed.amountCents, 15025);
+  assert.equal(parsed.operation, "ABC123456");
+  assert.equal(parseBankNotice(sent + "\nTransferencia pendiente").outgoing, undefined);
+  const deposit = parseBankNotice("Depósito recibido\nImporte: $250.00");
+  assert.equal(deposit.incoming, true);
+  assert.equal(deposit.reference, null);
+  assert.equal(deposit.amountCents, 25000);
+});
 test("permanent customer references are parsed exactly and normalized", () => {
   assert.equal(parseBankNotice(notice.replace("2310260", "ma-000123")).reference, "MA-000123");
   assert.equal(parseBankNotice(notice.replace("2310260", "MA-0001234")).reference, null);

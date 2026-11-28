@@ -26,9 +26,13 @@ begin
  insert into public.ma2_recharge_events(source_key,received_at,amount_cents,reference,transfer_key,verified,config_signature) values(gen_random_uuid()::text,now(),req.payable_cents,other.reference,gen_random_uuid()::text,true,'fixture') returning id into eid;
  if public.ma2_recharge_settle(eid)<>'review' then raise exception 'valid but mismatched reference fell through';end if;
  update public.ma2_recharge_events set reference=null where id=eid;
+ if public.ma2_recharge_settle(eid)<>'review' then raise exception 'amount without reference credited';end if;
+ update public.ma2_recharge_events set reference=req.reference, finance_direction='expense' where id=eid;
+ if public.ma2_recharge_settle(eid)<>'review' then raise exception 'outgoing notice credited';end if;
+ update public.ma2_recharge_events set finance_direction='income' where id=eid;
  -- Processing after a request was marked expired still accepts a receipt that arrived during its window.
  update public.ma2_recharge_requests set status='expired' where id=req.id;
- if public.ma2_recharge_settle(eid)<>'credited' then raise exception 'unique cents fallback failed';end if;
+ if public.ma2_recharge_settle(eid)<>'credited' then raise exception 'exact reference and cents did not credit';end if;
  insert into public.ma2_recharge_events(source_key,received_at,amount_cents,reference,transfer_key,verified,config_signature) values(gen_random_uuid()::text,other.expires_at+interval '1 second',other.payable_cents,other.reference,gen_random_uuid()::text,true,'fixture') returning id into eid;
  if public.ma2_recharge_settle(eid)<>'review' then raise exception 'late receipt credited';end if;
  update public.ma2_recharge_config set started_at=now()+interval '1 second' where id=1;
